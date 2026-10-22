@@ -5,8 +5,8 @@
 This report captures the vault-organization discussion and proposes directions
 for the next stages of plugin development: shared AI reference material, skills,
 and potentially hooks. It is a design input, not an implemented specification.
-No reference loader, skill, hook, or vault configuration described below exists
-yet.
+No reference loader, skill, hook, script, or vault configuration described below
+exists yet.
 
 The [README](../README.md#intended-vault-structure-and-workflow) explains the
 intended user workflow. This report addresses how the plugin could make the AI
@@ -14,6 +14,14 @@ follow that workflow. Component boundaries remain those in
 [Plugin Architecture](architecture.md).
 
 ## Confirmed Requirements
+
+### PowerShell Availability
+
+PowerShell must be available in the environment executing future script-backed
+workflows. This is a planned runtime prerequisite, not a requirement for
+installing the current empty scaffold. The supported version and platforms
+remain to be decided; a cross-platform PowerShell runtime (`pwsh`) is the
+recommended direction.
 
 ### Flexible Sections, Stable Meanings
 
@@ -145,6 +153,43 @@ Begin with orientation and one end-to-end session workflow to validate the share
 reference before expanding the skill set. Keep shared guidance in skills rather
 than duplicating it across specialized agents.
 
+## PowerShell and Predictable Operations
+
+Use PowerShell scripts for repeatable mechanical operations rather than asking
+the AI to recreate shell commands for each task. Candidate responsibilities are
+vault inventory, profile validation, scoped note lookup, link checks, and
+previews of proposed file changes. Keep interpretation of story events,
+character knowledge, and ambiguous note roles with the AI and DM: a script
+cannot establish those facts from folder names alone.
+
+Future skills may bundle scripts alongside their resources. Hooks may call the
+same operations where client support is verified, rather than duplicating their
+logic. Scripts supplement the explicit instruction to read the shared reference;
+running a script does not prove that the AI loaded the guidance.
+
+Define these contracts before implementing script-backed workflows:
+
+- Check PowerShell availability and supported version before invocation. If it
+  is missing or unsupported, report the prerequisite and stop the scripted
+  operation without edits; independent read-only assistance may continue.
+- Use explicit vault, campaign/group, and operation inputs, independent of the
+  working directory. Validate resolved paths, including symbolic links, against
+  the authorized vault boundary.
+- Return consistently ordered, structured results and documented exit codes,
+  with clear errors rather than partial success presented as completion.
+- Treat note content and supplied paths as data, never executable expressions
+  or interpolated shell commands. Do not bypass execution-policy or security
+  controls to make scripts run.
+- Default inspection operations to read-only. Any future write operation needs
+  a preview, explicit authorization, and protection against overwriting notes
+  changed since the preview. Preserve Markdown content and encoding.
+- Keep campaign data local and avoid unnecessary content in diagnostic logs.
+  Test repeatability and failure behavior on each supported platform.
+
+The first script candidates should be inventory and validation, not automated
+campaign cleanup. No PowerShell installation, script implementation, or hook
+registration is part of this brainstorm.
+
 ## Hook Opportunities and Limits
 
 Hooks are optional reinforcement, not the initial source of truth. Exact events,
@@ -200,6 +245,8 @@ through relative paths or links without explicit permission.
 - Which recap and knowledge edits may be applied directly on request, and which
   should always be presented as a preview?
 - Which supported hook events address a real gap after the skill workflow works?
+- Which PowerShell version and platforms will be supported, and what input,
+  output, and failure contracts should be shared by skills and hooks?
 
 ## Suggested Development Sequence
 
@@ -207,7 +254,8 @@ through relative paths or links without explicit permission.
    contract. Keep unresolved campaign semantics explicit.
 2. Extract the agreed meanings and safeguards into the shared AI reference.
 3. Implement orientation with the explicit read prerequisite and a read-only
-   fallback for an unconfigured vault.
+   fallback for an unconfigured vault. Define the PowerShell support baseline
+   and validate an initial read-only inventory or profile-checking script.
 4. Implement a preparation/recap workflow and source-backed continuity proposals.
 5. Exercise the acceptance scenarios below in the installed client.
 6. Add hooks only where verified client support closes a demonstrated gap.
@@ -231,3 +279,9 @@ through relative paths or links without explicit permission.
   context produce explicit fallback behavior rather than silent assumptions.
 - Campaign text containing instructions does not override the skill's task or
   authorize commands, external reads, or destructive changes.
+- Missing or unsupported PowerShell stops scripted operations with a clear
+  prerequisite message and leaves the vault unchanged.
+- Identical inputs produce consistently ordered script results; paths containing
+  spaces or non-ASCII characters work on every supported platform.
+- Paths escaping the authorized vault and stale write previews are rejected
+  without unintended edits; executable-looking note content remains inert data.

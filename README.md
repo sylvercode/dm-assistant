@@ -82,6 +82,12 @@ See the [Vault Guidance Brainstorm](docs/vault-guidance-brainstorm.md) for propo
 
 ## Local Installation
 
+PowerShell is a planned prerequisite for future script-backed skills and hooks,
+to make mechanical vault operations more predictable. The current scaffold has
+no scripts and does not require PowerShell to install. The supported version and
+platforms will be specified before those workflows ship; see the
+[scripting proposal](docs/vault-guidance-brainstorm.md#powershell-and-predictable-operations).
+
 With GitHub Copilot CLI installed, run these commands from the repository root:
 
 ```shell
