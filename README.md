@@ -1,6 +1,6 @@
 # DM Assistant
 
-A Copilot plugin concept for helping Dungeon Masters organize and run tabletop RPG campaigns stored in an Obsidian vault.
+A GitHub Copilot plugin scaffold for helping Dungeon Masters organize and run tabletop RPG campaigns stored in an Obsidian vault.
 
 ## Overview
 
@@ -23,4 +23,25 @@ The plugin will give an AI assistant a focused set of tools and guidance for wor
 
 ## Project Status
 
-This repository is at the project-brief stage. The capabilities above describe the intended direction; implementation details, vault conventions, and available tools will be documented as they are established.
+This repository contains an Agent Plugins 1.0 scaffold: a plugin manifest and reserved directories for portable skills and Copilot-specific agents. No skills, agents, hooks, or MCP servers are implemented yet. The planned capabilities above are not currently available.
+
+See [Plugin Architecture](docs/architecture.md) for component locations, extension boundaries, and the separation between the plugin and campaign vaults.
+
+## Local Installation
+
+With GitHub Copilot CLI installed, run these commands from the repository root:
+
+```shell
+copilot plugin install .
+copilot plugin list
+```
+
+The plugin should appear as `dm-assistant`. The empty scaffold does not add any agents or skills. Once components exist, check their discovery in a new interactive session with `/agent` and `/skills list`.
+
+Copilot caches installed plugins. Re-run `copilot plugin install .` after changing the local plugin, then start a new session to test it.
+
+To remove the local installation:
+
+```shell
+copilot plugin uninstall dm-assistant
+```

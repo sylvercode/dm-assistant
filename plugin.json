@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "dm-assistant",
+  "version": "0.1.0",
+  "description": "Dungeon Master assistance for tabletop RPG campaigns stored in an Obsidian vault.",
+  "author": {
+    "name": "Sylvercode"
+  },
+  "repository": "https://github.com/sylvercode/dm-assistant",
+  "license": "MIT",
+  "keywords": ["dungeon-master", "tabletop-rpg", "obsidian", "markdown"]
+}
