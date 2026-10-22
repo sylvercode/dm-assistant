@@ -27,6 +27,57 @@ This repository contains an Agent Plugins 1.0 scaffold: a plugin manifest and re
 
 See [Plugin Architecture](docs/architecture.md) for component locations, extension boundaries, and the separation between the plugin and campaign vaults.
 
+## Intended Vault Structure and Workflow
+
+The following conventions describe the intended workflow for users and future AI guidance; the scaffold does not yet load or enforce them. Campaign notes belong in your Obsidian vault, not in the plugin installation.
+
+### Vault Sections
+
+These are suggested folder names, not a mandatory tree. Keep an existing vault's organization, explain any different locations to the assistant, and do not assume a missing folder needs to be created.
+
+| Section | Contents |
+| --- | --- |
+| **Adventures** | Playable story arcs, events, encounters, and instructions for the DM when running them. An adventure may be a single Markdown file or a folder containing an arc's notes. Adventure files may also live at the vault root without an Adventures folder. |
+| **Lore** | Shared world knowledge referenced by adventures and other notes to keep storytelling consistent. Historical events belong here when they provide background rather than events the players will run. |
+| **Monsters Stats** | Reusable monster stat blocks, referenced by personas, adventures, lore, or other notes. |
+| **Rules** | Important recurring rules, reminders, and DM-approved house rules. Distinguish official rules from custom rulings. |
+| **Sessions** | Primarily recaps and logs of what actually happened during play, used as references for later sessions. Clearly separate any preparation from recorded outcomes. |
+
+Lore may include the following subsections, along with any others a campaign needs:
+
+- **Player:** One article per player character, plus an article for each adventuring group.
+- **Locations:** Towns and cities, regions, landmarks, and planes.
+- **Cosmology:** The world's cosmic structure and related background.
+- **Persona:** People of interest in adventures. Reference a monster stat block separately when relevant.
+
+Link shared information instead of duplicating it across notes. Keep playable adventure instructions distinct from general lore, and keep planned events distinct from events confirmed during play.
+
+### Players, Characters, and Knowledge
+
+The **Player** section describes player characters, not the real people playing them. A person may play multiple characters, and multiple people may share a character; there is no required one-to-one relationship.
+
+Record each character's knowledge in their article and shared group knowledge in the group article, with clear links between the group and its characters. Distinguish what a character currently knows from what they might discover and from DM-only world information. Players should roleplay based on their character's knowledge, not everything the player or DM knows.
+
+### Preparing and Recording Sessions
+
+1. Prepare from the relevant adventure, lore, rules, and the group's current knowledge.
+2. Put preparation likely to be used in the session note under a clearly labeled preparation section. Alternatively, keep it in a `Preparations` subfolder within Sessions, especially when its use is uncertain.
+3. After play, record what actually happened in the session recap or log. Prepared content may remain unused because of player choices; do not treat it as an outcome merely because it was prepared.
+4. Use the session record as a reference for subsequent play, updating relevant character and group knowledge and established world facts only when supported by actual events.
+
+### Multiple Campaigns and Reusing Adventures
+
+A vault may optionally contain more than one campaign. Clearly identify each group's campaign in the Player section and associate session records and campaign-specific outcomes with the appropriate group or campaign. One group's discoveries and outcomes must not automatically become another group's knowledge or history.
+
+To rerun an adventure as a fresh campaign:
+
+1. Copy the vault, keeping the original campaign intact.
+2. In the copy, remove the previous campaign's session logs, player-character and group articles, and their accumulated knowledge, including references elsewhere in the vault.
+3. Review retained adventure and lore notes for previous campaign outcomes or revealed secrets recorded as character knowledge, and reset those to the intended starting state. Keep reusable world lore, adventure material, monster statistics, and applicable rules.
+4. Add the new campaign's characters and group, establish their starting knowledge, and begin fresh session records.
+
+This is an intended manual workflow, not an automated vault-copying or cleanup feature.
+
 ## Local Installation
 
 With GitHub Copilot CLI installed, run these commands from the repository root:
