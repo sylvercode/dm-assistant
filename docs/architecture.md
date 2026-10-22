@@ -45,9 +45,12 @@ files remain in the user's Obsidian vault, outside the plugin installation.
 Future workflows must obtain the target vault from the user's workspace or
 explicit input, rather than assuming the plugin directory is the vault.
 
-Vault conventions, note templates, link-resolution behavior, and permissions
-for modifying campaign content are not defined by this scaffold. Define those
-contracts alongside the workflows and tools that implement them.
+The README describes intended vault conventions. The
+[Vault Guidance Brainstorm](vault-guidance-brainstorm.md) explores how future
+skills could load a shared AI reference and vault-local guidance, with optional
+hooks. These are design inputs, not implemented runtime contracts. Define note
+templates, link-resolution behavior, and permissions for modifying campaign
+content alongside the workflows and tools that implement them.
 
 ## Extension Rules
 

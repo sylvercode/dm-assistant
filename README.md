@@ -78,6 +78,8 @@ To rerun an adventure as a fresh campaign:
 
 This is an intended manual workflow, not an automated vault-copying or cleanup feature.
 
+See the [Vault Guidance Brainstorm](docs/vault-guidance-brainstorm.md) for proposed AI reference loading, skills, hook opportunities, and open development decisions.
+
 ## Local Installation
 
 With GitHub Copilot CLI installed, run these commands from the repository root:
