@@ -36,6 +36,9 @@ and defaults are deferred. Plugin-added support files use dot-prefixed names to
 stay hidden from Obsidian's normal note view. Campaign articles remain ordinary,
 visible Markdown notes.
 
+The vault is for the DM's eyes only. Documents meant to be shown to players are
+**handouts**, kept separate from DM commentary and hidden facts.
+
 ### Vault Sections
 
 These are suggested folder names, not a mandatory tree. Keep an existing vault's organization, explain any different locations to the assistant, and do not assume a missing folder needs to be created.
@@ -47,6 +50,7 @@ These are suggested folder names, not a mandatory tree. Keep an existing vault's
 | **Monsters Stats** | Reusable monster stat blocks, referenced by personas, adventures, lore, or other notes. |
 | **Rules** | Important recurring rules, reminders, and DM-approved house rules. Distinguish official rules from custom rulings. |
 | **Sessions** | Primarily recaps and logs of what actually happened during play, used as references for later sessions. Clearly separate any preparation from recorded outcomes. |
+| **Handouts** | Documents intended for players, such as letters, maps, and player-safe summaries. Do not include DM-only facts or revealing links. |
 
 Lore may include the following subsections, along with any others a campaign needs:
 
@@ -69,6 +73,17 @@ sharing or DM confirmation. Label rumors and mistaken beliefs and reference the
 real facts in DM-facing notes, without exposing those facts to characters who do
 not know them. If the truth is unknown, record that uncertainty rather than
 inventing a correction.
+
+Use Obsidian tags to classify knowledge exceptions, rumors, and mistaken beliefs,
+with prose for details and links to supporting facts. The exact tag vocabulary
+remains to be defined.
+
+### Editing and Recovery
+
+The vault is expected to be in a Git repository. Small, requested page-local
+edits need no separate approval; major changes, including bulk edits,
+restructuring, deletion, and broad continuity changes, require a preview and DM
+approval. Git history does not replace approval or justify overwriting user edits.
 
 ### Preparing and Recording Sessions
 

@@ -47,6 +47,13 @@ understand a note's role without requiring users to reorganize their vault.
 | Monsters Stats | Reusable monster statistics referenced from personas, adventures, lore, or other notes. A persona's identity and history are distinct from its combat statistics. |
 | Rules | Recurring rules, reminders, and DM-approved custom rulings. Official rules and house rules should be distinguishable. |
 | Sessions | Primarily recaps and logs of actual play, used as references for subsequent sessions. Preparation must remain distinguishable from confirmed outcomes. |
+| Handouts | Documents explicitly intended to be shown to players, such as letters, maps, or player-safe summaries. Keep DM commentary and revealing source links out of them. |
+
+The vault as a whole is for the DM's eyes only. Ordinary notes can contain both
+world truth and character beliefs; they need not be sanitized as if players
+could browse the vault. Any document intended for players is a handout, with
+Handouts as an additional suggested section. Creating a handout does not
+authorize publishing or sharing the vault.
 
 Suggested Lore subsections are Player, Locations, Cosmology, and Persona.
 Locations may include Town-Cities, Regions, Landmarks, and Planes. These are
@@ -69,7 +76,8 @@ examples, not an exhaustive taxonomy.
   the underlying DM-facing record. If the real facts are not established, mark
   them as unknown and ask the DM rather than inventing a correction. These
   references do not grant characters access to the truth; character-facing
-  output must not reveal DM-only facts or links that disclose them.
+  output, including handouts, must not reveal DM-only facts or links that
+  disclose them. This does not prevent DM-facing notes from explaining both.
 
 ### Preparation and Actual Play
 
@@ -92,6 +100,21 @@ examples, not an exhaustive taxonomy.
   the copy. Preserve the original.
 - Review retained notes for campaign-specific changes and references before
   establishing the new campaign's starting state.
+
+### Editing Approval and Git History
+
+Expect the vault to be maintained in a Git repository for review and recovery,
+but verify that assumption before relying on history. Do not initialize Git,
+commit, push, or discard user changes without authorization.
+
+Small, clearly requested edits local to a page may be applied without a separate
+approval or mandatory preview. Major changes require a scoped preview and DM
+approval: for example, bulk edits, restructuring, deletion, campaign resets, or
+changes with broad continuity consequences. Impact matters more than file count;
+a one-page rewrite that changes established history can still be major.
+
+Keep changes within the request and protect concurrent or uncommitted user
+edits. Git is a recovery aid, not permission to make destructive changes.
 
 ## Recommended Guidance Model
 
@@ -204,9 +227,10 @@ Define these contracts before implementing script-backed workflows:
 - Treat note content and supplied paths as data, never executable expressions
   or interpolated shell commands. Do not bypass execution-policy or security
   controls to make scripts run.
-- Default inspection operations to read-only. Any future write operation needs
-  a preview, explicit authorization, and protection against overwriting notes
-  changed since the preview. Preserve Markdown content and encoding.
+- Default inspection operations to read-only. Follow the editing policy above:
+  requested local edits need no separate approval, while major changes need a
+  preview and approval. Detect intervening changes before writes, including
+  changes since any preview. Preserve Markdown content and encoding.
 - Keep campaign data local and avoid unnecessary content in diagnostic logs.
   Test repeatability and failure behavior on each supported platform.
 
@@ -274,12 +298,19 @@ duplicate keys and custom tags, define unknown-field handling, and report invali
 configuration rather than silently falling back to guessed settings. Configuration
 must not execute commands, override safety rules, or grant permission for
 destructive actions. Preview preferences may strengthen safeguards, not remove
-the write-preview and authorization requirements.
+the preview and approval requirement for major changes.
 
-Start with existing headings, links, and prose. Consider optional metadata for
-note role, campaign/group scope, preparation versus actual-play status, or
-knowledge audience only if those cannot be determined reliably. Metadata must
-not force a migration of existing notes.
+Use native [Obsidian tags](https://obsidian.md/help/tags) to represent knowledge
+and belief categories, rather than introducing a custom metadata system for
+them. Nested tags can distinguish categories; the exact vocabulary remains to be
+chosen. Keep tags consistent with existing vault conventions and do not force a
+migration of existing notes.
+
+Tags classify information; prose identifies who knows it, character exceptions,
+and the claim being classified, while links reference the real facts and source
+notes. In mixed-content notes, keep a tag beside the relevant passage or heading
+so a rumor label is not mistaken for the status of the entire article. Tags do
+not establish truth, grant access, or replace those explanations.
 
 Keep campaign-specific profiles and content in the user's vault, outside the
 distributed plugin. A profile must not authorize reading outside that vault
@@ -341,12 +372,12 @@ be expanded when concrete workflows need them.
   and recorded, and which YAML features will the shared loader accept?
 - How should party membership changes and later information sharing update
   character exceptions in party lore?
-- What headings or metadata should express party knowledge exceptions, labeled
-  rumors, mistaken beliefs, and their DM-only fact references?
+- Which Obsidian tag vocabulary and placement conventions should express party
+  knowledge exceptions, rumors, and mistaken beliefs alongside prose and links?
 - How should uncertain memories and retcons be represented?
 - What is the minimum source reference needed to support a continuity update?
-- Which recap and knowledge edits may be applied directly on request, and which
-  should always be presented as a preview?
+- What additional examples should clarify the boundary between local edits and
+  major changes requiring preview and approval?
 - Which supported hook events address a real gap after the skill workflow works?
 - Which platforms will be supported, and what input,
   output, and failure contracts should be shared by skills and hooks?
@@ -409,6 +440,13 @@ initial single-campaign workflows.
   multiline content remains inside the intended callout.
 - Player-facing exports contain no DM-only callouts, secret links, or embeds,
   even if the source note uses collapsed callouts.
+- Handouts are the player-facing document type; DM notes retain truth references
+  without those references leaking into handouts.
+- Obsidian tags classify the intended passage without implying that every claim
+  in a mixed-content note has the same status.
+- A requested local edit proceeds without redundant approval; major changes wait
+  for approval, regardless of how many pages they touch. Existing user changes
+  are preserved, and Git availability is checked before relying on recovery.
 - `.dmassist.yaml` is discovered at the vault root, even when ordinary note
   listings omit hidden files. Plugin support artifacts use dot-prefixed names,
   while campaign articles remain visible in Obsidian.
