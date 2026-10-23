@@ -19,9 +19,21 @@ follow that workflow. Component boundaries remain those in
 
 PowerShell must be available in the environment executing future script-backed
 workflows. This is a planned runtime prerequisite, not a requirement for
-installing the current empty scaffold. The supported version and platforms
-remain to be decided; a cross-platform PowerShell runtime (`pwsh`) is the
-recommended direction.
+installing the current empty scaffold. Use the current latest stable PowerShell
+runtime (`pwsh`) and latest stable required modules, including powershell-yaml.
+Resolve and record the exact versions when implementing and validating workflows;
+this policy does not authorize automatic installation or upgrades during a task.
+The supported platform matrix and provisioning method remain to be decided.
+
+### Obsidian Compatibility and Configuration Location
+
+Use `.dmassist.yaml` at the vault root for configuration. Plugin-added support
+files, such as configuration, auxiliary AI guidance, or generated indexes, must
+have dot-prefixed names so they remain hidden from Obsidian's normal note view.
+This applies to plugin support artifacts, not campaign Markdown articles intended
+to be read in Obsidian. Do not rename existing user files or modify Obsidian's
+own configuration to enforce this convention. Hidden files are not an access
+control mechanism.
 
 ### Flexible Sections, Stable Meanings
 
@@ -49,6 +61,15 @@ examples, not an exhaustive taxonomy.
   information that might be discovered later.
 - Players roleplay from their character's knowledge, not all information
   available to the DM or the people playing.
+- Record lore shared by the party in the party/group article, with explicit
+  per-character exceptions for absent or otherwise uninformed characters.
+  Absence alone must not imply later knowledge; remove an exception only when
+  supported by an actual information-sharing event or DM confirmation.
+- Explicitly label rumors and mistaken beliefs and reference the real facts in
+  the underlying DM-facing record. If the real facts are not established, mark
+  them as unknown and ask the DM rather than inventing a correction. These
+  references do not grant characters access to the truth; character-facing
+  output must not reveal DM-only facts or links that disclose them.
 
 ### Preparation and Actual Play
 
@@ -60,7 +81,9 @@ examples, not an exhaustive taxonomy.
 
 ### Campaigns and Reuse
 
-- A vault may contain multiple campaigns, with clearly identified groups in the
+- Initial workflows target one campaign per vault. Multiple campaigns sharing a
+  vault or world state are a future evolution, not an initial implementation
+  requirement. Such vaults would need clearly identified campaign groups in the
   Player section.
 - Knowledge and actual outcomes must remain scoped to the relevant campaign and
   group, rather than leaking between campaigns.
@@ -119,7 +142,8 @@ to “follow the vault conventions” is insufficient.
 
 1. Obtain the vault location from the workspace or explicit user input. Never
    treat the installed plugin as the campaign vault.
-2. Read the plugin reference and the designated vault profile, if present.
+2. Read the plugin reference and discover `.dmassist.yaml` at the vault root,
+   if present, including any designated vault-local guidance.
 3. Resolve the requested campaign, group, and output audience: DM or characters.
 4. Inspect only relevant directories and representative notes to verify mappings.
 5. If no profile exists, infer a provisional mapping from the existing layout,
@@ -226,19 +250,22 @@ A minimal configuration could include:
 
 - A configuration schema version.
 - Section paths and root-level adventure exceptions.
-- Campaign/group identifiers and references to their notes.
+- The campaign/group context and references to its notes; shared-campaign
+  configuration is deferred.
 - Preparation locations, note-naming options, and preview preferences.
 - Paths to additional vault-specific Markdown guidance the AI must read.
 
 Do not duplicate lore, session history, or character knowledge in configuration.
-The filename, exact schema, defaults, and discovery mechanism remain open.
-Prefer one clearly named file at the vault root, with optional fields and a
-read-only discovery fallback for unconfigured vaults.
+The filename and location are `.dmassist.yaml` at the vault root. Schema and
+defaults will be decided later. Retain optional fields and a read-only discovery
+fallback for unconfigured vaults. Any additional plugin support files must follow
+the dot-prefix convention above.
 
 The shared PowerShell loader should parse and validate configuration before
 skills or hooks consume it. Parsing YAML does not validate field types, supported
-schema versions, or path boundaries. Before implementation, select and review a
-module version and its dependencies, decide how it is provisioned, and verify
+schema versions, or path boundaries. Before implementation, resolve and review
+the latest stable module version and its dependencies, record the versions used,
+decide how it is provisioned, and verify
 its behavior for duplicate keys, custom tags, aliases, and implicit scalar
 conversions. These behaviors are not assumed to be enforced by the parser.
 
@@ -260,33 +287,36 @@ through relative paths or links without explicit permission.
 
 ## Open Questions
 
-- What configuration filename, schema, defaults, and discovery rules should be
-  used, including behavior for missing, invalid, or newer schema versions?
+- What schema and defaults should `.dmassist.yaml` use, including behavior for
+  missing, invalid, or newer schema versions? These decisions are deferred.
 - How will skills reliably locate the installed shared reference and additional
   vault-local Markdown guidance?
-- Which powershell-yaml version and dependencies should be approved, how will
-  they be provisioned, and which YAML features will the shared loader accept?
-- How should one vault represent divergent world facts across campaigns sharing
-  the same lore without overwriting each other's history?
-- How should group membership changes affect shared knowledge, especially for
-  characters absent from a session?
-- How should uncertain memories, rumors, mistaken beliefs, and retcons be
-  represented without confusing them with established world facts?
+- How will latest stable PowerShell and required modules be provisioned, checked,
+  and recorded, and which YAML features will the shared loader accept?
+- How should party membership changes and later information sharing update
+  character exceptions in party lore?
+- What headings or metadata should express party knowledge exceptions, labeled
+  rumors, mistaken beliefs, and their DM-only fact references?
+- How should uncertain memories and retcons be represented?
 - What is the minimum source reference needed to support a continuity update?
 - Which recap and knowledge edits may be applied directly on request, and which
   should always be presented as a preview?
 - Which supported hook events address a real gap after the skill workflow works?
-- Which PowerShell version and platforms will be supported, and what input,
+- Which platforms will be supported, and what input,
   output, and failure contracts should be shared by skills and hooks?
+
+Deferred evolution: representing divergent world facts across campaigns sharing
+a vault, without overwriting each other's history. This is not a blocker for the
+initial single-campaign workflows.
 
 ## Suggested Development Sequence
 
-1. Review this report and settle the reference location and profile-discovery
-   contract, YAML schema, and parser provisioning. Keep unresolved campaign
-   semantics explicit.
+1. Review this report and settle the shared reference location and parser
+   provisioning. Use root-level `.dmassist.yaml`; design its schema and defaults
+   in a subsequent implementation step. Keep shared campaigns out of initial scope.
 2. Extract the agreed meanings and safeguards into the shared AI reference.
 3. Implement orientation with the explicit read prerequisite and a read-only
-   fallback for an unconfigured vault. Define the PowerShell support baseline
+   fallback for an unconfigured vault. Resolve the latest stable runtime/modules
    and validate an initial read-only inventory or profile-checking script.
 4. Implement a preparation/recap workflow and source-backed continuity proposals.
 5. Exercise the acceptance scenarios below in the installed client.
@@ -300,11 +330,16 @@ through relative paths or links without explicit permission.
 - Renamed folders follow the confirmed profile; extra Lore sections are retained.
 - Multiple people sharing a character, or one person playing several characters,
   does not merge distinct characters' knowledge.
+- Party lore records shared information with exceptions for absent or uninformed
+  characters; later sharing updates only supported exceptions.
+- Rumors and mistaken beliefs are labeled and linked to real facts in DM-facing
+  records without leaking those facts in character-facing output.
 - Mixed preparation and recap notes never turn an unused encounter into history.
 - Character-facing output excludes DM-only facts, and unknown knowledge is not
   guessed from what the assistant can read.
-- Selecting another group does not carry over the previous group's discoveries
-  or campaign-specific outcomes.
+- Initial workflows do not silently combine multiple campaigns. In a future
+  shared-campaign implementation, selecting another group must not carry over
+  the previous group's discoveries or campaign-specific outcomes.
 - A fresh-campaign review targets only the copy and identifies residual knowledge
   and outcome references without deleting reusable lore or the original vault.
 - Missing references, ambiguous mappings, unavailable hooks, and changed vault
@@ -322,3 +357,6 @@ through relative paths or links without explicit permission.
   tags, and out-of-vault paths produce clear errors before edits.
 - A missing YAML module reports the required dependency without silently
   installing it or attempting an ad hoc parser.
+- `.dmassist.yaml` is discovered at the vault root, even when ordinary note
+  listings omit hidden files. Plugin support artifacts use dot-prefixed names,
+  while campaign articles remain visible in Obsidian.

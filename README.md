@@ -31,6 +31,11 @@ See [Plugin Architecture](docs/architecture.md) for component locations, extensi
 
 The following conventions describe the intended workflow for users and future AI guidance; the scaffold does not yet load or enforce them. Campaign notes belong in your Obsidian vault, not in the plugin installation.
 
+The planned vault configuration is `.dmassist.yaml` at the vault root; its schema
+and defaults are deferred. Plugin-added support files use dot-prefixed names to
+stay hidden from Obsidian's normal note view. Campaign articles remain ordinary,
+visible Markdown notes.
+
 ### Vault Sections
 
 These are suggested folder names, not a mandatory tree. Keep an existing vault's organization, explain any different locations to the assistant, and do not assume a missing folder needs to be created.
@@ -58,6 +63,13 @@ The **Player** section describes player characters, not the real people playing 
 
 Record each character's knowledge in their article and shared group knowledge in the group article, with clear links between the group and its characters. Distinguish what a character currently knows from what they might discover and from DM-only world information. Players should roleplay based on their character's knowledge, not everything the player or DM knows.
 
+Party lore can hold shared knowledge with explicit exceptions for absent or
+uninformed characters. Update those exceptions only after supported information
+sharing or DM confirmation. Label rumors and mistaken beliefs and reference the
+real facts in DM-facing notes, without exposing those facts to characters who do
+not know them. If the truth is unknown, record that uncertainty rather than
+inventing a correction.
+
 ### Preparing and Recording Sessions
 
 1. Prepare from the relevant adventure, lore, rules, and the group's current knowledge.
@@ -67,7 +79,9 @@ Record each character's knowledge in their article and shared group knowledge in
 
 ### Multiple Campaigns and Reusing Adventures
 
-A vault may optionally contain more than one campaign. Clearly identify each group's campaign in the Player section and associate session records and campaign-specific outcomes with the appropriate group or campaign. One group's discoveries and outcomes must not automatically become another group's knowledge or history.
+Initial workflows target one campaign per vault. Supporting multiple campaigns
+sharing a vault is a future evolution, which will require clearly identifying
+each group's campaign and keeping their knowledge and outcomes separate.
 
 To rerun an adventure as a fresh campaign:
 
@@ -84,8 +98,10 @@ See the [Vault Guidance Brainstorm](docs/vault-guidance-brainstorm.md) for propo
 
 PowerShell is a planned prerequisite for future script-backed skills and hooks,
 to make mechanical vault operations more predictable. The current scaffold has
-no scripts and does not require PowerShell to install. The supported version and
-platforms will be specified before those workflows ship; see the
+no scripts and does not require PowerShell to install. Future workflows will use
+the latest stable `pwsh` and required modules, including `powershell-yaml`, with
+exact versions recorded during implementation and validation. Platform support
+and provisioning remain to be specified; see the
 [scripting proposal](docs/vault-guidance-brainstorm.md#powershell-and-predictable-operations).
 
 With GitHub Copilot CLI installed, run these commands from the repository root:
