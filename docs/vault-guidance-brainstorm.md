@@ -383,12 +383,71 @@ Resolve link targets rather than inventing them, and avoid embedding a whole
 DM-facing note into player-facing material. Exact conventions beyond callouts can
 be expanded when concrete workflows need them.
 
+## Article Template Storage and Selection
+
+This decision covers storage and selection only. Template contents, exact YAML
+fields, and runtime loading are deferred; no templates or loader are implemented
+by this report.
+
+### Plugin Defaults and DM Ownership
+
+Bundle default templates as resources of the relevant skills inside the installed
+plugin, for example under `skills/<skill-name>/templates/`. They are plugin-owned
+defaults, separate from campaign data. Resolve them relative to the installed
+skill resource location, not the current working directory.
+
+Recommend `.dmassist-templates/` at the vault root for DM-owned templates, with
+dot-prefixed Markdown filenames to follow the plugin support-file convention.
+The DM may copy a plugin default there and customize it, or write a template
+from scratch. Copying is optional and must not overwrite an existing custom
+template. Plugin updates must never replace these vault-owned copies.
+
+The DM may also reference an existing template elsewhere inside the vault.
+Do not move or rename existing user templates to enforce the hidden-file
+convention; it applies to newly added plugin support artifacts.
+
+### Configuration and Resolution
+
+Use `.dmassist.yaml` to map article types to custom template paths, relative to
+the vault root. The exact field names and article-type identifiers will be
+designed with the configuration schema.
+
+For each new article:
+
+1. Use the explicitly configured DM template for that article type.
+2. If no override is configured, use the relevant plugin default.
+3. If a configured template is missing, unreadable, or invalid, report the error
+   and stop that article's creation rather than silently substituting a default.
+4. If neither an override nor a plugin default exists, explain that no template
+   is available and ask the DM how to proceed.
+
+Validate custom template paths against the authorized vault boundary, including
+symbolic links and relative-path traversal. Treat templates as authoring
+resources, not commands or permission to read other files.
+
+Skills must explicitly read the selected template before creating the article,
+along with the shared reference and designated vault guidance. Templates guide
+new articles; selecting or updating a template does not migrate, reformat, or
+overwrite existing campaign notes. Template selection does not alter the rules
+for handouts, lore evolution, contradictions, or preserved adventure plans.
+
+### Obsidian Templates Boundary
+
+These are plugin authoring templates, not automatic integration with Obsidian's
+Templates feature. Existing Obsidian template files can be referenced as source
+material, but dynamic expressions, substitutions, and community-plugin syntax
+require separately defined support. Do not execute expressions or claim that
+Obsidian or community-plugin expansion has occurred. If unresolved expressions
+are needed for the article, report the limitation and ask the DM how to proceed.
+
 ## Open Questions
 
 - What schema and defaults should `.dmassist.yaml` use, including behavior for
   missing, invalid, or newer schema versions? These decisions are deferred.
 - How will skills reliably locate the installed shared reference and additional
   vault-local Markdown guidance?
+- Which article-type identifiers and configuration fields will select template
+  overrides? Template contents and dynamic-expression support remain deferred.
 - How will latest stable PowerShell and required modules be provisioned, checked,
   and recorded, and which YAML features will the shared loader accept?
 - How should party membership and knowledge exceptions be presented for convenient
@@ -415,6 +474,8 @@ initial single-campaign workflows.
    provisioning. Use root-level `.dmassist.yaml`; design its schema and defaults
    in a subsequent implementation step. Keep shared campaigns out of initial scope.
 2. Extract the agreed meanings and safeguards into the shared AI reference.
+   When authoring skills are added, bundle their default templates and implement
+   the custom-template selection contract without migrating existing notes.
 3. Implement orientation with the explicit read prerequisite and a read-only
    fallback for an unconfigured vault. Resolve the latest stable runtime/modules
    and validate an initial read-only inventory or profile-checking script.
@@ -480,3 +541,11 @@ initial single-campaign workflows.
 - `.dmassist.yaml` is discovered at the vault root, even when ordinary note
   listings omit hidden files. Plugin support artifacts use dot-prefixed names,
   while campaign articles remain visible in Obsidian.
+- A configured DM template overrides the plugin default and is read before
+  article creation. Without an override, the installed default is used.
+- Missing or unreadable overrides produce errors without silent fallback;
+  out-of-vault template paths are rejected.
+- Existing vault templates work without being moved or renamed. Plugin updates
+  leave DM copies unchanged, and template changes do not migrate existing notes.
+- Unresolved dynamic template expressions are reported, not executed or silently
+  presented as successfully expanded.

@@ -52,6 +52,26 @@ hooks. These are design inputs, not implemented runtime contracts. Define note
 templates, link-resolution behavior, and permissions for modifying campaign
 content alongside the workflows and tools that implement them.
 
+## Planned Template Resources
+
+Default article templates will be bundled with the relevant skills, for example
+under `skills/<skill-name>/templates/`, and resolved from the installed skill
+location. DM customizations belong in the vault, not in the plugin installation,
+so plugin updates cannot overwrite them.
+
+The recommended vault location is `.dmassist-templates/`, with dot-prefixed
+Markdown filenames for new support files. Existing vault templates may instead
+be referenced in place. `.dmassist.yaml` will map article types to vault-relative
+custom paths; exact fields and template contents are deferred.
+
+An explicit custom template takes precedence over the plugin default. An invalid
+or unreadable override is an error, not a reason to silently fall back. Future
+skills must read the selected template before creating a note and validate that
+custom paths remain within the vault. This does not migrate existing notes or
+automatically integrate with Obsidian's Templates feature. See the
+[template selection contract](vault-guidance-brainstorm.md#article-template-storage-and-selection)
+for the full design. No templates or runtime loader exist yet.
+
 ## Extension Rules
 
 - Add each workflow as a named skill with `name` and `description` frontmatter.
