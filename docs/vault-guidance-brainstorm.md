@@ -214,13 +214,40 @@ instructions when hooks are unavailable or fail.
 Do not execute commands drawn from campaign notes, log private campaign content
 unnecessarily, or use a hook as implicit consent for edits or deletion.
 
-## Vault Profile and Note Metadata: Options to Decide
+## YAML Vault Configuration and Note Metadata
 
-A minimal profile could record section paths, root-level adventure exceptions,
-campaign/group identifiers, preparation locations, and knowledge conventions.
-Its filename, format, and discovery mechanism remain open. Compare a readable
-Markdown profile with structured metadata only when actual validation needs are
-known; do not require both by default.
+Use YAML as the proposed format for vault-local configuration and options, with
+[cloudbase/powershell-yaml](https://github.com/cloudbase/powershell-yaml) as the
+proposed PowerShell parser. This records the discussion's direction; no module
+is installed, version selected, or configuration loader implemented yet.
+
+Keep machine-readable settings in YAML and explanatory guidance in Markdown.
+A minimal configuration could include:
+
+- A configuration schema version.
+- Section paths and root-level adventure exceptions.
+- Campaign/group identifiers and references to their notes.
+- Preparation locations, note-naming options, and preview preferences.
+- Paths to additional vault-specific Markdown guidance the AI must read.
+
+Do not duplicate lore, session history, or character knowledge in configuration.
+The filename, exact schema, defaults, and discovery mechanism remain open.
+Prefer one clearly named file at the vault root, with optional fields and a
+read-only discovery fallback for unconfigured vaults.
+
+The shared PowerShell loader should parse and validate configuration before
+skills or hooks consume it. Parsing YAML does not validate field types, supported
+schema versions, or path boundaries. Before implementation, select and review a
+module version and its dependencies, decide how it is provisioned, and verify
+its behavior for duplicate keys, custom tags, aliases, and implicit scalar
+conversions. These behaviors are not assumed to be enforced by the parser.
+
+Prefer a restricted YAML subset of mappings, lists, and scalar values. Reject
+duplicate keys and custom tags, define unknown-field handling, and report invalid
+configuration rather than silently falling back to guessed settings. Configuration
+must not execute commands, override safety rules, or grant permission for
+destructive actions. Preview preferences may strengthen safeguards, not remove
+the write-preview and authorization requirements.
 
 Start with existing headings, links, and prose. Consider optional metadata for
 note role, campaign/group scope, preparation versus actual-play status, or
@@ -233,8 +260,12 @@ through relative paths or links without explicit permission.
 
 ## Open Questions
 
-- How will users designate a vault profile, and how will skills reliably locate
-  the installed shared reference?
+- What configuration filename, schema, defaults, and discovery rules should be
+  used, including behavior for missing, invalid, or newer schema versions?
+- How will skills reliably locate the installed shared reference and additional
+  vault-local Markdown guidance?
+- Which powershell-yaml version and dependencies should be approved, how will
+  they be provisioned, and which YAML features will the shared loader accept?
 - How should one vault represent divergent world facts across campaigns sharing
   the same lore without overwriting each other's history?
 - How should group membership changes affect shared knowledge, especially for
@@ -251,7 +282,8 @@ through relative paths or links without explicit permission.
 ## Suggested Development Sequence
 
 1. Review this report and settle the reference location and profile-discovery
-   contract. Keep unresolved campaign semantics explicit.
+   contract, YAML schema, and parser provisioning. Keep unresolved campaign
+   semantics explicit.
 2. Extract the agreed meanings and safeguards into the shared AI reference.
 3. Implement orientation with the explicit read prerequisite and a read-only
    fallback for an unconfigured vault. Define the PowerShell support baseline
@@ -285,3 +317,8 @@ through relative paths or links without explicit permission.
   spaces or non-ASCII characters work on every supported platform.
 - Paths escaping the authorized vault and stale write previews are rejected
   without unintended edits; executable-looking note content remains inert data.
+- A valid YAML configuration supplies the same validated settings to skills and
+  hooks. Invalid types, unsupported schema versions, duplicate keys, forbidden
+  tags, and out-of-vault paths produce clear errors before edits.
+- A missing YAML module reports the required dependency without silently
+  installing it or attempting an ad hoc parser.
