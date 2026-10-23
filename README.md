@@ -68,8 +68,8 @@ The **Player** section describes player characters, not the real people playing 
 Record each character's knowledge in their article and shared group knowledge in the group article, with clear links between the group and its characters. Distinguish what a character currently knows from what they might discover and from DM-only world information. Players should roleplay based on their character's knowledge, not everything the player or DM knows.
 
 Party lore can hold shared knowledge with explicit exceptions for absent or
-uninformed characters. Update those exceptions only after supported information
-sharing or DM confirmation. Label rumors and mistaken beliefs and reference the
+uninformed characters. The DM's judgment is sufficient to establish character
+knowledge or change an exception; no evidence log is required. Label rumors and mistaken beliefs and reference the
 real facts in DM-facing notes, without exposing those facts to characters who do
 not know them. If the truth is unknown, record that uncertainty rather than
 inventing a correction.
@@ -90,7 +90,15 @@ approval. Git history does not replace approval or justify overwriting user edit
 1. Prepare from the relevant adventure, lore, rules, and the group's current knowledge.
 2. Put preparation likely to be used in the session note under a clearly labeled preparation section. Alternatively, keep it in a `Preparations` subfolder within Sessions, especially when its use is uncertain.
 3. After play, record what actually happened in the session recap or log. Prepared content may remain unused because of player choices; do not treat it as an outcome merely because it was prepared.
-4. Use the session record as a reference for subsequent play, updating relevant character and group knowledge and established world facts only when supported by actual events.
+4. Record lore changes caused by player actions or other events as **evolution**,
+   preserving the prior context. Link to a session when applicable; the session
+   contains the event details. DM judgment is sufficient for character knowledge,
+   without recording evidence.
+5. Do not update adventure plans to match outcomes after they have been run;
+   they are expected to become outdated.
+6. Never automatically correct contradictions. Tell the DM and leave the
+   conflicting accounts unchanged until the DM clarifies; accepted reality may
+   be decided later.
 
 ### Multiple Campaigns and Reusing Adventures
 

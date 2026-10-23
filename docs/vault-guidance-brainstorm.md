@@ -70,8 +70,9 @@ examples, not an exhaustive taxonomy.
   available to the DM or the people playing.
 - Record lore shared by the party in the party/group article, with explicit
   per-character exceptions for absent or otherwise uninformed characters.
-  Absence alone must not imply later knowledge; remove an exception only when
-  supported by an actual information-sharing event or DM confirmation.
+  Absence alone must not imply later knowledge. The DM's judgment is sufficient
+  to establish knowledge or remove an exception; no evidence log, source link,
+  or recorded information-sharing event is required for that judgment.
 - Explicitly label rumors and mistaken beliefs and reference the real facts in
   the underlying DM-facing record. If the real facts are not established, mark
   them as unknown and ask the DM rather than inventing a correction. These
@@ -86,6 +87,26 @@ examples, not an exhaustive taxonomy.
 - Any prepared event may remain unused because of player choices.
 - Session recaps record what happened. Unused preparation is not campaign history
   and does not establish character knowledge.
+- Do not update adventure plans to match outcomes after they have been run.
+  They are expected to become outdated; sessions record what actually happened.
+
+### Lore Evolution and Contradictions
+
+- Record changes to lore caused by player actions or other events as
+  **evolution**, preserving the previous context rather than silently replacing
+  it. Link to the relevant session when applicable; the session contains the
+  detailed account of the event.
+- Evolution can also come from events outside a play session. Do not fabricate
+  a session reference when none applies.
+- Never automatically correct contradictions, even when chronology seems to
+  suggest a resolution. Tell the DM about the conflicting accounts and leave
+  them unchanged until the DM clarifies. Accepted reality may be decided later.
+- A clearly established change over time is evolution, not permission to resolve
+  a contradiction. If the relationship between accounts is ambiguous, report it
+  rather than choosing, reconciling, or inventing an explanation.
+- Knowledge decisions do not require an evidence trail. Respect the DM's
+  judgment while keeping optional session links for lore evolution distinct
+  from proof of a character's knowledge.
 
 ### Campaigns and Reuse
 
@@ -193,7 +214,7 @@ Every vault-facing candidate must use the shared loading prerequisite.
 | Find and connect notes | Locate relevant lore, adventures, rules, and statistics; resolve references. | Do not infer a note's role solely from its folder or expose DM-only information in character-facing answers. |
 | Session preparation | Assemble relevant material and possible events for a group. | Label preparation as tentative; never update actual history from this workflow. |
 | Session recap | Separate actual play from unused preparation and draft a sourced recap. | Missing outcomes require clarification, not invention. |
-| Knowledge and continuity update | Propose character/group knowledge and lore changes supported by recorded play. | A witnessed event is not automatically known by every character; show sources and resolve contradictions with the DM. |
+| Knowledge and lore evolution | Apply DM knowledge judgments and record established lore evolution, linking sessions when applicable. | Do not require knowledge evidence, rewrite run adventure plans, or resolve contradictions; report conflicting accounts and await DM clarification. |
 | Fresh-campaign reuse review | Identify campaign-specific state to remove or reset in a copied vault. | Start with a review checklist, not automated deletion. Never clean the original vault. |
 
 Begin with orientation and one end-to-end session workflow to validate the shared
@@ -370,12 +391,14 @@ be expanded when concrete workflows need them.
   vault-local Markdown guidance?
 - How will latest stable PowerShell and required modules be provisioned, checked,
   and recorded, and which YAML features will the shared loader accept?
-- How should party membership changes and later information sharing update
-  character exceptions in party lore?
+- How should party membership and knowledge exceptions be presented for convenient
+  DM maintenance, without requiring evidence for the DM's decisions?
 - Which Obsidian tag vocabulary and placement conventions should express party
   knowledge exceptions, rumors, and mistaken beliefs alongside prose and links?
-- How should uncertain memories and retcons be represented?
-- What is the minimum source reference needed to support a continuity update?
+- How should unresolved uncertainty and later DM-directed retcons be represented,
+  while leaving contradictions unchanged until clarification?
+- What headings or tags should distinguish lore evolution from the original
+  context and link applicable sessions?
 - What additional examples should clarify the boundary between local edits and
   major changes requiring preview and approval?
 - Which supported hook events address a real gap after the skill workflow works?
@@ -395,7 +418,8 @@ initial single-campaign workflows.
 3. Implement orientation with the explicit read prerequisite and a read-only
    fallback for an unconfigured vault. Resolve the latest stable runtime/modules
    and validate an initial read-only inventory or profile-checking script.
-4. Implement a preparation/recap workflow and source-backed continuity proposals.
+4. Implement preparation/recap workflows, lore evolution entries, and DM-directed
+   knowledge updates without evidence requirements.
 5. Exercise the acceptance scenarios below in the installed client.
 6. Add hooks only where verified client support closes a demonstrated gap.
 
@@ -408,7 +432,13 @@ initial single-campaign workflows.
 - Multiple people sharing a character, or one person playing several characters,
   does not merge distinct characters' knowledge.
 - Party lore records shared information with exceptions for absent or uninformed
-  characters; later sharing updates only supported exceptions.
+  characters; DM knowledge judgments update exceptions without an evidence log.
+- Lore evolution preserves prior context and links applicable sessions containing
+  event details; events outside sessions do not require invented session links.
+- Adventure plans remain unchanged after being run, even when actual outcomes
+  differ from their planned events.
+- Contradictions are reported without rewriting either account or choosing an
+  accepted reality, including when the DM defers clarification.
 - Rumors and mistaken beliefs are labeled and linked to real facts in DM-facing
   records without leaking those facts in character-facing output.
 - Mixed preparation and recap notes never turn an unused encounter into history.
