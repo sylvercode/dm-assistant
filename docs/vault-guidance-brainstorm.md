@@ -285,6 +285,52 @@ Keep campaign-specific profiles and content in the user's vault, outside the
 distributed plugin. A profile must not authorize reading outside that vault
 through relative paths or links without explicit permission.
 
+## Vault-Specific AI Guidance and Obsidian Syntax
+
+Use optional `.dmassist-guidance.md` at the vault root for free-form campaign
+instructions, referenced from `.dmassist.yaml`. Future vault-facing skills must
+read that designated file along with the plugin reference before generating or
+editing notes. This is an agreed design direction, not an implemented loader;
+the YAML field name remains part of the deferred schema.
+
+The plugin reference should explain standard Obsidian Markdown conventions.
+The vault guidance can customize their use, narrative style, and language without
+duplicating structured settings or campaign facts. Preserve existing conventions
+when editing notes, and do not reformat unrelated content.
+
+### Proposed Callout Uses
+
+Use native [Obsidian callouts](https://obsidian.md/help/callouts) with descriptive
+titles to distinguish material at a glance:
+
+| Purpose | Proposed callout | Content boundary |
+| --- | --- | --- |
+| Text to read aloud | `quote`, titled “Read aloud” | Player-safe narration for the specified scene, without DM instructions or hidden facts. |
+| Important DM tips | `tip`, titled “DM tip” | Pacing, portrayal, or other practical advice; not text intended to be read aloud. |
+| Important cautions | `warning`, with a specific title | Consequences, continuity risks, or reminders the DM should notice. |
+| Secret information | `note`, titled “DM only” | DM-facing facts kept separate from player-facing narration. |
+
+These are proposed defaults that vault guidance may override. Prefer built-in
+callout types so no theme, CSS snippet, or community plugin is required.
+Formatting a prepared scene as “Read aloud” does not establish that it happened.
+
+Future authoring instructions should require valid callout syntax: a blockquote
+whose first line contains `[!type]` and a title, with each content line (including
+blank lines within the callout) carrying the blockquote prefix. Keep separate
+purposes in separate callouts, and use ordinary prose for content that does not
+need special presentation.
+
+A “DM only” title or a collapsed callout is a visual cue, not access control.
+When producing a player-facing document, omit hidden facts and revealing links
+entirely rather than merely placing them in a labeled or collapsed callout.
+Read-aloud narration must respect the intended characters' knowledge and the
+requested scene; it must not silently reveal the truth behind rumors.
+
+Other useful reference topics are internal note links, heading links, and embeds.
+Resolve link targets rather than inventing them, and avoid embedding a whole
+DM-facing note into player-facing material. Exact conventions beyond callouts can
+be expanded when concrete workflows need them.
+
 ## Open Questions
 
 - What schema and defaults should `.dmassist.yaml` use, including behavior for
@@ -357,6 +403,12 @@ initial single-campaign workflows.
   tags, and out-of-vault paths produce clear errors before edits.
 - A missing YAML module reports the required dependency without silently
   installing it or attempting an ad hoc parser.
+- A designated `.dmassist-guidance.md` is read before note authoring, and its
+  formatting preferences are applied without rewriting unrelated content.
+- Read-aloud text and DM tips render as separate native Obsidian callouts;
+  multiline content remains inside the intended callout.
+- Player-facing exports contain no DM-only callouts, secret links, or embeds,
+  even if the source note uses collapsed callouts.
 - `.dmassist.yaml` is discovered at the vault root, even when ordinary note
   listings omit hidden files. Plugin support artifacts use dot-prefixed names,
   while campaign articles remain visible in Obsidian.
