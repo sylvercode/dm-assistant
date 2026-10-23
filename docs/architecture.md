@@ -85,3 +85,43 @@ for the full design. No templates or runtime loader exist yet.
 
 - [Plugins for GitHub Copilot](https://docs.github.com/en/copilot/concepts/customizations/plugins)
 - [Creating a plugin for GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating)
+
+## Next Logical Development Steps
+
+These are future milestones, not implemented capabilities. Use the
+[Vault Guidance Brainstorm](vault-guidance-brainstorm.md) for detailed decisions,
+open questions, and acceptance scenarios.
+
+1. **Establish shared AI guidance.** Extract the agreed vault meanings and
+   safeguards into a reference bundled with a vault-orientation skill. Verify
+   installed-resource lookup and explicitly require every vault-facing skill to
+   read it, along with designated `.dmassist-guidance.md` guidance.
+2. **Define the configuration contract.** Design the deferred `.dmassist.yaml`
+   schema and defaults, covering section mappings, party context, guidance paths,
+   and template overrides. Define validation and missing/invalid configuration
+   behavior without forcing existing vaults to migrate.
+3. **Establish the script runtime.** Choose supported platforms and provisioning
+   for latest stable `pwsh` and required modules, including powershell-yaml.
+   Review dependencies and record exact versions; define shared inputs,
+   structured outputs, errors, and vault-path safety checks.
+4. **Deliver read-only vault orientation.** Implement configuration loading and
+   a first inventory or validation script. Support unconfigured vault discovery,
+   resolve the target vault independently of the plugin location, and report
+   ambiguity rather than restructuring files.
+5. **Add article authoring and template selection.** Design template contents
+   when authoring workflows are ready. Bundle skill defaults, read selected
+   templates explicitly, and support DM overrides without overwriting them or
+   migrating existing notes. Apply the agreed Obsidian tag and callout conventions.
+6. **Deliver an end-to-end session workflow.** Separate preparation from recaps,
+   record lore evolution with applicable session links, and accept DM knowledge
+   judgments without evidence logs. Preserve run adventure plans, report
+   contradictions without resolving them, and keep handouts player-safe. Require
+   approval for major changes, not redundant approval for requested local edits.
+7. **Validate in the installed client.** Exercise the brainstorm's acceptance
+   scenarios, verify resource and skill discovery after reinstalling the plugin,
+   and check generated notes in Obsidian. Cover failure cases, path boundaries,
+   preservation of user edits, and supported-platform behavior.
+8. **Add integrations only for demonstrated gaps.** Introduce supported hooks,
+   specialized agents, or MCP tools only when the working skills require them.
+   Keep shared-campaign support and dynamic template expressions deferred until
+   their separate contracts are designed.
