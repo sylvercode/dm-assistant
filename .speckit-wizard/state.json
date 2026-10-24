@@ -6,12 +6,12 @@
     "pluginInstalled": true,
     "cliInstalled": true,
     "projectInitialized": true,
-    "skillsReloaded": false,
+    "skillsReloaded": true,
     "catalogsLoaded": false
   },
   "phases": {
     "setup": {
-      "status": "in_progress",
+      "status": "done",
       "optionalSkipped": false,
       "lastRunAt": null,
       "formValues": {},
@@ -111,7 +111,21 @@
         }
       }
     ],
-    "extensions": [],
+    "extensions": [
+      {
+        "id": "github",
+        "name": "github",
+        "priority": 10,
+        "enabled": true,
+        "description": "",
+        "provides": {
+          "commands": 1,
+          "templates": 0,
+          "scripts": 0,
+          "hooks": 0
+        }
+      }
+    ],
     "artifacts": [
       {
         "id": "commands/speckit.specify",
@@ -290,6 +304,23 @@
         "effectiveBaseIdx": 1
       },
       {
+        "id": "commands/speckit.github.taskstoissues",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "extension",
+            "presetId": "github",
+            "presetName": "github",
+            "strategy": "replace",
+            "version": null,
+            "sourcePath": ".specify/extensions/github/commands/speckit.github.taskstoissues.md",
+            "active": true
+          }
+        ],
+        "description": "Convert tasks from tasks.md into dependency-ordered GitHub issues",
+        "effectiveBaseIdx": 0
+      },
+      {
         "id": "commands/speckit.constitution",
         "kind": "command",
         "stack": [
@@ -434,7 +465,7 @@
         "effectiveBaseIdx": 0
       }
     ],
-    "refreshedAt": "2026-10-24T19:40:13.878Z",
+    "refreshedAt": "2026-10-24T19:43:12.365Z",
     "inferredPipeline": {
       "shape": "augmented-canonical",
       "pipeline": [
@@ -452,8 +483,8 @@
       "rationale": "Synthesized from canonical spine — no new commands and no stack directives detected."
     },
     "builtFrom": {
-      "compositionFingerprint": "6c81a508501306111a7c6e986822dd799a93605c",
-      "catalogChangedAt": "2026-10-24T19:40:13.878Z"
+      "compositionFingerprint": "f794f62e564ab2abc258301b5b42bfac8c31f14e",
+      "catalogChangedAt": "2026-10-24T19:43:12.365Z"
     }
   }
 }

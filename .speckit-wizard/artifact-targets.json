@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "entries": {
+    "commands/speckit.github.taskstoissues": {
+      "description": "Convert existing tasks into actionable, dependency-ordered GitHub issues",
+      "argsHint": "Provide any instructions or context to guide the tasks-to-issues conversion",
+      "argsWhenEmpty": "If left empty, the skill will use the available feature design artifacts and task list",
+      "source": "llm",
+      "skillPath": ".specify/extensions/github/commands/speckit.github.taskstoissues.md"
+    }
+  },
+  "updatedAt": "2026-10-24T19:42:30.464Z"
+}
