@@ -109,6 +109,18 @@
           "templates": 0,
           "scripts": 0
         }
+      },
+      {
+        "id": "copilot-assess-ask-questions",
+        "name": "copilot-assess-ask-questions",
+        "priority": 10,
+        "enabled": true,
+        "description": "",
+        "provides": {
+          "commands": 5,
+          "templates": 0,
+          "scripts": 0
+        }
       }
     ],
     "extensions": [
@@ -304,6 +316,91 @@
         "effectiveBaseIdx": 1
       },
       {
+        "id": "commands/speckit.assess.intake",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "preset",
+            "presetId": "copilot-assess-ask-questions",
+            "presetName": "copilot-assess-ask-questions",
+            "strategy": "wrap",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-assess-ask-questions/commands/speckit.assess.intake.md",
+            "active": true
+          }
+        ],
+        "description": "Wrap the stage with an #askQuestions-style clarifying round (ask_user) about the idea's origin, type, slug, and boundary before writing intake.md",
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.assess.research",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "preset",
+            "presetId": "copilot-assess-ask-questions",
+            "presetName": "copilot-assess-ask-questions",
+            "strategy": "wrap",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-assess-ask-questions/commands/speckit.assess.research.md",
+            "active": true
+          }
+        ],
+        "description": "Wrap the stage with an #askQuestions-style clarifying round (ask_user) about evidence lenses, sources, and known counter-evidence before writing research.md",
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.assess.define",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "preset",
+            "presetId": "copilot-assess-ask-questions",
+            "presetName": "copilot-assess-ask-questions",
+            "strategy": "wrap",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-assess-ask-questions/commands/speckit.assess.define.md",
+            "active": true
+          }
+        ],
+        "description": "Wrap the stage with an #askQuestions-style clarifying round (ask_user) about users, success metrics, non-goals, and cost of inaction before writing problem.md",
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.assess.shape",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "preset",
+            "presetId": "copilot-assess-ask-questions",
+            "presetName": "copilot-assess-ask-questions",
+            "strategy": "wrap",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-assess-ask-questions/commands/speckit.assess.shape.md",
+            "active": true
+          }
+        ],
+        "description": "Wrap the stage with an #askQuestions-style clarifying round (ask_user) about appetite, constraints, and trade-offs before writing concept.md",
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.assess.decide",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "preset",
+            "presetId": "copilot-assess-ask-questions",
+            "presetName": "copilot-assess-ask-questions",
+            "strategy": "wrap",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-assess-ask-questions/commands/speckit.assess.decide.md",
+            "active": true
+          }
+        ],
+        "description": "Wrap the stage with an #askQuestions-style clarifying round (ask_user) about criteria weight, risk tolerance, and strategic context before writing decision.md",
+        "effectiveBaseIdx": 0
+      },
+      {
         "id": "commands/speckit.github.taskstoissues",
         "kind": "command",
         "stack": [
@@ -465,7 +562,7 @@
         "effectiveBaseIdx": 0
       }
     ],
-    "refreshedAt": "2026-10-24T19:43:12.365Z",
+    "refreshedAt": "2026-10-24T19:47:06.692Z",
     "inferredPipeline": {
       "shape": "augmented-canonical",
       "pipeline": [
@@ -483,8 +580,8 @@
       "rationale": "Synthesized from canonical spine — no new commands and no stack directives detected."
     },
     "builtFrom": {
-      "compositionFingerprint": "f794f62e564ab2abc258301b5b42bfac8c31f14e",
-      "catalogChangedAt": "2026-10-24T19:43:12.365Z"
+      "compositionFingerprint": "78cfb6a75bfa2c84b8a6b4c7321124beb69d299c",
+      "catalogChangedAt": "2026-10-24T19:47:06.692Z"
     }
   }
 }

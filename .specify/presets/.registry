@@ -21,6 +21,16 @@
         ]
       },
       "installed_at": "2026-10-24T19:39:49.312519+00:00"
+    },
+    "copilot-assess-ask-questions": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:02f2ee23ab3681a0f8597f991f222153bdfca4ad8aaba6914c136601385e8098",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {},
+      "registered_skills": {},
+      "installed_at": "2026-10-24T19:46:43.449507+00:00"
     }
   }
 }
