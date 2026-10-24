@@ -1,7 +1,7 @@
 {
   "$schema": "speckit-wizard/v1",
   "currentPhase": "setup",
-  "preset": null,
+  "preset": "copilot-sub-agents",
   "setup": {
     "pluginInstalled": true,
     "cliInstalled": true,
@@ -97,107 +97,200 @@
   },
   "pipeline": null,
   "composition": {
-    "presets": [],
+    "presets": [
+      {
+        "id": "copilot-sub-agents",
+        "name": "copilot-sub-agents",
+        "priority": 10,
+        "enabled": true,
+        "description": "",
+        "provides": {
+          "commands": 8,
+          "templates": 0,
+          "scripts": 0
+        }
+      }
+    ],
     "extensions": [],
     "artifacts": [
-      {
-        "id": "commands/speckit.constitution",
-        "kind": "command",
-        "stack": [
-          {
-            "layer": "core",
-            "active": true,
-            "strategy": "replace"
-          }
-        ],
-        "effectiveBaseIdx": 0
-      },
       {
         "id": "commands/speckit.specify",
         "kind": "command",
         "stack": [
           {
-            "layer": "core",
-            "active": true,
-            "strategy": "replace"
-          }
-        ],
-        "effectiveBaseIdx": 0
-      },
-      {
-        "id": "commands/speckit.clarify",
-        "kind": "command",
-        "stack": [
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.specify.md",
+            "active": true
+          },
           {
             "layer": "core",
-            "active": true,
+            "active": false,
             "strategy": "replace"
           }
         ],
-        "effectiveBaseIdx": 0
+        "description": "Prepend sub-agent delegation for spec quality validation",
+        "effectiveBaseIdx": 1
       },
       {
         "id": "commands/speckit.plan",
         "kind": "command",
         "stack": [
           {
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.plan.md",
+            "active": true
+          },
+          {
             "layer": "core",
-            "active": true,
+            "active": false,
             "strategy": "replace"
           }
         ],
-        "effectiveBaseIdx": 0
+        "description": "Prepend sub-agent delegation for parallel research and design artifact generation",
+        "effectiveBaseIdx": 1
       },
       {
         "id": "commands/speckit.tasks",
         "kind": "command",
         "stack": [
           {
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.tasks.md",
+            "active": true
+          },
+          {
             "layer": "core",
-            "active": true,
+            "active": false,
             "strategy": "replace"
           }
         ],
-        "effectiveBaseIdx": 0
+        "description": "Prepend sub-agent delegation for parallel document loading and per-user-story task generation",
+        "effectiveBaseIdx": 1
       },
       {
-        "id": "commands/speckit.taskstoissues",
+        "id": "commands/speckit.implement",
         "kind": "command",
         "stack": [
           {
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.implement.md",
+            "active": true
+          },
+          {
             "layer": "core",
-            "active": true,
+            "active": false,
             "strategy": "replace"
           }
         ],
-        "effectiveBaseIdx": 0
+        "description": "Prepend sub-agent delegation for parallel [P] task execution",
+        "effectiveBaseIdx": 1
       },
       {
         "id": "commands/speckit.analyze",
         "kind": "command",
         "stack": [
           {
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.analyze.md",
+            "active": true
+          },
+          {
             "layer": "core",
-            "active": true,
+            "active": false,
             "strategy": "replace"
           }
         ],
-        "effectiveBaseIdx": 0
+        "description": "Prepend sub-agent delegation for parallel detection passes",
+        "effectiveBaseIdx": 1
       },
       {
         "id": "commands/speckit.checklist",
         "kind": "command",
         "stack": [
           {
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.checklist.md",
+            "active": true
+          },
+          {
             "layer": "core",
-            "active": true,
+            "active": false,
             "strategy": "replace"
           }
         ],
-        "effectiveBaseIdx": 0
+        "description": "Prepend sub-agent delegation for parallel context loading",
+        "effectiveBaseIdx": 1
       },
       {
-        "id": "commands/speckit.implement",
+        "id": "commands/speckit.clarify",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.clarify.md",
+            "active": true
+          },
+          {
+            "layer": "core",
+            "active": false,
+            "strategy": "replace"
+          }
+        ],
+        "description": "Prepend sub-agent delegation for parallel ambiguity scan categories",
+        "effectiveBaseIdx": 1
+      },
+      {
+        "id": "commands/speckit.taskstoissues",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "preset",
+            "presetId": "copilot-sub-agents",
+            "presetName": "copilot-sub-agents",
+            "strategy": "prepend",
+            "version": null,
+            "sourcePath": ".specify/presets/copilot-sub-agents/commands/speckit.taskstoissues.md",
+            "active": true
+          },
+          {
+            "layer": "core",
+            "active": false,
+            "strategy": "replace"
+          }
+        ],
+        "description": "Prepend sub-agent delegation for parallel GitHub issue creation",
+        "effectiveBaseIdx": 1
+      },
+      {
+        "id": "commands/speckit.constitution",
         "kind": "command",
         "stack": [
           {
@@ -341,7 +434,7 @@
         "effectiveBaseIdx": 0
       }
     ],
-    "refreshedAt": "2026-10-24T17:23:35.376Z",
+    "refreshedAt": "2026-10-24T19:40:13.878Z",
     "inferredPipeline": {
       "shape": "augmented-canonical",
       "pipeline": [
@@ -359,8 +452,8 @@
       "rationale": "Synthesized from canonical spine — no new commands and no stack directives detected."
     },
     "builtFrom": {
-      "compositionFingerprint": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-      "catalogChangedAt": "2026-10-24T17:23:35.376Z"
+      "compositionFingerprint": "6c81a508501306111a7c6e986822dd799a93605c",
+      "catalogChangedAt": "2026-10-24T19:40:13.878Z"
     }
   }
 }

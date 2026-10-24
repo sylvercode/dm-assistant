@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "presets": {
+    "copilot-sub-agents": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:3d8dda91bad641005265aea959fc724859512aec15aadf3264f91f855504bfae",
+      "enabled": true,
+      "priority": 1,
+      "registered_commands": {},
+      "registered_skills": {
+        "copilot": [
+          "speckit-specify",
+          "speckit-plan",
+          "speckit-tasks",
+          "speckit-implement",
+          "speckit-analyze",
+          "speckit-checklist",
+          "speckit-clarify",
+          "speckit-taskstoissues"
+        ]
+      },
+      "installed_at": "2026-10-24T19:39:49.312519+00:00"
+    }
+  }
+}
