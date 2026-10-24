@@ -1,0 +1,366 @@
+{
+  "$schema": "speckit-wizard/v1",
+  "currentPhase": "setup",
+  "preset": null,
+  "setup": {
+    "pluginInstalled": true,
+    "cliInstalled": true,
+    "projectInitialized": true,
+    "skillsReloaded": false,
+    "catalogsLoaded": false
+  },
+  "phases": {
+    "setup": {
+      "status": "in_progress",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": null
+    },
+    "preset": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": null
+    },
+    "constitution": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": ".specify/memory/constitution.md"
+    },
+    "specify": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": "specs/<slug>/spec.md"
+    },
+    "clarify": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": "specs/<slug>/spec.md"
+    },
+    "checklist": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": "specs/<slug>/checklists/"
+    },
+    "plan": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": "specs/<slug>/plan.md"
+    },
+    "tasks": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": "specs/<slug>/tasks.md"
+    },
+    "analyze": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": "specs/<slug>/analysis.md"
+    },
+    "taskstoissues": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": null
+    },
+    "implement": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": null
+    },
+    "converge": {
+      "status": "empty",
+      "optionalSkipped": false,
+      "lastRunAt": null,
+      "formValues": {},
+      "artifactPath": "specs/<slug>/tasks.md"
+    }
+  },
+  "pipeline": null,
+  "composition": {
+    "presets": [],
+    "extensions": [],
+    "artifacts": [
+      {
+        "id": "commands/speckit.constitution",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.specify",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.clarify",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.plan",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.tasks",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.taskstoissues",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.analyze",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.checklist",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.implement",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "commands/speckit.converge",
+        "kind": "command",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "spec-template",
+        "kind": "template",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "plan-template",
+        "kind": "template",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "tasks-template",
+        "kind": "template",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "checklist-template",
+        "kind": "template",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "constitution-template",
+        "kind": "template",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "agent-file-template",
+        "kind": "template",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "check-prerequisites",
+        "kind": "script",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "common",
+        "kind": "script",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "setup-plan",
+        "kind": "script",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      },
+      {
+        "id": "setup-tasks",
+        "kind": "script",
+        "stack": [
+          {
+            "layer": "core",
+            "active": true,
+            "strategy": "replace"
+          }
+        ],
+        "effectiveBaseIdx": 0
+      }
+    ],
+    "refreshedAt": "2026-10-24T17:23:35.376Z",
+    "inferredPipeline": {
+      "shape": "augmented-canonical",
+      "pipeline": [
+        "commands/speckit.constitution",
+        "commands/speckit.specify",
+        "commands/speckit.clarify",
+        "commands/speckit.plan",
+        "commands/speckit.tasks",
+        "commands/speckit.taskstoissues",
+        "commands/speckit.analyze",
+        "commands/speckit.checklist",
+        "commands/speckit.implement"
+      ],
+      "unplaced": [],
+      "rationale": "Synthesized from canonical spine — no new commands and no stack directives detected."
+    },
+    "builtFrom": {
+      "compositionFingerprint": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      "catalogChangedAt": "2026-10-24T17:23:35.376Z"
+    }
+  }
+}
