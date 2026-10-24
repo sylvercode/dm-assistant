@@ -1,50 +1,82 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!-- Sync Impact Report
+Version change: initial adoption → 1.0.0
+Modified principles: none
+Added sections: Core Principles, Plugin and Vault Constraints, Development Workflow
+Removed sections: none
+Follow-up TODOs: Confirm the original ratification date.
+-->
+# DM Assistant Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Preserve the Plugin Architecture
+The repository root MUST remain the installable Agent Plugins 1.0 plugin. Portable
+skills MUST live in immediate child folders of `skills/`, and Copilot-specific
+agents MUST live in `com.github.copilot/agents/`. Plugin metadata MUST follow the
+official discovery contract; do not add legacy component-path fields or
+placeholder hooks, MCP servers, or integrations. This keeps the plugin portable
+and its capabilities discoverable.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Keep the Campaign Vault Separate
+The campaign vault is distinct from the plugin repository. Vault-facing workflows
+MUST obtain the vault location from the user's workspace or explicit input and
+MUST NOT assume the plugin directory is the vault. This prevents operations from
+being directed at the wrong data.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Preserve Campaign Continuity and User Control
+Vault-facing workflows MUST preserve existing organization and user edits. They
+MUST NOT infer that missing folders should be created, silently resolve
+contradictions, or rewrite run adventure plans. Broad, destructive, restructuring,
+or continuity-changing edits require a preview and DM approval; clearly requested
+local edits do not require redundant approval. These safeguards keep campaign
+history and the DM's authority intact.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Respect Character Knowledge and Player Safety
+Preparation MUST remain distinct from actual play and character knowledge. Future
+workflows may update character or group knowledge and world facts only from
+actual-play records, or from an explicit DM judgment where the guidance allows
+it. DM-only facts and revealing links MUST NOT appear in player-facing handouts.
+This protects both continuity and the separation between player and DM knowledge.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Distinguish Proposals from Implemented Behavior
+Documentation, brainstorms, and planned capabilities MUST be treated as proposals
+until implemented. Documentation MUST identify scaffold limitations and MUST NOT
+describe planned behavior as available runtime behavior. This avoids misleading
+contributors and users.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Plugin and Vault Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Keep reusable workflow guidance in skills rather than duplicating it in agents.
+- Add integrations only when a concrete need and an actual implementation exist.
+- Keep credentials and campaign content out of the distributed plugin.
+- Follow the official Plugins for GitHub Copilot and Copilot CLI plugin
+  documentation when changing plugin metadata or discovery behavior.
+- Preserve existing vault conventions; do not migrate or restructure a vault
+  without explicit authorization.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+- Check current GitHub issues for scope and dependencies before starting planned
+  project work. The `epic` label tracks epics; it does not prove implementation.
+- Update directly related documentation when behavior or architecture changes.
+- Validate plugin discovery using the local installation steps in `README.md`.
+- This documentation-and-metadata scaffold defines no build, test, or lint
+  commands. Do not claim those checks were run unless such commands are added.
+- Reviews MUST verify that changes comply with this constitution and distinguish
+  implemented behavior from proposals.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution governs repository design and supersedes conflicting
+contributor guidance. Amendments MUST be made through a reviewed change that
+explains the rationale and identifies affected guidance or implementation.
+Contributors MUST check compliance during planning and review; deviations require
+an explicit rationale and approval in the change.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+Constitution versions use semantic versioning: MAJOR for backward-incompatible
+governance changes, MINOR for new or materially expanded principles or sections,
+and PATCH for clarifications and non-semantic refinements. The ratification date
+records the original adoption date and MUST NOT be reset by later amendments.
+The last-amended date changes whenever the constitution changes.
+
+**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): confirm original adoption date | **Last Amended**: 2026-10-24

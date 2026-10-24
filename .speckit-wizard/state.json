@@ -25,9 +25,9 @@
       "artifactPath": null
     },
     "constitution": {
-      "status": "empty",
+      "status": "done",
       "optionalSkipped": false,
-      "lastRunAt": null,
+      "lastRunAt": "2026-10-24T20:14:01.326Z",
       "formValues": {},
       "artifactPath": ".specify/memory/constitution.md"
     },
@@ -578,6 +578,33 @@
       ],
       "unplaced": [],
       "rationale": "Synthesized from canonical spine — no new commands and no stack directives detected."
+    },
+    "executionReports": {
+      "commands/speckit.constitution": {
+        "expected": {
+          "templates": [
+            "constitution-template"
+          ],
+          "scripts": [],
+          "hooks": []
+        },
+        "artifacts": {
+          "template": {
+            "constitution-template": {
+              "state": "executed",
+              "detail": null
+            }
+          },
+          "script": {},
+          "hook": {}
+        },
+        "sourcePath": "witness:llm-selfreport",
+        "sourceHash": null,
+        "sessionId": null,
+        "sessionWindow": null,
+        "analyzedAt": "2026-10-24T20:14:03.553Z",
+        "stale": false
+      }
     },
     "builtFrom": {
       "compositionFingerprint": "78cfb6a75bfa2c84b8a6b4c7321124beb69d299c",
