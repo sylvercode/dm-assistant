@@ -33,4 +33,4 @@
 
 - Issue #3 has no comments. Its artifact-list endpoint returned HTTP 404, so no issue artifacts were available to inspect.
 - Defaults name the exact conventional section folders; preparation uses a section titled `Preparation`; identical profile and vault inputs resolve to identical settings and path boundaries.
-- Missing or invalid schema versions, unavailable explicitly designated guidance, unavailable validation capability, and consistent resolution each have explicit acceptance scenarios. The runtime plan will select and document YAML-reading capability and dependency provisioning without prescribing implementation choices in this specification.
+- Missing or invalid schema versions, unavailable explicitly designated guidance, unavailable validation, and consistent resolution each have explicit acceptance scenarios. Issue #3 defines the schema and observable validation outcomes; Issue #4 owns reader selection, runtime, and dependency provisioning.

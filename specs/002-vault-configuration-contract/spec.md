@@ -1,5 +1,12 @@
 # Feature Specification: Vault Configuration Contract
 
+**Scope boundary**: This feature defines the `.dmassist.yaml` schema and the
+observable outcomes for valid, invalid, and absent configuration. It does not
+select or provision a YAML parser, define a PowerShell runtime, or implement a
+configuration reader. Parser selection, dependency provisioning, and reader
+integration belong to Issue #4, “Establish the PowerShell runtime and safe
+operation contracts.”
+
 **Feature Branch**: `sylvercode-vault-configuration-contract`
 
 **Created**: 2026-10-25
@@ -14,7 +21,7 @@
 
 - Q: When a configured section folder does not exist, should the entire profile fail validation or only operations that need that folder stop? → A: Reject the entire profile until every explicitly configured section folder exists.
 - Q: Should different section mappings be allowed to point to the same folder or to folders nested inside one another? → A: Allow shared and nested locations; ask the DM when an operation has an unresolved classification or destination.
-- Q: Should the initial configuration format allow YAML anchors and aliases, which let one setting reuse another setting's value? → A: Reject anchors, aliases, and merge keys; require explicit values.
+- Q: Should the initial configuration format allow YAML anchors and aliases, which let one setting reuse another setting's value? → A: Allow syntax supported by the reader selected under Issue #4 when the resolved configuration passes schema validation; duplicate keys and invalid/conflicting settings remain errors.
 - Q: When read-only discovery finds several plausible locations for one section, how should the assistant proceed? → A: Select the most likely candidate, report the choice, and continue read-only work.
 - Q: If configuration or a referenced guidance file, template, or path changes after validation but before a dependent operation completes, what should happen? → A: Stop the affected operation, report the change, and require revalidation before retrying.
 
@@ -54,6 +61,7 @@ A Dungeon Master can provide an optional vault-local profile to identify section
 5. **Given** an explicitly configured guidance file that is missing or unreadable, **When** a workflow needs that guidance, **Then** it reports the problem rather than silently proceeding without it.
 6. **Given** an explicitly configured section folder does not exist, **When** the profile is validated, **Then** the entire profile is rejected with an error identifying the missing folder, and no folder is created automatically.
 7. **Given** section mappings share a folder or are nested within one another, **When** the profile is validated, **Then** overlap alone does not invalidate the profile; an operation with an unresolved classification or destination asks the DM before proceeding.
+8. **Given** a vault has a section outside the built-in categories, **When** the DM defines a custom section with an identifier, existing folder, and description of its use, **Then** workflows can use that description as context when identifying relevant material without treating it as executable instruction or automatic classification.
 
 ---
 
@@ -81,7 +89,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - A configured section, guidance file, group note, or template does not exist or is unreadable.
 - Two existing locations plausibly match one section, or configured locations overlap.
 - A path is valid as text but resolves through a symbolic link outside the authorized vault.
-- YAML contains duplicate keys, custom tags, aliases, or scalar values whose types could be interpreted differently.
+- YAML uses aliases or merge keys, contains duplicate mapping keys, or has scalar values whose parsed types differ from the schema field types.
 - A profile uses an absent, invalid, or newer schema version.
 - The vault has no conventional folders, or has root-level adventure material and unrelated root notes.
 - The optional default guidance file is absent; this must not make an otherwise unconfigured vault unusable.
@@ -101,25 +109,29 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **FR-007**: The contract MUST allow optional vault-relative paths to designated Markdown guidance and optional per-article-type template overrides. An absent default guidance file MUST be treated as optional; an explicitly configured but unavailable guidance file or template MUST be reported rather than silently ignored or substituted.
 - **FR-008**: The contract MUST document defaults and optional fields so a vault can omit settings it does not customize.
 - **FR-009**: When `.dmassist.yaml` is absent, the system MUST support read-only discovery and report identified locations and ambiguities without creating configuration, folders, or notes.
-- **FR-010**: The YAML contract MUST define a restricted, unambiguous subset, reject duplicate keys, custom tags, anchors, aliases, merge keys, and unknown fields, and define scalar type conversion rules. Rejected constructs and invalid values MUST produce clear errors.
+- **FR-010**: The schema MUST define expected field types and validation outcomes. Duplicate keys, unknown fields, unsupported schema versions, invalid values, and explicit nulls MUST produce clear errors. YAML syntax supported by the reader chosen for implementation may be used if the resulting configuration passes schema validation; unsupported or malformed syntax MUST stop profile loading. String-valued fields MUST resolve to non-empty strings, and the reader/validator MUST handle scalar conversion consistently.
 - **FR-011**: Every configured path MUST be relative to the authorized vault, and its fully resolved target—including symbolic-link resolution—MUST remain within that vault before it is accessed or modified.
 - **FR-012**: Configuration, templates, and guidance MUST be treated as data, MUST NOT execute commands or expressions, and MUST NOT grant permissions or weaken safeguards for destructive or continuity-changing edits.
-- **FR-013**: A workflow MUST clearly report when it cannot validate the profile and MUST NOT silently install a dependency, substitute an unvalidated reading method, or continue using unvalidated settings.
+- **FR-013**: A workflow MUST clearly report when it cannot validate the profile and MUST NOT continue using unvalidated settings. Runtime selection and dependency handling are outside this feature's scope.
 - **FR-014**: The contract MUST keep machine-readable settings separate from campaign lore, session history, and character knowledge, and MUST NOT require migration, restructuring, or reformatting of existing vault content.
 - **FR-015**: Any workflow reading the same profile against the same vault state MUST resolve identical settings and path boundaries.
 - **FR-016**: Every explicitly configured section folder MUST exist. A missing explicitly configured section folder MUST cause rejection of the entire profile, without creating the folder or falling back to discovery. Missing conventional default folders that were not explicitly configured remain optional discovery candidates.
 - **FR-017**: Section mappings MAY share locations or be nested. Overlap MUST NOT invalidate an otherwise valid profile or classify every note under a mapped location automatically. An operation with an unresolved classification or destination MUST ask the DM before proceeding.
 - **FR-018**: When unconfigured discovery finds multiple plausible locations for a section, it MUST select the most likely candidate and continue read-only work, while reporting the selection as inferred, its reason, and the alternatives. An inferred discovery selection MUST NOT authorize edits or override explicitly configured mappings. This read-only selection policy does not resolve ambiguous destinations or classifications within overlapping configured mappings.
 - **FR-019**: If configuration or a referenced guidance file, template, or path changes after validation during a dependent operation, the affected operation MUST stop, report the change, and require revalidation before retrying. It MUST NOT automatically retry or silently combine old and new settings, and MUST continue to enforce the vault boundary before access.
+- **FR-020**: The contract MUST allow optional custom sections, each with a stable identifier, a vault-relative existing directory path, and a non-empty description of the section's intended use. Descriptions MUST be treated as data that can inform classification, not as instructions, authorization, or proof that every note in the folder belongs to that section. Custom section paths MUST follow the same boundary, existence, overlap, and whole-profile validation rules as explicitly configured built-in sections.
+- **FR-021**: The contract MUST allow optional named custom article-template overrides for DM-specific article types beyond the built-in types. Each custom type MUST map to one vault-relative Markdown template path, use a valid identifier that does not duplicate a built-in type, and follow the same path-boundary and missing/unreadable/invalid-template error behavior as built-in overrides. Custom template content MUST remain data and MUST NOT execute or grant permissions.
 
 ### Key Entities
 
 - **Vault profile**: Optional, versioned settings associated with one authorized campaign vault.
 - **Section mapping**: A configurable vault-relative location for a campaign content category, with a documented conventional default.
+- **Custom section**: An optional user-defined category with an identifier, existing vault-relative directory, and description to help future workflows understand its intended content.
 - **Campaign/group context**: The single active group's note reference used to scope future workflows without storing the group's knowledge in configuration.
 - **Preparation location**: The configured way to keep tentative session preparation distinct from actual-play records.
 - **Guidance path**: An optional in-vault Markdown source designated for vault-specific instructions.
 - **Template override**: An optional mapping from an article type to a DM-owned, vault-relative template.
+- **Custom template type**: A DM-defined article type identifier mapped to a vault-owned template for article needs outside the built-in template catalog.
 
 ## Success Criteria *(mandatory)*
 
@@ -138,6 +150,6 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - Conventional section names and meanings follow the repository README; existing vault organization takes precedence when a profile maps different locations.
 - The optional root-level `.dmassist-guidance.md` is the default designated guidance candidate, but its absence is not an error unless a path is explicitly configured.
 - Preparation defaults to a section titled `Preparation` in the session note; a separate preparation location can be selected when desired.
-- Unknown fields and unsupported YAML features are rejected to prevent misspelled or ambiguous settings from being silently ignored.
+- Unknown fields are rejected so misspelled or ambiguous settings are not silently ignored. YAML syntax support follows the reader selected during runtime implementation.
 - Configuration and path validation do not authorize any content edits; existing approval and continuity safeguards remain in force.
-- The runtime plan will select and document the YAML-reading capability and its dependency provisioning; this user-facing contract does not prescribe a parser or dependency.
+- The YAML reader, runtime, dependency versions, and provisioning are owned by Issue #4; this feature defines only the configuration schema and externally observable validation behavior.
