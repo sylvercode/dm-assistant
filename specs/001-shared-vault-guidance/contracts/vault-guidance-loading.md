@@ -23,8 +23,10 @@ currently exists.
   behavior.
 - **Plugin-owned shared reference:** Define common meanings and non-negotiable
   safeguards shared across vault-facing skills. It includes locally available,
-  paraphrased defaults for Obsidian aliases, tags, wikilinks, and callouts,
-  with official source links for provenance. It is distributed with the
+  paraphrased defaults for Obsidian aliases, tags, wikilinks and Markdown-style
+  internal links, and callouts, with official source links for provenance.
+  Wikilinks are the default unless DM input or designated vault-local guidance
+  establishes another vault preference. It is distributed with the
   plugin, separate from campaign data and vault-owned guidance; runtime
   workflows do not fetch those documentation pages.
 - **DM-designated vault-local guidance:** Supply the DM's conventions,
@@ -151,9 +153,11 @@ The plugin-owned reference defines locally available general defaults:
   display text for a one-off label. Follow native property syntax.
 - **Tags:** use tags for classification and retrieval, preserving the DM's
   vocabulary; use prose when the meaning needs explanation.
-- **Wikilinks:** respect the vault's chosen internal-link format and use
-  heading/block targets or display text where appropriate. Resolve a link
-  destination rather than inventing one.
+- **Internal links:** Obsidian supports wikilink and Markdown-style internal
+  links, including heading/block targets and display text. Prefer wikilinks
+  unless DM input or designated local guidance establishes a vault preference
+  for another supported format. Resolve a link destination rather than
+  inventing one.
 - **Callouts:** use native blockquote callout syntax for clearly titled
   supplemental content. Treat callout type/style as presentation, never as an
   access-control mechanism.

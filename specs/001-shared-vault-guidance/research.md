@@ -70,8 +70,10 @@ vault-facing task.
 - **Wikilinks/internal links**
   ([official guide](https://obsidian.md/help/links)): Obsidian supports
   wikilink and Markdown internal-link formats, with optional heading/block
-  targets and display text. Respect the vault's existing link conventions and
-  resolve targets rather than inventing them.
+  targets and display text. The spec clarification selects wikilinks as the
+  default and covers both formats, while an explicitly established preference
+  from DM input or designated vault-local guidance takes precedence. Resolve
+  targets rather than inventing them.
 - **Callouts** ([official guide](https://obsidian.md/help/callouts)): native
   callouts use blockquote syntax with a `[!type]` marker; titles and collapsible
   markers are presentation options. Callout styling may be customized, so
@@ -79,7 +81,7 @@ vault-facing task.
   access control.
 
 These defaults describe native behavior and general recommended use; they do
-not mandate a vault structure, tag vocabulary, or a single link style.
+not mandate a vault structure or tag vocabulary.
 DM-designated guidance may supplement, customize, or replace general
 recommendations for that campaign. It cannot redefine supported syntax or
 override shared safety requirements.

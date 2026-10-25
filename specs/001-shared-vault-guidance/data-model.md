@@ -27,8 +27,10 @@ Conceptual attributes:
 - **Owner**: the plugin.
 - **Scope**: shared across vault-facing skills; not campaign-specific.
 - **Content**: common conventions and safeguards, including paraphrased local
-  defaults for aliases, tags, wikilinks, and callouts with links to official
-  documentation as provenance.
+  defaults for aliases, tags, wikilinks and Markdown-style internal links, and
+  callouts with links to official documentation as provenance. Wikilinks are
+  the default unless DM input or designated vault-local guidance establishes
+  another vault preference.
 - **Availability**: bundled locally so skills can use the defaults without
   fetching external help pages at runtime.
 - **Resource identity/location**: a resolvable installed-plugin resource. The
@@ -96,8 +98,10 @@ Conceptual attributes:
 - **Required guidance**: the canonical shared reference and the designated
   vault-local guidance.
 - **Obsidian convention defaults**: local reference guidance for aliases, tags,
-  wikilinks, and callouts; external documentation links are citations, not
-  required runtime fetches.
+  both internal-link formats, and callouts; external documentation links are
+  citations, not required runtime fetches. A preference is established by
+  explicit DM input or designated vault-local guidance, not inferred from
+  isolated examples without confirmation.
 - **Resolved context**: the authorized vault, relevant campaign/group, and
   audience when applicable.
 - **Proposed change scope**: whether a requested edit is clearly page-local or

@@ -8,6 +8,12 @@
 
 **Input**: GitHub issue #2, “Establish shared vault guidance and loading prerequisites”
 
+## Clarifications
+
+### Session 2026-10-25
+
+- Q: Should the local Obsidian link guidance cover both wikilinks and Markdown-style internal links, or only wikilinks? → A: Cover both formats and recommend wikilinks by default, while respecting an explicitly established vault preference.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Consistent vault-aware assistance (Priority: P1)
@@ -23,7 +29,7 @@ As a DM using a vault-facing skill, I need it to apply the same campaign boundar
 1. **Given** the shared reference and designated vault-local guidance are available, **When** a vault-facing skill starts a campaign-note task, **Then** it loads both sources and the active vault/campaign context before interpreting or changing notes.
 2. **Given** a task concerns preparation, actual play, character knowledge, lore, or a player-facing handout, **When** the skill responds, **Then** it follows the preparation and knowledge boundary in FR-007, the continuity boundary in FR-008, and the player-safety boundary in FR-009, as applicable.
 3. **Given** the plugin is installed separately from the campaign vault, **When** the skill locates its shared reference, **Then** it uses the plugin-owned resource and does not treat the plugin directory as the vault.
-4. **Given** official Obsidian help pages are unavailable during a task and the shared reference is loaded, **When** a DM asks about aliases, tags, wikilinks, or callouts, **Then** the skill uses the local defaults, applies any compatible DM-designated customization, and does not fetch external documentation or claim unsupported syntax.
+4. **Given** official Obsidian help pages are unavailable during a task and the shared reference is loaded, **When** a DM asks about aliases, tags, internal links, or callouts, **Then** the skill uses the local defaults, applies any compatible DM-designated customization, and does not fetch external documentation or claim unsupported syntax.
 
 ### User Story 2 - Safe handling of missing or ambiguous guidance (Priority: P1)
 
@@ -81,7 +87,7 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 - **FR-012**: The installed-resource lookup MUST be verified in the supported client so that skills can find the bundled reference independently of the current working directory.
 - **FR-013**: Before any vault-facing skill reads or changes campaign notes, it MUST verify that every currently declared required runtime dependency is available. The initial required dependency is the Obsidian Link Resolver MCP server exposing `resolve_obsidian_link`, configured to allow the authorized vault. If any required dependency is missing, unavailable, or misconfigured, the skill MUST explain the failure and stop before accessing or changing campaign notes.
 - **FR-014**: The required-dependency inventory MUST be explicitly documented and extensible; it is not an exhaustive list of all future dependencies. Each added required dependency MUST state its purpose and scope, supported version or compatibility contract, user setup/configuration, readiness check, and behavior when unavailable.
-- **FR-015**: The plugin-owned shared reference MUST contain concise, locally available, paraphrased default guidance for Obsidian aliases, tags, wikilinks, and callouts, based on the official documentation linked in this specification. Vault-facing skills MUST be able to use these defaults without fetching or reinterpreting the external pages at runtime.
+- **FR-015**: The plugin-owned shared reference MUST contain concise, locally available, paraphrased default guidance for Obsidian aliases, tags, internal links (both wikilinks and Markdown-style links), and callouts, based on the official documentation linked in this specification. It MUST recommend wikilinks by default while respecting an explicitly established vault preference. Vault-facing skills MUST be able to use these defaults without fetching or reinterpreting the external pages at runtime.
 - **FR-016**: DM-designated vault-local guidance MAY supplement or customize the shared Obsidian defaults, including replacing a general recommendation for a campaign. It MUST preserve valid Obsidian syntax and semantics and MUST NOT override the shared safety requirements.
 
 ## Expected Runtime Dependencies *(initial, non-exhaustive)*
@@ -104,10 +110,12 @@ paraphrased guidance rather than requiring runtime access to the web pages:
 |---|---|---|
 | Aliases | [Obsidian Aliases](https://obsidian.md/help/aliases) | Use aliases as reusable alternate names for a note; use per-link display text for a one-off label. Store note aliases using Obsidian's supported list property. |
 | Tags | [Obsidian Tags](https://obsidian.md/help/tags) | Use tags as classification and retrieval metadata, not as a substitute for explanatory prose. Preserve the DM's vocabulary; nested tags may express a hierarchy. |
-| Wikilinks | [Obsidian Internal links](https://obsidian.md/help/links) | Use internal links to connect notes and, where appropriate, headings or blocks. Resolve destinations rather than inventing them; use display text for local presentation and aliases for reusable alternate names. |
+| Internal links (Wikilinks and Markdown) | [Obsidian Internal links](https://obsidian.md/help/links) | Both wikilink and Markdown-style internal links are supported. Prefer wikilinks by default unless an established vault preference says otherwise. Use heading/block targets and display text where appropriate; resolve destinations rather than inventing them. |
 | Callouts | [Obsidian Callouts](https://obsidian.md/help/callouts) | Use supported blockquote callout syntax for clearly titled supplemental content. A callout or collapsed section is presentation only, not an access-control boundary. |
 
 These are general defaults, not a required vault structure or tag vocabulary.
+An explicitly established vault preference may come from DM input or
+designated vault-local guidance; it takes precedence over the wikilink default.
 DM-designated guidance may set campaign-specific terms and usage preferences
 within FR-016. If a preferred convention conflicts with native syntax or cannot
 be verified from the available local guidance, the skill MUST identify the
