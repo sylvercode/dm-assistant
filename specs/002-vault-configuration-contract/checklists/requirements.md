@@ -6,20 +6,20 @@
 
 ## Content Quality
 
-- [x] No implementation details (languages, frameworks, APIs)
+- [x] No implementation details beyond the machine-readable contract technology explicitly required by the feature
 - [x] Focused on user value and business needs
-- [x] Written for non-technical stakeholders
+- [x] Written for non-technical stakeholders, with necessary contract terms explained by context
 - [x] All mandatory sections completed
 
 ## Requirement Completeness
 
 - [x] No [NEEDS CLARIFICATION] markers remain
-- [x] Requirements are testable and unambiguous
+- [x] Requirements are testable and unambiguous, including scalar conversion outcomes and the JSON Schema's normalized input
 - [x] Success criteria are measurable
-- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] Success criteria are technology-agnostic and verifiable against the stated contract
 - [x] All acceptance scenarios are defined
-- [x] Edge cases are identified
-- [x] Scope is clearly bounded
+- [x] Edge cases are identified, including missing/invalid schema and JSON Schema limits
+- [x] Scope is clearly bounded between the version-1 profile/schema and Issue #4 runtime integration
 - [x] Dependencies and assumptions identified
 
 ## Feature Readiness
@@ -27,10 +27,9 @@
 - [x] All functional requirements have clear acceptance criteria
 - [x] User scenarios cover primary flows
 - [x] Feature meets measurable outcomes defined in Success Criteria
-- [x] No implementation details leak into specification
+- [x] No implementation details leak into specification beyond the required JSON Schema artifact
 
 ## Notes
 
-- Issue #3 has no comments. Its artifact-list endpoint returned HTTP 404, so no issue artifacts were available to inspect.
-- Defaults name the exact conventional section folders; preparation uses a section titled `Preparation`; identical profile and vault inputs resolve to identical settings and path boundaries.
-- Missing or invalid schema versions, unavailable explicitly designated guidance, unavailable validation, and consistent resolution each have explicit acceptance scenarios. Issue #3 defines the schema and observable validation outcomes; Issue #4 owns reader selection, runtime, and dependency provisioning.
+- The JSON Schema validates structural and value constraints on the normalized profile; YAML parsing, scalar normalization, duplicate-key detection, and vault/filesystem checks remain separate runtime obligations owned by Issue #4.
+- FR-010 specifies the observable scalar normalization outcome without choosing a parser or normalization implementation.

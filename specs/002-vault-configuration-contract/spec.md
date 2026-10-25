@@ -1,11 +1,13 @@
 # Feature Specification: Vault Configuration Contract
 
 **Scope boundary**: This feature defines the `.dmassist.yaml` schema and the
-observable outcomes for valid, invalid, and absent configuration. It does not
-select or provision a YAML parser, define a PowerShell runtime, or implement a
-configuration reader. Parser selection, dependency provisioning, and reader
-integration belong to Issue #4, “Establish the PowerShell runtime and safe
-operation contracts.”
+observable outcomes for valid, invalid, and absent configuration, including a
+machine-readable JSON Schema for profile structure and value constraints. The
+schema does not replace YAML parsing or runtime checks that depend on the
+authorized vault and filesystem. This feature does not select or provision a
+YAML parser, define a PowerShell runtime, or implement a configuration reader.
+Parser selection, dependency provisioning, and reader integration belong to
+Issue #4, “Establish the PowerShell runtime and safe operation contracts.”
 
 **Feature Branch**: `sylvercode-vault-configuration-contract`
 
@@ -62,6 +64,7 @@ A Dungeon Master can provide an optional vault-local profile to identify section
 6. **Given** an explicitly configured section folder does not exist, **When** the profile is validated, **Then** the entire profile is rejected with an error identifying the missing folder, and no folder is created automatically.
 7. **Given** section mappings share a folder or are nested within one another, **When** the profile is validated, **Then** overlap alone does not invalidate the profile; an operation with an unresolved classification or destination asks the DM before proceeding.
 8. **Given** a vault has a section outside the built-in categories, **When** the DM defines a custom section with an identifier, existing folder, and description of its use, **Then** workflows can use that description as context when identifying relevant material without treating it as executable instruction or automatic classification.
+9. **Given** a DM or maintainer needs to check the profile's supported structure, **When** they use the published machine-readable schema, **Then** it describes the version-1 profile's structural and value constraints, while the written contract identifies validation that still depends on YAML parsing or vault state.
 
 ---
 
@@ -95,6 +98,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - The optional default guidance file is absent; this must not make an otherwise unconfigured vault unusable.
 - A configured template override fails validation; article creation must stop rather than silently use a different template.
 - Configuration or a referenced guidance file, template, or path changes after validation: stop the affected operation, report the change, and require revalidation before retrying.
+- The machine-readable schema is missing, invalid, or inconsistent with the written version-1 contract; it cannot be used as a complete substitute for the contract or runtime validation.
 
 ## Requirements *(mandatory)*
 
@@ -109,7 +113,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **FR-007**: The contract MUST allow optional vault-relative paths to designated Markdown guidance and optional per-article-type template overrides. An absent default guidance file MUST be treated as optional; an explicitly configured but unavailable guidance file or template MUST be reported rather than silently ignored or substituted.
 - **FR-008**: The contract MUST document defaults and optional fields so a vault can omit settings it does not customize.
 - **FR-009**: When `.dmassist.yaml` is absent, the system MUST support read-only discovery and report identified locations and ambiguities without creating configuration, folders, or notes.
-- **FR-010**: The schema MUST define expected field types and validation outcomes. Duplicate keys, unknown fields, unsupported schema versions, invalid values, and explicit nulls MUST produce clear errors. YAML syntax supported by the reader chosen for implementation may be used if the resulting configuration passes schema validation; unsupported or malformed syntax MUST stop profile loading. String-valued fields MUST resolve to non-empty strings, and the reader/validator MUST handle scalar conversion consistently.
+- **FR-010**: The configuration contract MUST define expected field types and validation outcomes. Duplicate YAML mapping keys MUST be rejected during parsing; unknown fields, unsupported schema versions, invalid values, and explicit nulls MUST produce clear errors. YAML syntax supported by the reader chosen for implementation may be used if the resulting configuration passes schema validation; unsupported or malformed syntax MUST stop profile loading. For string-valued fields, YAML string, boolean, numeric, and date/time scalar values MUST resolve to non-empty strings using locale-independent representations; booleans MUST use lowercase text and dates and timestamps MUST use ISO 8601. Explicit nulls and collection values MUST be rejected. The version field MUST remain the integer `1`.
 - **FR-011**: Every configured path MUST be relative to the authorized vault, and its fully resolved target—including symbolic-link resolution—MUST remain within that vault before it is accessed or modified.
 - **FR-012**: Configuration, templates, and guidance MUST be treated as data, MUST NOT execute commands or expressions, and MUST NOT grant permissions or weaken safeguards for destructive or continuity-changing edits.
 - **FR-013**: A workflow MUST clearly report when it cannot validate the profile and MUST NOT continue using unvalidated settings. Runtime selection and dependency handling are outside this feature's scope.
@@ -121,6 +125,9 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **FR-019**: If configuration or a referenced guidance file, template, or path changes after validation during a dependent operation, the affected operation MUST stop, report the change, and require revalidation before retrying. It MUST NOT automatically retry or silently combine old and new settings, and MUST continue to enforce the vault boundary before access.
 - **FR-020**: The contract MUST allow optional custom sections, each with a stable identifier, a vault-relative existing directory path, and a non-empty description of the section's intended use. Descriptions MUST be treated as data that can inform classification, not as instructions, authorization, or proof that every note in the folder belongs to that section. Custom section paths MUST follow the same boundary, existence, overlap, and whole-profile validation rules as explicitly configured built-in sections.
 - **FR-021**: The contract MUST allow optional named custom article-template overrides for DM-specific article types beyond the built-in types. Each custom type MUST map to one vault-relative Markdown template path, use a valid identifier that does not duplicate a built-in type, and follow the same path-boundary and missing/unreadable/invalid-template error behavior as built-in overrides. Custom template content MUST remain data and MUST NOT execute or grant permissions.
+- **FR-022**: The feature MUST provide a machine-readable JSON Schema for version 1 of `.dmassist.yaml`, distributed with the configuration contract. The schema MUST validate the normalized profile structure and define its structural and value constraints, including allowed properties, required values, field types, enums, identifier patterns, and conditional preparation settings. It MUST reject unknown properties and include applicable defaults as JSON Schema annotations, without implying that schema validation applies them.
+- **FR-023**: The JSON Schema MUST be consistent with the written version-1 contract and serve as the machine-readable definition of constraints expressible over the normalized profile structure. The written contract MUST remain authoritative for defaults and observable behavior not encoded by the schema.
+- **FR-024**: The JSON Schema MUST NOT be presented as parsing YAML or as validating duplicate YAML keys, reader-specific syntax, scalar normalization, vault-relative path resolution, filesystem existence or readability, symbolic-link boundaries, or changes to inputs during an operation. Those requirements remain separate runtime obligations; Issue #4 owns YAML reading, normalization to the schema's input structure, validator integration, and filesystem-dependent checks.
 
 ### Key Entities
 
@@ -132,6 +139,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **Guidance path**: An optional in-vault Markdown source designated for vault-specific instructions.
 - **Template override**: An optional mapping from an article type to a DM-owned, vault-relative template.
 - **Custom template type**: A DM-defined article type identifier mapped to a vault-owned template for article needs outside the built-in template catalog.
+- **Machine-readable profile schema**: A versioned artifact describing the structural and value constraints of the normalized version-1 profile, complementing rather than replacing the written contract and runtime checks.
 
 ## Success Criteria *(mandatory)*
 
@@ -142,6 +150,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **SC-003**: All validation cases for malformed YAML, duplicate keys, unknown fields, unsupported schema versions, invalid types, traversal, and out-of-vault symbolic links produce an explicit error before any out-of-vault access or write.
 - **SC-004**: Existing vaults can use their current organization without renaming folders, moving notes, or changing campaign-content formats.
 - **SC-005**: In every test where profile validation is unavailable, the workflow reports that it cannot validate the profile and makes no decision using unvalidated settings.
+- **SC-006**: Every structural and value constraint expressible against the normalized version-1 profile has a corresponding schema validation case, and all cases produce the outcomes defined by the written contract without treating parser or filesystem checks as schema validation.
 
 ## Assumptions
 
@@ -151,5 +160,6 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - The optional root-level `.dmassist-guidance.md` is the default designated guidance candidate, but its absence is not an error unless a path is explicitly configured.
 - Preparation defaults to a section titled `Preparation` in the session note; a separate preparation location can be selected when desired.
 - Unknown fields are rejected so misspelled or ambiguous settings are not silently ignored. YAML syntax support follows the reader selected during runtime implementation.
+- A JSON Schema artifact validates the structure and value constraints of the normalized profile; YAML parsing, scalar normalization, and checks requiring access to the authorized vault remain outside its scope.
 - Configuration and path validation do not authorize any content edits; existing approval and continuity safeguards remain in force.
 - The YAML reader, runtime, dependency versions, and provisioning are owned by Issue #4; this feature defines only the configuration schema and externally observable validation behavior.
