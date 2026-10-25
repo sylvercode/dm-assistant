@@ -22,12 +22,16 @@ currently exists.
   with purpose, scope, compatibility, setup, readiness check, and failure
   behavior.
 - **Plugin-owned shared reference:** Define common meanings and non-negotiable
-  safeguards shared across vault-facing skills. It is distributed with the
-  plugin, separate from campaign data and vault-owned guidance.
+  safeguards shared across vault-facing skills. It includes locally available,
+  paraphrased defaults for Obsidian aliases, tags, wikilinks, and callouts,
+  with official source links for provenance. It is distributed with the
+  plugin, separate from campaign data and vault-owned guidance; runtime
+  workflows do not fetch those documentation pages.
 - **DM-designated vault-local guidance:** Supply the DM's conventions,
   organization mappings, campaign-specific instructions, and exceptions. It
-  customizes how shared meanings apply to a vault, but cannot override the
-  safeguards in this contract or authorize unrelated actions.
+  may supplement, customize, or replace general Obsidian-use recommendations
+  for that vault, but cannot redefine native syntax/semantics, override the
+  safeguards in this contract, or authorize unrelated actions.
 - **DM:** Identify or confirm the authorized vault and relevant campaign/group
   when needed; resolve material ambiguity; and approve proposed broad,
   destructive, restructuring, or continuity-changing edits before they are
@@ -58,7 +62,8 @@ Before interpreting or changing campaign notes, the skill must establish:
    vault-local guidance explicitly designated by the DM or by an established
    vault-local configuration contract. Do not guess which local guidance file
    is designated. This contract does not define that configuration schema or
-   defaults.
+   defaults. Use the shared reference's local Obsidian convention defaults
+   without fetching external documentation pages.
 
 A vault-local guidance file is not required merely because none has been
 designated. If no profile or local guidance is available, a straightforward
@@ -77,7 +82,8 @@ equivalent to no source having been designated.
    campaign notes.
 3. Load the canonical plugin-owned shared reference from the installed plugin
    resource, not from an assumed current directory, source checkout, or vault
-   path.
+   path. Its paraphrased Obsidian convention defaults must be usable without
+   network access.
 4. At the vault root, inspect the configuration/profile if present to identify
    any designated local guidance; read that guidance before interpreting or
    changing notes. The configuration format and the mechanism for designating
@@ -130,9 +136,34 @@ re-establish the applicable context before proceeding.
 The dependency inventory is explicit but non-exhaustive. Each future required
 dependency must document its purpose and scope, compatible version/interface,
 user-owned setup, readiness check, and unavailable behavior. The official
-[Obsidian Aliases](https://obsidian.md/help/aliases) and
-[Obsidian Tags](https://obsidian.md/help/tags) pages are references, not
-runtime dependencies.
+Obsidian documentation for [Aliases](https://obsidian.md/help/aliases),
+[Tags](https://obsidian.md/help/tags), [Internal
+links](https://obsidian.md/help/links), and
+[Callouts](https://obsidian.md/help/callouts) are sources for concise,
+paraphrased guidance bundled in the shared reference, not runtime
+dependencies. A skill must not fetch them to apply the defaults.
+
+## Obsidian convention defaults and DM customization
+
+The plugin-owned reference defines locally available general defaults:
+
+- **Aliases:** use reusable alternate note names where helpful; use link
+  display text for a one-off label. Follow native property syntax.
+- **Tags:** use tags for classification and retrieval, preserving the DM's
+  vocabulary; use prose when the meaning needs explanation.
+- **Wikilinks:** respect the vault's chosen internal-link format and use
+  heading/block targets or display text where appropriate. Resolve a link
+  destination rather than inventing one.
+- **Callouts:** use native blockquote callout syntax for clearly titled
+  supplemental content. Treat callout type/style as presentation, never as an
+  access-control mechanism.
+
+These are starting defaults, not required folder structures, tag taxonomies,
+or a mandated link style. DM-designated guidance may add to or replace a
+general recommendation for the campaign. It cannot claim invalid or
+unsupported Obsidian syntax, change native semantics, or weaken shared safety
+rules. When a requested customization appears incompatible with native
+behavior, report the conflict rather than silently applying or promising it.
 
 ## Initial dependency configuration
 

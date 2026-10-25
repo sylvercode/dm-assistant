@@ -50,10 +50,43 @@ Copilot CLI's user-managed MCP settings. Verify with `copilot mcp list` and
 a new session. Do not ship plugin MCP configuration with an empty or
 hard-coded vault root.
 
-The official [Obsidian Aliases](https://obsidian.md/help/aliases) and
-[Obsidian Tags](https://obsidian.md/help/tags) pages are reference sources,
-not runtime dependencies. Obsidian need not be running, and campaign-specific
-tag vocabulary remains DM-owned.
+## Locally bundled Obsidian convention defaults
+
+**Decision**: Put concise, paraphrased defaults for Aliases, Tags, Internal
+links, and Callouts in the plugin-owned shared reference. Keep the official
+documentation URLs as provenance and maintenance references, but do not fetch
+the pages or require the DM or skill to reinterpret them during a
+vault-facing task.
+
+**Verified source concepts**:
+
+- **Aliases** ([official guide](https://obsidian.md/help/aliases)): aliases are
+  reusable alternate names for a note, while link display text is appropriate
+  for a one-off presentation change. Note aliases use a YAML list property.
+- **Tags** ([official guide](https://obsidian.md/help/tags)): tags classify
+  notes and support retrieval; they may be inline or represented in a YAML
+  list property. Slash-separated nested tags provide a hierarchy. The exact
+  campaign vocabulary remains DM-owned.
+- **Wikilinks/internal links**
+  ([official guide](https://obsidian.md/help/links)): Obsidian supports
+  wikilink and Markdown internal-link formats, with optional heading/block
+  targets and display text. Respect the vault's existing link conventions and
+  resolve targets rather than inventing them.
+- **Callouts** ([official guide](https://obsidian.md/help/callouts)): native
+  callouts use blockquote syntax with a `[!type]` marker; titles and collapsible
+  markers are presentation options. Callout styling may be customized, so
+  avoid assuming community-defined types exist. A collapsed callout is not
+  access control.
+
+These defaults describe native behavior and general recommended use; they do
+not mandate a vault structure, tag vocabulary, or a single link style.
+DM-designated guidance may supplement, customize, or replace general
+recommendations for that campaign. It cannot redefine supported syntax or
+override shared safety requirements.
+
+The official Obsidian help pages are source references, not runtime
+dependencies. Obsidian need not be running and no network access is required
+to use the local summaries.
 
 **Sources**:
 
@@ -64,4 +97,4 @@ tag vocabulary remains DM-owned.
 - `docs/architecture.md` — component boundaries and campaign-vault separation.
 - `docs/vault-guidance-brainstorm.md` — recommended three-layer guidance model and loading sequence.
 - [Obsidian Link Resolver](https://github.com/sylvercode/obsidian-link-resolver) — resolver release, MCP startup requirements, and tool contract.
-- [Obsidian Aliases](https://obsidian.md/help/aliases) and [Obsidian Tags](https://obsidian.md/help/tags) — reference material for native feature semantics.
+- [Obsidian Aliases](https://obsidian.md/help/aliases), [Obsidian Tags](https://obsidian.md/help/tags), [Obsidian Internal links](https://obsidian.md/help/links), and [Obsidian Callouts](https://obsidian.md/help/callouts) — primary references for local, paraphrased convention defaults; none is a runtime dependency.

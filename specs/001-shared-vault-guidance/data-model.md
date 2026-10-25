@@ -19,13 +19,18 @@ guidance, not an implemented loader contract.
 ### Plugin-owned shared reference
 
 Canonical plugin-distributed guidance that defines shared meanings, campaign
-boundaries, knowledge and preparation distinctions, and editing safeguards.
+boundaries, knowledge and preparation distinctions, editing safeguards, and
+concise Obsidian-native convention defaults.
 
 Conceptual attributes:
 
 - **Owner**: the plugin.
 - **Scope**: shared across vault-facing skills; not campaign-specific.
-- **Content**: common conventions and safeguards.
+- **Content**: common conventions and safeguards, including paraphrased local
+  defaults for aliases, tags, wikilinks, and callouts with links to official
+  documentation as provenance.
+- **Availability**: bundled locally so skills can use the defaults without
+  fetching external help pages at runtime.
 - **Resource identity/location**: a resolvable installed-plugin resource. The
   research recommends bundling it with a vault-orientation skill, but installed
   lookup must be verified; a source-tree path is not sufficient.
@@ -36,8 +41,10 @@ DM-owned guidance.
 ### DM-owned vault-local guidance
 
 DM-authored conventions, mappings, and exceptions applicable to a particular
-vault. It customizes organization and style without replacing shared safeguards
-or duplicating campaign facts.
+vault. It customizes organization and style, including supplementing or
+replacing general Obsidian-use recommendations for that campaign, without
+redefining native syntax/semantics, replacing shared safeguards, or duplicating
+campaign facts.
 
 Conceptual attributes:
 
@@ -47,6 +54,9 @@ Conceptual attributes:
   established vault-local configuration contract. The skill must not guess.
 - **Content/location**: guidance text and its vault-local source, which may be
   absent, unreadable, or conflicting.
+- **Customization scope**: campaign-specific choices and conventions may
+  customize general defaults; native syntax/semantics and shared safety
+  invariants remain authoritative.
 
 The brainstorm proposes optional `.dmassist-guidance.md` at the vault root,
 referenced from `.dmassist.yaml`; this is a design direction, not a required
@@ -85,6 +95,9 @@ Conceptual attributes:
 - **Vault-facing status**: whether the workflow reads or changes campaign notes.
 - **Required guidance**: the canonical shared reference and the designated
   vault-local guidance.
+- **Obsidian convention defaults**: local reference guidance for aliases, tags,
+  wikilinks, and callouts; external documentation links are citations, not
+  required runtime fetches.
 - **Resolved context**: the authorized vault, relevant campaign/group, and
   audience when applicable.
 - **Proposed change scope**: whether a requested edit is clearly page-local or
@@ -117,8 +130,9 @@ Conceptual attributes:
 The initial dependency is the Obsidian Link Resolver MCP server,
 `obsidian-link-resolver` version `2.0.0` or later, exposing
 `resolve_obsidian_link`. The user configures authorized vault roots in Copilot
-CLI; private paths are not stored in the plugin. Obsidian Aliases and Tags
-documentation are reference sources, not runtime dependencies.
+CLI; private paths are not stored in the plugin. Official Obsidian help pages
+for aliases, tags, internal links, and callouts are provenance for locally
+bundled paraphrased guidance, not runtime dependencies.
 
 ## Relationships
 
@@ -126,6 +140,9 @@ documentation are reference sources, not runtime dependencies.
   the vault-local guidance designated for the authorized vault, and verify
   every currently declared required dependency, before interpreting or
   changing campaign notes.
+- Locally bundled Obsidian convention defaults supply general native usage;
+  designated DM guidance may customize the campaign convention but cannot
+  misrepresent native syntax or override shared safety requirements.
 - A DM-owned guidance source applies to its designated vault; it is not
   distributed with the plugin and cannot authorize actions outside that vault.
 - A resolved vault/campaign context scopes the task and its campaign material.

@@ -23,6 +23,7 @@ As a DM using a vault-facing skill, I need it to apply the same campaign boundar
 1. **Given** the shared reference and designated vault-local guidance are available, **When** a vault-facing skill starts a campaign-note task, **Then** it loads both sources and the active vault/campaign context before interpreting or changing notes.
 2. **Given** a task concerns preparation, actual play, character knowledge, lore, or a player-facing handout, **When** the skill responds, **Then** it follows the preparation and knowledge boundary in FR-007, the continuity boundary in FR-008, and the player-safety boundary in FR-009, as applicable.
 3. **Given** the plugin is installed separately from the campaign vault, **When** the skill locates its shared reference, **Then** it uses the plugin-owned resource and does not treat the plugin directory as the vault.
+4. **Given** official Obsidian help pages are unavailable during a task and the shared reference is loaded, **When** a DM asks about aliases, tags, wikilinks, or callouts, **Then** the skill uses the local defaults, applies any compatible DM-designated customization, and does not fetch external documentation or claim unsupported syntax.
 
 ### User Story 2 - Safe handling of missing or ambiguous guidance (Priority: P1)
 
@@ -80,19 +81,37 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 - **FR-012**: The installed-resource lookup MUST be verified in the supported client so that skills can find the bundled reference independently of the current working directory.
 - **FR-013**: Before any vault-facing skill reads or changes campaign notes, it MUST verify that every currently declared required runtime dependency is available. The initial required dependency is the Obsidian Link Resolver MCP server exposing `resolve_obsidian_link`, configured to allow the authorized vault. If any required dependency is missing, unavailable, or misconfigured, the skill MUST explain the failure and stop before accessing or changing campaign notes.
 - **FR-014**: The required-dependency inventory MUST be explicitly documented and extensible; it is not an exhaustive list of all future dependencies. Each added required dependency MUST state its purpose and scope, supported version or compatibility contract, user setup/configuration, readiness check, and behavior when unavailable.
+- **FR-015**: The plugin-owned shared reference MUST contain concise, locally available, paraphrased default guidance for Obsidian aliases, tags, wikilinks, and callouts, based on the official documentation linked in this specification. Vault-facing skills MUST be able to use these defaults without fetching or reinterpreting the external pages at runtime.
+- **FR-016**: DM-designated vault-local guidance MAY supplement or customize the shared Obsidian defaults, including replacing a general recommendation for a campaign. It MUST preserve valid Obsidian syntax and semantics and MUST NOT override the shared safety requirements.
 
-## Expected Dependencies *(initial, non-exhaustive)*
+## Expected Runtime Dependencies *(initial, non-exhaustive)*
 
 | Dependency | Type and scope | Purpose | Setup and verification | Failure behavior |
 |---|---|---|---|---|
 | [Obsidian Link Resolver](https://github.com/sylvercode/obsidian-link-resolver) | Required runtime MCP server for every vault-facing skill; minimum compatible release is `2.0.0`. | Exposes `resolve_obsidian_link` for resolving Obsidian links against an authorized vault. | The DM installs the MCP release separately and configures `obsidian-link-resolver` in Copilot CLI with one or more explicitly authorized absolute vault roots. Verify the server and tool are available in a new session. Do not embed vault-specific paths in the plugin. | If the server or tool is unavailable, or the vault is not authorized, the skill stops before reading or changing campaign notes and reports the required setup. Resolver errors or unresolved/ambiguous links MUST be surfaced; skills MUST NOT guess a destination. |
-| [Obsidian Aliases documentation](https://obsidian.md/help/aliases) | Reference source, not a runtime dependency. | Documents native alias behavior for shared guidance and validation examples. | Keep as a reference link; do not require the Obsidian application at runtime. | If documentation is unavailable, do not claim undocumented alias behavior. |
-| [Obsidian Tags documentation](https://obsidian.md/help/tags) | Reference source, not a runtime dependency. | Documents native tag behavior for shared guidance and validation examples. | Keep as a reference link; campaign-specific tag vocabulary remains DM-owned. | If documentation is unavailable, do not claim undocumented tag behavior. |
 
 This inventory records dependencies identified so far and is not exhaustive.
-Future required runtime dependencies may be added using FR-014. Documentation
-links remain reference sources unless a later specification explicitly makes
-them runtime dependencies.
+Future required runtime dependencies may be added using FR-014. Obsidian help
+pages listed below are source references for the locally bundled guidance, not
+runtime dependencies.
+
+## Local Obsidian Convention Sources
+
+The shared reference MUST summarize these native concepts locally, using
+paraphrased guidance rather than requiring runtime access to the web pages:
+
+| Concept | Official source | Local default guidance |
+|---|---|---|
+| Aliases | [Obsidian Aliases](https://obsidian.md/help/aliases) | Use aliases as reusable alternate names for a note; use per-link display text for a one-off label. Store note aliases using Obsidian's supported list property. |
+| Tags | [Obsidian Tags](https://obsidian.md/help/tags) | Use tags as classification and retrieval metadata, not as a substitute for explanatory prose. Preserve the DM's vocabulary; nested tags may express a hierarchy. |
+| Wikilinks | [Obsidian Internal links](https://obsidian.md/help/links) | Use internal links to connect notes and, where appropriate, headings or blocks. Resolve destinations rather than inventing them; use display text for local presentation and aliases for reusable alternate names. |
+| Callouts | [Obsidian Callouts](https://obsidian.md/help/callouts) | Use supported blockquote callout syntax for clearly titled supplemental content. A callout or collapsed section is presentation only, not an access-control boundary. |
+
+These are general defaults, not a required vault structure or tag vocabulary.
+DM-designated guidance may set campaign-specific terms and usage preferences
+within FR-016. If a preferred convention conflicts with native syntax or cannot
+be verified from the available local guidance, the skill MUST identify the
+conflict rather than claim unsupported behavior.
 
 ### Key Entities
 
@@ -111,12 +130,14 @@ them runtime dependencies.
 - **SC-003**: All documented acceptance scenarios for preparation/history, continuity, player safety, and approval safeguards pass without unintended campaign-note changes.
 - **SC-004**: In a short walkthrough, at least 4 of 5 DMs can correctly identify which example guidance is plugin-wide and which is vault-specific, with no vault reorganization required.
 - **SC-005**: In 100% of tested vault-facing skill invocations where the resolver server or `resolve_obsidian_link` is unavailable or not configured for the authorized vault, the skill reports the dependency problem and performs no campaign-note reads or changes.
+- **SC-006**: In 100% of tested convention-guidance tasks, skills use the locally bundled Obsidian defaults without fetching external help pages, and apply DM-designated customizations without misrepresenting native syntax or weakening safety requirements.
 
 ## Assumptions
 
 - The initial workflows support one campaign per vault; multi-campaign isolation is outside this feature.
 - The supported client and installed-resource lookup method will be selected and verified during planning; source-tree presence alone does not satisfy the lookup requirement.
 - GitHub Copilot CLI is the supported client for the initial resolver dependency setup. The MCP server and user-authorized vault roots are configured outside the distributed plugin.
+- Official Obsidian help pages are source references used to maintain concise local defaults; no network access to those pages is required during a vault-facing task.
 - The designated vault-local guidance source is supplied explicitly by the DM or identified by the vault-configuration contract. The separate configuration work defines its specific discovery and configuration rules; this feature does not prescribe that schema or require vault migration.
 - A specialized agent may be considered as a future workflow option only if supported and useful, but explicit skill prerequisites remain required and do not depend on agent availability.
 - No vault folders, profile files, or guidance files are created or reorganized automatically by this feature.

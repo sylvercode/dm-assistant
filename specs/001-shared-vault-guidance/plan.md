@@ -6,17 +6,17 @@
 
 ## Summary
 
-Create one canonical, plugin-owned shared vault reference and a vault-orientation skill that loads it alongside DM-designated vault-local guidance before handling campaign notes. Every vault-facing skill must explicitly follow the same loading and context-resolution contract. Validate the packaged resource lookup in the installed GitHub Copilot CLI plugin, independently of the current working directory; do not assume source-tree paths are valid after installation.
+Create one canonical, plugin-owned shared vault reference and a vault-orientation skill that loads it alongside DM-designated vault-local guidance before handling campaign notes. The shared reference will include local, paraphrased defaults for Obsidian aliases, tags, wikilinks, and callouts, so a skill does not need to fetch or reinterpret official help pages at runtime. DM-designated guidance may supplement or customize these defaults for a campaign while preserving Obsidian syntax/semantics and shared safety requirements. Every vault-facing skill must explicitly follow the same loading and context-resolution contract. Validate the packaged resource lookup in the installed GitHub Copilot CLI plugin, independently of the current working directory; do not assume source-tree paths are valid after installation.
 
 ## Technical Context
 
 **Language/Version**: Markdown for plugin guidance and portable skill instructions; PowerShell is the repository's script environment, but this feature adds no runtime scripts.
 
-**Primary Dependencies**: Agent Plugins 1.0 fixed plugin layout; GitHub Copilot CLI as the supported client for installed-resource validation; Obsidian Link Resolver MCP server v2.0.0 or later, installed/configured by the user with explicitly authorized vault roots. This is the initial, non-exhaustive runtime dependency inventory. Official Obsidian Aliases and Tags documentation are reference sources, not runtime dependencies.
+**Primary Dependencies**: Agent Plugins 1.0 fixed plugin layout; GitHub Copilot CLI as the supported client for installed-resource validation; Obsidian Link Resolver MCP server v2.0.0 or later, installed/configured by the user with explicitly authorized vault roots. This is the initial, non-exhaustive runtime dependency inventory. Official Obsidian documentation for Aliases, Tags, Internal links, and Callouts provides source references for paraphrased guidance but is not fetched at runtime.
 
 **Storage**: Plugin-owned Markdown resources in the plugin installation; campaign Markdown and DM-owned guidance remain in the user's separate Obsidian vault.
 
-**Testing**: Configure the resolver separately using Copilot CLI's user-managed MCP settings and explicit authorized vault root(s); verify with `copilot mcp list`/`copilot mcp get` and tool discovery in a new session. Then manually validate installed-plugin discovery, loading from different working directories, resolver outcomes, unavailable-dependency fail-closed behavior, and the spec's missing/ambiguous-guidance scenarios. The repository currently defines no automated test or lint commands.
+**Testing**: Configure the resolver separately using Copilot CLI's user-managed MCP settings and explicit authorized vault root(s); verify with `copilot mcp list`/`copilot mcp get` and tool discovery in a new session. Then manually validate installed-plugin discovery, loading from different working directories, offline use of locally bundled Obsidian convention defaults, DM customization without semantic/safety violations, resolver outcomes, unavailable-dependency fail-closed behavior, and the spec's missing/ambiguous-guidance scenarios. The repository currently defines no automated test or lint commands.
 
 **Target Platform**: GitHub Copilot CLI with Agent Plugins 1.0 plugin installation.
 
@@ -24,7 +24,7 @@ Create one canonical, plugin-owned shared vault reference and a vault-orientatio
 
 **Performance Goals**: No latency or throughput target; load the required guidance before note interpretation or changes.
 
-**Constraints**: The plugin root remains installable; portable skills must be immediate children of `skills/`; use one canonical shared reference rather than duplicating it; do not treat the plugin directory as the vault; never distribute user-specific vault paths; the resolver is configured separately by the user and is required before every vault-facing skill; no vault migration, automatic folder creation, or configuration schema is introduced. The required-dependency inventory is extensible and non-exhaustive.
+**Constraints**: The plugin root remains installable; portable skills must be immediate children of `skills/`; use one canonical shared reference rather than duplicating it; do not treat the plugin directory as the vault; never distribute user-specific vault paths; the resolver is configured separately by the user and is required before every vault-facing skill; official Obsidian help pages are citations/source material, not runtime dependencies; no vault migration, automatic folder creation, or configuration schema is introduced. DM-customizable guidance cannot redefine Obsidian-native syntax or weaken shared safety requirements. The required-dependency inventory is extensible and non-exhaustive.
 
 **Scale/Scope**: Initial support is one campaign per vault. Include every implemented vault-facing skill in the explicit loading inventory; the current scaffold has no implemented skills.
 
@@ -73,7 +73,7 @@ plugin root/
 └── skills/
     ├── vault-orientation/
     │   ├── SKILL.md
-    │   └── VAULT-REFERENCE.md
+    │   └── VAULT-REFERENCE.md  # Includes paraphrased Obsidian convention defaults and source links
     └── <each vault-facing skill>/
         └── SKILL.md         # Explicitly loads the canonical reference
 ```

@@ -25,8 +25,8 @@ path.
   user-specific vault paths in the plugin or repository.
 - The dependency inventory is non-exhaustive. Every vault-facing skill must
   verify all currently declared required dependencies before accessing
-  campaign notes. Obsidian Aliases and Tags pages are reference sources, not
-  runtime dependencies.
+  campaign notes. Official Obsidian help pages are source references, not
+  runtime dependencies; the shared reference supplies the local defaults.
 - Use a **disposable test vault**, separate from the plugin checkout and any
   live campaign vault. Make a manual before-test inventory of its files and
   contents so that you can confirm whether any note changed.
@@ -89,6 +89,26 @@ the test vault with its before-test inventory to confirm no note access or
 changes occurred. This prerequisite applies even when the requested task does
 not itself resolve a link. Do not alter the user's active MCP configuration for
 this test.
+
+### Local Obsidian convention defaults and DM customization
+
+After the shared reference is available in the installed plugin, use an
+isolated session without network access to ask the skill how the reference
+recommends using aliases, tags, wikilinks, and callouts. Then provide
+DM-designated test guidance that customizes the campaign tag vocabulary,
+preferred internal-link format, and callout use, and ask the same questions
+again.
+
+**Expected:** the skill uses the bundled defaults without fetching official
+help pages. It describes aliases as reusable alternate note names rather than
+one-off display text, tags as classification with campaign vocabulary
+preserved, internal links using the vault's chosen supported format, and
+callouts as presentation rather than access control. The skill applies
+campaign-specific customizations when they remain compatible with native
+Obsidian syntax and semantics; it flags incompatible requests and never lets
+custom guidance weaken shared safety boundaries. The official source links
+remain available for contributor maintenance, but runtime answers do not
+depend on them.
 
 ## 2. Verify canonical resource lookup from different working directories
 
