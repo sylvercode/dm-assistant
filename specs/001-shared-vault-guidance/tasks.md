@@ -174,17 +174,24 @@ read and write workflows.
 **Purpose**: Keep contributor-facing discovery guidance accurate and verify
 the integrated feature in the supported client.
 
-- [ ] T007 Update `skills/README.md` to link to the implemented
-  `skills/vault-orientation/SKILL.md` and state that every future vault-facing
-  skill must follow its shared-reference and required-dependency preflight
-  contract. Keep the README concise and do not duplicate the full guidance.
+- [ ] T007 Make `skills/README.md` the declared inventory of every immediate
+  child skill directory containing a `SKILL.md`. Add an entry for
+  `skills/vault-orientation/SKILL.md`, classify it as vault-facing, and identify
+  its shared-reference and required-dependency preflight obligations. Define
+  the inventory table format so each new skill is classified as vault-facing
+  or non-vault-facing; link to skill instructions rather than duplicating
+  them. Do not list a skill that does not exist.
 - [ ] T008 Run the applicable scenarios in
   `specs/001-shared-vault-guidance/quickstart.md` using an isolated Copilot CLI
   setup and disposable test vault after the Resolver integration in #7 is
   available. Verify installed discovery and reference loading from different
   working directories, offline defaults, dependency fail-closed behavior,
   guidance/context failures, continuity/player-safety safeguards, and the
-  preview/approval gate. Record each exercised scenario as pass, fail, or
+  preview/approval gate. Enumerate all immediate-child `skills/*/SKILL.md`
+  files, verify each has exactly one README inventory entry and a vault-facing
+  classification, then verify every vault-facing skill explicitly loads both
+  guidance sources and checks all declared dependencies before campaign-note
+  access. Record each exercised scenario and inventory check as pass, fail, or
   blocked in the quickstart completion record; do not mark unimplemented or
   unexercised behavior as passed.
 

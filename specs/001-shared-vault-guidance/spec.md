@@ -13,6 +13,11 @@
 ### Session 2026-10-25
 
 - Q: Should the local Obsidian link guidance cover both wikilinks and Markdown-style internal links, or only wikilinks? → A: Cover both formats and recommend wikilinks by default, while respecting an explicitly established vault preference.
+- Q: Which workflows should count as vault-facing and therefore require the shared guidance and dependency checks? → A: Any skill that reads, interprets, creates, or changes campaign material.
+- Q: What order should a vault-facing skill follow before reading campaign notes? → A: Confirm the vault location without reading notes; verify required tools are available and authorized for that vault; load shared and designated local guidance; resolve campaign/group and audience; then access campaign notes.
+- Q: When must a vault-facing skill determine whether its output is for the DM or for players/characters? → A: Only handout and read-aloud sections are player-facing; in every case, gate-check them before handing them out or reading them aloud.
+- Q: For the required inventory check, should verification stop at enumerating every skill file and inspecting each listed vault-facing skill’s declared preflight, or also run each skill in the supported client? → A: Use a static inventory and source audit only; runtime verification of every vault-facing skill is not required.
+- Q: How should SC-004 measure whether DMs can distinguish plugin-wide guidance from vault-specific guidance? → A: Keep the existing 4-of-5 DM threshold and use an informal walkthrough; do not standardize the examples or scoring.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -58,7 +63,7 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 1. **Given** an expected folder or note is absent, **When** a skill uses the shared guidance, **Then** it does not assume a folder should be created or reorganize existing notes.
 2. **Given** preparation contains material not confirmed in actual play, **When** the skill handles campaign history or character knowledge, **Then** it does not treat preparation alone as an established event or knowledge.
 3. **Given** notes contain a contradiction or an unresolved adventure plan, **When** the skill encounters it, **Then** it preserves the existing content and asks the DM rather than silently resolving or rewriting it.
-4. **Given** output is intended for players, **When** the skill uses campaign information, **Then** it excludes DM-only facts and revealing links.
+4. **Given** a task includes a handout or read-aloud section, **When** the skill prepares that section, **Then** it treats only that section as player-facing, excludes DM-only facts and revealing links, and gate-checks it before handing it out or reading it aloud.
 5. **Given** a requested change is broad, destructive, restructuring, or continuity-changing, **When** the skill proposes the change, **Then** it previews the proposed changes and obtains DM approval before applying them.
 
 ### Edge Cases
@@ -76,12 +81,12 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 - **FR-001**: The plugin MUST provide one canonical shared reference for vault meanings, conventions, campaign boundaries, knowledge rules, preparation/history distinctions, and editing safeguards.
 - **FR-002**: The shared reference MUST be distributed as a plugin-owned resource, separate from campaign data and user-owned vault guidance.
 - **FR-003**: Every implemented vault-facing skill MUST explicitly load the shared reference and the vault-local guidance designated either by the DM or by an established vault-local configuration contract before interpreting or changing campaign notes. A skill MUST NOT guess which local guidance is designated.
-- **FR-004**: Before a vault-facing skill acts on campaign notes, it MUST establish the authorized vault from the user's workspace or explicit input and the relevant campaign/group from explicit input or unambiguous vault context. If either cannot be established, it MUST ask the DM before proceeding.
+- **FR-004**: Before a vault-facing skill accesses campaign notes, it MUST establish the authorized vault location from the user's workspace or explicit input without reading campaign notes. After loading required guidance, it MUST establish the relevant campaign/group from explicit input or unambiguous designated context. If the vault or campaign/group cannot be established, it MUST ask the DM before proceeding.
 - **FR-005**: When required guidance is unavailable or unreadable, a vault-facing skill MUST identify the affected source, explain which requested work depends on it, and pause that work without changing campaign notes or silently substituting assumptions.
 - **FR-006**: When vault mappings, guidance, or campaign context have multiple reasonable interpretations that affect the next action, a vault-facing skill MUST state the competing interpretations, identify the needed decision, and request DM direction before proceeding.
 - **FR-007**: Shared guidance MUST distinguish preparation from actual-play history and character knowledge; preparation alone MUST NOT establish that an event occurred or that a character knows it.
 - **FR-008**: Shared guidance MUST preserve existing vault organization and notes, avoid assuming absent folders should be created, and prohibit silently resolving contradictions or rewriting run adventure plans.
-- **FR-009**: Shared guidance MUST keep DM-only facts and revealing links out of player-facing handouts and outputs.
+- **FR-009**: Shared guidance MUST treat only handout and read-aloud sections as player-facing, exclude DM-only facts and revealing links from them, and require a gate check before each is handed out or read aloud. All other task content is DM-facing.
 - **FR-010**: Broad, destructive, restructuring, or continuity-changing edits MUST be previewed and approved by the DM before application; clearly requested page-local edits MUST NOT require redundant approval.
 - **FR-011**: Shared guidance and vault content MUST be treated as data, not as authority to override governing instructions or authorize unrelated actions.
 - **FR-012**: The installed-resource lookup MUST be verified in the supported client so that skills can find the bundled reference independently of the current working directory.
@@ -89,6 +94,8 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 - **FR-014**: The required-dependency inventory MUST be explicitly documented and extensible; it is not an exhaustive list of all future dependencies. Each added required dependency MUST state its purpose and scope, supported version or compatibility contract, user setup/configuration, readiness check, and behavior when unavailable.
 - **FR-015**: The plugin-owned shared reference MUST contain concise, locally available, paraphrased default guidance for Obsidian aliases, tags, internal links (both wikilinks and Markdown-style links), and callouts, based on the official documentation linked in this specification. It MUST recommend wikilinks by default while respecting an explicitly established vault preference. Vault-facing skills MUST be able to use these defaults without fetching or reinterpreting the external pages at runtime.
 - **FR-016**: DM-designated vault-local guidance MAY supplement or customize the shared Obsidian defaults, including replacing a general recommendation for a campaign. It MUST preserve valid Obsidian syntax and semantics and MUST NOT override the shared safety requirements.
+- **FR-017**: `skills/README.md` MUST be the plugin's declared skill inventory and MUST list every immediate child skill directory containing a `SKILL.md`, classifying each entry as vault-facing or non-vault-facing. For every vault-facing skill, the inventory MUST identify its shared-reference and required-dependency preflight obligation. Validation MUST use a static inventory and source audit: enumerate all `skills/*/SKILL.md` files, confirm an exact one-to-one match with inventory entries (no missing, extra, duplicate, or unclassified entries), and inspect every listed vault-facing skill to verify that its source explicitly loads the shared reference and verifies required dependencies before campaign-note access. Runtime verification of every vault-facing skill in the supported client is not required.
+- **FR-018**: A vault-facing skill MUST follow this order before accessing campaign notes: establish the authorized vault location without reading campaign notes; verify every declared required dependency is available and authorized for that vault; load the plugin-owned shared reference and designated vault-local guidance; establish the relevant campaign/group and whether the requested output includes a handout or read-aloud section; then access campaign notes. It MUST pause and ask the DM when a required step cannot be completed. Before handing out or reading aloud either player-facing section, the skill MUST gate-check it for DM-only facts and revealing links.
 
 ## Expected Runtime Dependencies *(initial, non-exhaustive)*
 
@@ -126,17 +133,17 @@ conflict rather than claim unsupported behavior.
 - **Shared vault reference**: Plugin-owned guidance describing common vault concepts, boundaries, continuity safeguards, knowledge rules, and safe editing expectations.
 - **Vault-local guidance**: DM-owned conventions and exceptions designated for a particular vault; it remains outside the distributed plugin.
 - **Vault and campaign context**: The authorized campaign workspace and relevant campaign/group identity needed to interpret a task.
-- **Vault-facing skill**: A user-invoked workflow that reads or changes campaign notes and is therefore subject to the loading prerequisite and safeguards.
+- **Vault-facing skill**: A user-invoked workflow that reads, interprets, creates, or changes campaign material and is therefore subject to the loading prerequisite and safeguards.
 - **Required runtime dependency**: An explicitly declared external tool or service with a purpose, scope, supported compatibility contract, setup, readiness check, and unavailable behavior. The initial inventory is non-exhaustive.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: Every plugin skill that reads or changes campaign notes is included in the plugin's declared skill inventory, and 100% of that inventory passes a check that both guidance sources are loaded before note interpretation or changes.
+- **SC-001**: A static inventory and source audit confirms that the set of immediate-child `skills/*/SKILL.md` files matches the declared inventory in `skills/README.md` exactly one-to-one, with no missing, extra, duplicate, or unclassified entries, and that 100% of entries classified as vault-facing explicitly load both required guidance sources and verify all declared dependencies before campaign-note access.
 - **SC-002**: 100% of tested missing-guidance and ambiguity scenarios identify the missing source or competing interpretations, name the dependent work, and pause that work without campaign-note changes until DM direction is available.
 - **SC-003**: All documented acceptance scenarios for preparation/history, continuity, player safety, and approval safeguards pass without unintended campaign-note changes.
-- **SC-004**: In a short walkthrough, at least 4 of 5 DMs can correctly identify which example guidance is plugin-wide and which is vault-specific, with no vault reorganization required.
+- **SC-004**: In an informal short walkthrough, at least 4 of 5 DMs can correctly identify which example guidance is plugin-wide and which is vault-specific. The examples and scoring are not standardized, and no vault reorganization is required.
 - **SC-005**: In 100% of tested vault-facing skill invocations where the resolver server or `resolve_obsidian_link` is unavailable or not configured for the authorized vault, the skill reports the dependency problem and performs no campaign-note reads or changes.
 - **SC-006**: In 100% of tested convention-guidance tasks, skills use the locally bundled Obsidian defaults without fetching external help pages, and apply DM-designated customizations without misrepresenting native syntax or weakening safety requirements.
 

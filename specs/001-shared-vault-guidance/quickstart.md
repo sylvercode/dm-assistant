@@ -75,6 +75,22 @@ reads, interprets, creates, or changes campaign material is present. The
 current scaffold has no skills, so discovery of these skills is not an expected
 current result.
 
+### Declared skill inventory completeness
+
+Inspect `skills/README.md` as the declared inventory. Enumerate every immediate
+child skill directory containing a `SKILL.md` and compare it to the inventory.
+Confirm each discovered skill has exactly one entry and is classified as
+vault-facing or non-vault-facing. For every vault-facing entry, verify that its
+`SKILL.md` explicitly requires loading the shared reference and designated
+vault-local guidance, and checks all declared runtime dependencies before
+campaign-note access.
+
+**Expected:** the discovered skill-file set and inventory entries match
+one-to-one, with no unclassified or duplicate entries. Every vault-facing skill
+in the inventory satisfies the shared loading and dependency-preflight
+contract. Record the check as blocked rather than passed if the feature is
+unimplemented or a skill cannot be inspected.
+
 ### Required dependency availability and fail-closed behavior
 
 In an isolated Copilot CLI configuration, first configure the resolver against

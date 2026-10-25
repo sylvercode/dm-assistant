@@ -37,7 +37,19 @@ stay hidden from Obsidian's normal note view. Campaign articles remain ordinary,
 visible Markdown notes.
 
 The vault is for the DM's eyes only. Documents meant to be shown to players are
-**handouts**, kept separate from DM commentary and hidden facts.
+**handouts**, kept separate from DM commentary and hidden facts. A player-facing
+section is limited to a handout or material the DM will read aloud; each must
+pass a check for DM-only facts and revealing links immediately before it is
+handed out or read aloud. All other task content is DM-facing.
+
+Future vault-facing skills—any workflow that reads, interprets, creates, or
+changes campaign material—must follow the shared vault-guidance contract. They
+will first confirm the authorized vault without reading campaign notes, verify
+that required tools are available and authorized for that vault, load the
+plugin's shared reference and designated vault-local guidance, and establish
+the campaign/group and any handout or read-aloud section before accessing
+campaign notes. These are planned safeguards, not behavior provided by the
+current scaffold.
 
 ### Vault Sections
 
