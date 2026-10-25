@@ -22,6 +22,39 @@
 3. Invoke a vault-facing skill from the repository root and a different working directory; verify it reads the same installed canonical reference in both cases.
 4. Exercise missing/unreadable-reference, missing vault-local guidance, ambiguous context, and approval-boundary cases; confirm affected note work pauses without changes.
 
+## Required runtime dependency inventory
+
+**Decision**: Require the Obsidian Link Resolver MCP server for every
+vault-facing skill, not only tasks that happen to resolve a link. Keep an
+explicit, non-exhaustive inventory so future required dependencies can be
+added with their purpose, scope, compatible version/interface, user-owned
+setup, readiness check, and unavailable behavior.
+
+**Verified resolver contract**:
+
+- Repository: [sylvercode/obsidian-link-resolver](https://github.com/sylvercode/obsidian-link-resolver).
+- Minimum compatible release: `2.0.0`, which publishes the MCP server.
+- Server name: `obsidian-link-resolver`; required tool:
+  `resolve_obsidian_link`.
+- Server startup requires one or more accessible, explicitly authorized
+  `--vault` roots. Keep those user-specific paths out of the plugin and
+  repository.
+- If the server/tool is missing or the intended vault is not authorized, every
+  vault-facing skill must stop before campaign-note access and report the setup
+  needed. Resolution outcomes such as unresolved or ambiguous must not be
+  replaced with guessed destinations.
+
+**Setup decision**: The DM installs and configures the resolver separately in
+Copilot CLI's user-managed MCP settings. Verify with `copilot mcp list` and
+`copilot mcp get obsidian-link-resolver`, then confirm the tool is exposed in
+a new session. Do not ship plugin MCP configuration with an empty or
+hard-coded vault root.
+
+The official [Obsidian Aliases](https://obsidian.md/help/aliases) and
+[Obsidian Tags](https://obsidian.md/help/tags) pages are reference sources,
+not runtime dependencies. Obsidian need not be running, and campaign-specific
+tag vocabulary remains DM-owned.
+
 **Sources**:
 
 - [GitHub Copilot plugins](https://docs.github.com/en/copilot/concepts/customizations/plugins) — Agent Plugins 1.0 portability and fixed component locations.
@@ -30,3 +63,5 @@
 - `README.md` — repository's local install and new-session discovery steps.
 - `docs/architecture.md` — component boundaries and campaign-vault separation.
 - `docs/vault-guidance-brainstorm.md` — recommended three-layer guidance model and loading sequence.
+- [Obsidian Link Resolver](https://github.com/sylvercode/obsidian-link-resolver) — resolver release, MCP startup requirements, and tool contract.
+- [Obsidian Aliases](https://obsidian.md/help/aliases) and [Obsidian Tags](https://obsidian.md/help/tags) — reference material for native feature semantics.

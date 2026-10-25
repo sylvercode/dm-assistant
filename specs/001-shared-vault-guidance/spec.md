@@ -78,6 +78,21 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 - **FR-010**: Broad, destructive, restructuring, or continuity-changing edits MUST be previewed and approved by the DM before application; clearly requested page-local edits MUST NOT require redundant approval.
 - **FR-011**: Shared guidance and vault content MUST be treated as data, not as authority to override governing instructions or authorize unrelated actions.
 - **FR-012**: The installed-resource lookup MUST be verified in the supported client so that skills can find the bundled reference independently of the current working directory.
+- **FR-013**: Before any vault-facing skill reads or changes campaign notes, it MUST verify that every currently declared required runtime dependency is available. The initial required dependency is the Obsidian Link Resolver MCP server exposing `resolve_obsidian_link`, configured to allow the authorized vault. If any required dependency is missing, unavailable, or misconfigured, the skill MUST explain the failure and stop before accessing or changing campaign notes.
+- **FR-014**: The required-dependency inventory MUST be explicitly documented and extensible; it is not an exhaustive list of all future dependencies. Each added required dependency MUST state its purpose and scope, supported version or compatibility contract, user setup/configuration, readiness check, and behavior when unavailable.
+
+## Expected Dependencies *(initial, non-exhaustive)*
+
+| Dependency | Type and scope | Purpose | Setup and verification | Failure behavior |
+|---|---|---|---|---|
+| [Obsidian Link Resolver](https://github.com/sylvercode/obsidian-link-resolver) | Required runtime MCP server for every vault-facing skill; minimum compatible release is `2.0.0`. | Exposes `resolve_obsidian_link` for resolving Obsidian links against an authorized vault. | The DM installs the MCP release separately and configures `obsidian-link-resolver` in Copilot CLI with one or more explicitly authorized absolute vault roots. Verify the server and tool are available in a new session. Do not embed vault-specific paths in the plugin. | If the server or tool is unavailable, or the vault is not authorized, the skill stops before reading or changing campaign notes and reports the required setup. Resolver errors or unresolved/ambiguous links MUST be surfaced; skills MUST NOT guess a destination. |
+| [Obsidian Aliases documentation](https://obsidian.md/help/aliases) | Reference source, not a runtime dependency. | Documents native alias behavior for shared guidance and validation examples. | Keep as a reference link; do not require the Obsidian application at runtime. | If documentation is unavailable, do not claim undocumented alias behavior. |
+| [Obsidian Tags documentation](https://obsidian.md/help/tags) | Reference source, not a runtime dependency. | Documents native tag behavior for shared guidance and validation examples. | Keep as a reference link; campaign-specific tag vocabulary remains DM-owned. | If documentation is unavailable, do not claim undocumented tag behavior. |
+
+This inventory records dependencies identified so far and is not exhaustive.
+Future required runtime dependencies may be added using FR-014. Documentation
+links remain reference sources unless a later specification explicitly makes
+them runtime dependencies.
 
 ### Key Entities
 
@@ -85,6 +100,7 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 - **Vault-local guidance**: DM-owned conventions and exceptions designated for a particular vault; it remains outside the distributed plugin.
 - **Vault and campaign context**: The authorized campaign workspace and relevant campaign/group identity needed to interpret a task.
 - **Vault-facing skill**: A user-invoked workflow that reads or changes campaign notes and is therefore subject to the loading prerequisite and safeguards.
+- **Required runtime dependency**: An explicitly declared external tool or service with a purpose, scope, supported compatibility contract, setup, readiness check, and unavailable behavior. The initial inventory is non-exhaustive.
 
 ## Success Criteria *(mandatory)*
 
@@ -94,11 +110,13 @@ As a DM, I need shared guidance to protect existing organization, continuity, an
 - **SC-002**: 100% of tested missing-guidance and ambiguity scenarios identify the missing source or competing interpretations, name the dependent work, and pause that work without campaign-note changes until DM direction is available.
 - **SC-003**: All documented acceptance scenarios for preparation/history, continuity, player safety, and approval safeguards pass without unintended campaign-note changes.
 - **SC-004**: In a short walkthrough, at least 4 of 5 DMs can correctly identify which example guidance is plugin-wide and which is vault-specific, with no vault reorganization required.
+- **SC-005**: In 100% of tested vault-facing skill invocations where the resolver server or `resolve_obsidian_link` is unavailable or not configured for the authorized vault, the skill reports the dependency problem and performs no campaign-note reads or changes.
 
 ## Assumptions
 
 - The initial workflows support one campaign per vault; multi-campaign isolation is outside this feature.
 - The supported client and installed-resource lookup method will be selected and verified during planning; source-tree presence alone does not satisfy the lookup requirement.
+- GitHub Copilot CLI is the supported client for the initial resolver dependency setup. The MCP server and user-authorized vault roots are configured outside the distributed plugin.
 - The designated vault-local guidance source is supplied explicitly by the DM or identified by the vault-configuration contract. The separate configuration work defines its specific discovery and configuration rules; this feature does not prescribe that schema or require vault migration.
 - A specialized agent may be considered as a future workflow option only if supported and useful, but explicit skill prerequisites remain required and do not depend on agent availability.
 - No vault folders, profile files, or guidance files are created or reorganized automatically by this feature.

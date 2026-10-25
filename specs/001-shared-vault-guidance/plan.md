@@ -12,11 +12,11 @@ Create one canonical, plugin-owned shared vault reference and a vault-orientatio
 
 **Language/Version**: Markdown for plugin guidance and portable skill instructions; PowerShell is the repository's script environment, but this feature adds no runtime scripts.
 
-**Primary Dependencies**: Agent Plugins 1.0 fixed plugin layout; GitHub Copilot CLI as the supported client for installed-resource validation.
+**Primary Dependencies**: Agent Plugins 1.0 fixed plugin layout; GitHub Copilot CLI as the supported client for installed-resource validation; Obsidian Link Resolver MCP server v2.0.0 or later, installed/configured by the user with explicitly authorized vault roots. This is the initial, non-exhaustive runtime dependency inventory. Official Obsidian Aliases and Tags documentation are reference sources, not runtime dependencies.
 
 **Storage**: Plugin-owned Markdown resources in the plugin installation; campaign Markdown and DM-owned guidance remain in the user's separate Obsidian vault.
 
-**Testing**: Manual installed-plugin validation with `copilot plugin install .`, `copilot plugin list`, and skill discovery in a new interactive session; exercise loading from different working directories and the spec's missing/ambiguous-guidance scenarios. The repository currently defines no automated test or lint commands.
+**Testing**: Configure the resolver separately using Copilot CLI's user-managed MCP settings and explicit authorized vault root(s); verify with `copilot mcp list`/`copilot mcp get` and tool discovery in a new session. Then manually validate installed-plugin discovery, loading from different working directories, resolver outcomes, unavailable-dependency fail-closed behavior, and the spec's missing/ambiguous-guidance scenarios. The repository currently defines no automated test or lint commands.
 
 **Target Platform**: GitHub Copilot CLI with Agent Plugins 1.0 plugin installation.
 
@@ -24,7 +24,7 @@ Create one canonical, plugin-owned shared vault reference and a vault-orientatio
 
 **Performance Goals**: No latency or throughput target; load the required guidance before note interpretation or changes.
 
-**Constraints**: The plugin root remains installable; portable skills must be immediate children of `skills/`; use one canonical shared reference rather than duplicating it; do not treat the plugin directory as the vault; no vault migration, automatic folder creation, or configuration schema is introduced.
+**Constraints**: The plugin root remains installable; portable skills must be immediate children of `skills/`; use one canonical shared reference rather than duplicating it; do not treat the plugin directory as the vault; never distribute user-specific vault paths; the resolver is configured separately by the user and is required before every vault-facing skill; no vault migration, automatic folder creation, or configuration schema is introduced. The required-dependency inventory is extensible and non-exhaustive.
 
 **Scale/Scope**: Initial support is one campaign per vault. Include every implemented vault-facing skill in the explicit loading inventory; the current scaffold has no implemented skills.
 

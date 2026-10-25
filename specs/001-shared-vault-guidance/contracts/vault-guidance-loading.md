@@ -11,9 +11,16 @@ currently exists.
 
 ## Responsibilities and authority
 
-- **Vault-facing skill:** Load the applicable guidance and establish the task's
-  vault and campaign context before interpreting or changing campaign notes.
-  Apply the safeguards below and report when it cannot safely proceed.
+- **Vault-facing skill:** Load the applicable guidance and establish required
+  dependency readiness and the task's vault and campaign context before
+  interpreting or changing campaign notes. Apply the safeguards below and
+  report when it cannot safely proceed.
+- **Required runtime dependencies:** A non-exhaustive inventory of external
+  tools/services that every vault-facing skill must verify before
+  campaign-note access. The initial dependency is the Obsidian Link Resolver
+  MCP server for every vault-facing skill; future dependencies may be added
+  with purpose, scope, compatibility, setup, readiness check, and failure
+  behavior.
 - **Plugin-owned shared reference:** Define common meanings and non-negotiable
   safeguards shared across vault-facing skills. It is distributed with the
   plugin, separate from campaign data and vault-owned guidance.
@@ -42,7 +49,12 @@ Before interpreting or changing campaign notes, the skill must establish:
 3. **Output audience, when relevant:** Determine whether the work is
    DM-facing or intended for characters/players. If the audience affects what
    information is safe to include and is unclear, ask the DM.
-4. **Guidance sources:** Load the plugin-owned shared reference and any
+4. **Required dependencies:** Confirm every currently declared required
+   dependency is ready before accessing campaign notes. Initially, the active
+   Copilot CLI session must expose `resolve_obsidian_link` from the
+   `obsidian-link-resolver` MCP server. This applies to every vault-facing
+   skill, even if its requested task does not resolve a link.
+5. **Guidance sources:** Load the plugin-owned shared reference and any
    vault-local guidance explicitly designated by the DM or by an established
    vault-local configuration contract. Do not guess which local guidance file
    is designated. This contract does not define that configuration schema or
@@ -57,25 +69,28 @@ equivalent to no source having been designated.
 
 ## Loading and interpretation sequence
 
-1. Establish the authorized vault from the workspace or explicit user input.
+1. Verify every currently declared required dependency before accessing
+   campaign notes. Initially, Copilot CLI must expose
+   `resolve_obsidian_link` from the `obsidian-link-resolver` MCP server.
+2. Establish the authorized vault from the workspace or explicit user input.
    If it cannot be established, ask the DM before accessing or changing
    campaign notes.
-2. Load the canonical plugin-owned shared reference from the installed plugin
+3. Load the canonical plugin-owned shared reference from the installed plugin
    resource, not from an assumed current directory, source checkout, or vault
    path.
-3. At the vault root, inspect the configuration/profile if present to identify
+4. At the vault root, inspect the configuration/profile if present to identify
    any designated local guidance; read that guidance before interpreting or
    changing notes. The configuration format and the mechanism for designating
    guidance are outside this contract.
-4. Resolve the requested campaign/group and output audience as applicable. If
+5. Resolve the requested campaign/group and output audience as applicable. If
    the context is not unambiguous, ask the DM before dependent work.
-5. Inspect only relevant parts of the existing vault to confirm mappings and
+6. Inspect only relevant parts of the existing vault to confirm mappings and
    note roles. Folder names are defaults, not a required tree; use confirmed
    DM-approved mappings rather than imposing standard locations.
-6. Before a change, confirm any uncertain destination or conflicting
+7. Before a change, confirm any uncertain destination or conflicting
    convention. An absent folder is not permission to create it, move content,
    or reorganize the vault.
-7. Refresh the loaded context whenever the vault, designated guidance/profile,
+8. Refresh the loaded context whenever the vault, designated guidance/profile,
    campaign, or group changes. Do not carry context across those boundaries.
 
 No particular cross-skill relative-path technique is guaranteed by this
@@ -84,6 +99,13 @@ verified in the supported client before it is claimed to satisfy this
 prerequisite.
 
 ## Blocked, missing, unreadable, or ambiguous inputs
+
+If any currently declared required runtime dependency is missing, unavailable,
+or incompatible, every vault-facing skill must stop before reading or changing
+campaign notes. The skill must identify the dependency and the setup or
+verification step needed to continue. Initially this requires the
+`obsidian-link-resolver` MCP server (minimum compatible release `2.0.0`) and
+its `resolve_obsidian_link` tool in the active Copilot CLI session.
 
 If the shared reference or a designated vault-local guidance source is missing,
 unavailable, or unreadable, the skill must:
@@ -104,6 +126,24 @@ ambiguity, the skill must not create, modify, move, delete, or reorganize
 campaign notes. It may report the issue and request the information needed to
 continue. Once the missing input or decision is resolved, the skill must
 re-establish the applicable context before proceeding.
+
+The dependency inventory is explicit but non-exhaustive. Each future required
+dependency must document its purpose and scope, compatible version/interface,
+user-owned setup, readiness check, and unavailable behavior. The official
+[Obsidian Aliases](https://obsidian.md/help/aliases) and
+[Obsidian Tags](https://obsidian.md/help/tags) pages are references, not
+runtime dependencies.
+
+## Initial dependency configuration
+
+The Obsidian Link Resolver MCP server (minimum compatible release `2.0.0`)
+must be installed and configured separately by the DM in Copilot CLI with one
+or more explicitly authorized absolute vault roots. Verify the configuration
+with `copilot mcp list` and `copilot mcp get obsidian-link-resolver`, then
+start a new session and confirm `resolve_obsidian_link` is available. Do not
+embed vault paths in the plugin or repository. If the server or tool is not
+available, every vault-facing skill must stop before campaign-note access,
+explain the missing setup, and avoid guessing link destinations.
 
 ## Campaign and information boundaries
 

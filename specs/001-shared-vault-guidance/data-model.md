@@ -92,13 +92,40 @@ Conceptual attributes:
 
 These attributes describe responsibilities, not required skill metadata or
 implementation state. Only implemented vault-facing skills are subject to the
-inventory requirement in the spec.
+dependency-inventory requirement in the spec. Each vault-facing skill must
+check all currently declared required dependencies before accessing campaign
+notes.
+
+### Required runtime dependency
+
+An explicitly listed external tool or service that must be ready before
+vault-facing skills can access campaign notes. The inventory is intentionally
+non-exhaustive and may grow as future requirements are added.
+
+Conceptual attributes:
+
+- **Identity and purpose**: the named dependency and capability it provides.
+- **Scope**: which skills require it; the initial resolver applies to every
+  vault-facing skill.
+- **Compatibility**: supported tool/interface and compatible version.
+- **Setup**: user-owned installation and configuration.
+- **Readiness check**: evidence that the supported client exposes the expected
+  capability and authorizes the intended vault.
+- **Unavailable behavior**: a clear fail-closed result before campaign-note
+  access or edits.
+
+The initial dependency is the Obsidian Link Resolver MCP server,
+`obsidian-link-resolver` version `2.0.0` or later, exposing
+`resolve_obsidian_link`. The user configures authorized vault roots in Copilot
+CLI; private paths are not stored in the plugin. Obsidian Aliases and Tags
+documentation are reference sources, not runtime dependencies.
 
 ## Relationships
 
 - Each vault-facing skill must load the one plugin-owned shared reference and
-  the vault-local guidance designated for the authorized vault before
-  interpreting or changing campaign notes.
+  the vault-local guidance designated for the authorized vault, and verify
+  every currently declared required dependency, before interpreting or
+  changing campaign notes.
 - A DM-owned guidance source applies to its designated vault; it is not
   distributed with the plugin and cannot authorize actions outside that vault.
 - A resolved vault/campaign context scopes the task and its campaign material.

@@ -17,6 +17,16 @@ path.
 
 - Use GitHub Copilot CLI, the supported client selected for installed-resource
   validation.
+- Install the Obsidian Link Resolver MCP server separately (minimum compatible
+  release `2.0.0`) and configure it in Copilot CLI's user-managed MCP settings
+  with one or more explicitly authorized absolute vault roots. Verify with
+  `copilot mcp list` and `copilot mcp get obsidian-link-resolver`, then confirm
+  `resolve_obsidian_link` is available in a new session. Do not embed
+  user-specific vault paths in the plugin or repository.
+- The dependency inventory is non-exhaustive. Every vault-facing skill must
+  verify all currently declared required dependencies before accessing
+  campaign notes. Obsidian Aliases and Tags pages are reference sources, not
+  runtime dependencies.
 - Use a **disposable test vault**, separate from the plugin checkout and any
   live campaign vault. Make a manual before-test inventory of its files and
   contents so that you can confirm whether any note changed.
@@ -64,6 +74,21 @@ implemented vault-facing skill are discoverable. Confirm that every skill that
 reads, interprets, creates, or changes campaign material is present. The
 current scaffold has no skills, so discovery of these skills is not an expected
 current result.
+
+### Required dependency availability and fail-closed behavior
+
+In an isolated Copilot CLI configuration, first configure the resolver against
+the disposable test vault and confirm `resolve_obsidian_link` is exposed in a
+new session. Then use a separate isolated configuration with the resolver
+missing or disabled and invoke each implemented vault-facing skill with a
+campaign-note task.
+
+**Expected:** each skill explains that the required resolver dependency is
+unavailable and stops before reading or changing any campaign notes. Compare
+the test vault with its before-test inventory to confirm no note access or
+changes occurred. This prerequisite applies even when the requested task does
+not itself resolve a link. Do not alter the user's active MCP configuration for
+this test.
 
 ## 2. Verify canonical resource lookup from different working directories
 

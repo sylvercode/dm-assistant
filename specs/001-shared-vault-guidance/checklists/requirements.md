@@ -35,4 +35,5 @@
 - Installed-resource lookup is an explicit planning decision that must be verified in the supported client (FR-012, Assumptions).
 - Vault-local guidance designation is bounded to DM input or the separate vault-configuration contract; that contract's detailed discovery rules remain a dependency (FR-003, Assumptions).
 - Success criteria enumerate the skill population by its function and define the DM walkthrough threshold (SC-001, SC-004).
+- Required runtime dependencies are explicitly inventoried, and the inventory is non-exhaustive; aliases/tags documentation is reference material rather than a runtime prerequisite (FR-013, FR-014).
 - This checklist validates specification quality, not implementation completion.
