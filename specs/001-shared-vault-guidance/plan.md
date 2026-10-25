@@ -1,0 +1,85 @@
+# Implementation Plan: Shared Vault Guidance
+
+**Branch**: `sylvercode-shared-vault-guidance` | **Date**: 2026-10-25 | **Spec**: [spec.md](spec.md)
+
+**Input**: Feature specification from `specs/001-shared-vault-guidance/spec.md`
+
+## Summary
+
+Create one canonical, plugin-owned shared vault reference and a vault-orientation skill that loads it alongside DM-designated vault-local guidance before handling campaign notes. Every vault-facing skill must explicitly follow the same loading and context-resolution contract. Validate the packaged resource lookup in the installed GitHub Copilot CLI plugin, independently of the current working directory; do not assume source-tree paths are valid after installation.
+
+## Technical Context
+
+**Language/Version**: Markdown for plugin guidance and portable skill instructions; PowerShell is the repository's script environment, but this feature adds no runtime scripts.
+
+**Primary Dependencies**: Agent Plugins 1.0 fixed plugin layout; GitHub Copilot CLI as the supported client for installed-resource validation.
+
+**Storage**: Plugin-owned Markdown resources in the plugin installation; campaign Markdown and DM-owned guidance remain in the user's separate Obsidian vault.
+
+**Testing**: Manual installed-plugin validation with `copilot plugin install .`, `copilot plugin list`, and skill discovery in a new interactive session; exercise loading from different working directories and the spec's missing/ambiguous-guidance scenarios. The repository currently defines no automated test or lint commands.
+
+**Target Platform**: GitHub Copilot CLI with Agent Plugins 1.0 plugin installation.
+
+**Project Type**: Installable Agent Plugins 1.0 documentation-and-skill scaffold.
+
+**Performance Goals**: No latency or throughput target; load the required guidance before note interpretation or changes.
+
+**Constraints**: The plugin root remains installable; portable skills must be immediate children of `skills/`; use one canonical shared reference rather than duplicating it; do not treat the plugin directory as the vault; no vault migration, automatic folder creation, or configuration schema is introduced.
+
+**Scale/Scope**: Initial support is one campaign per vault. Include every implemented vault-facing skill in the explicit loading inventory; the current scaffold has no implemented skills.
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+| Principle | Gate | Result |
+|---|---|---|
+| Preserve the Plugin Architecture | Keep the repository root as the Agent Plugins 1.0 plugin; skills go in immediate child folders under `skills/`; add no legacy metadata, placeholder hooks, servers, or integrations. | PASS |
+| Keep the Campaign Vault Separate | Obtain vault location from workspace or explicit input; never use the plugin installation as the vault. | PASS |
+| Preserve Campaign Continuity and User Control | Preserve organization and edits; do not create missing folders by assumption, resolve contradictions silently, or rewrite run plans; gate broad changes on preview and DM approval. | PASS |
+| Respect Character Knowledge and Player Safety | Separate preparation, actual play, and character knowledge; keep DM-only facts and revealing links out of player-facing output. | PASS |
+| Distinguish Proposals from Implemented Behavior | Mark future behavior as planned until implemented and verified. | PASS |
+
+No constitution violations are identified.
+
+### Post-design re-evaluation
+
+The design artifacts retain the same PASS results: they define proposed
+guidance and validation contracts without adding plugin metadata, runtime
+integrations, a vault configuration schema, or permission to modify the
+campaign vault. The installed-resource mechanism remains an explicit
+implementation verification gate, not an assumed capability.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/001-shared-vault-guidance/
+├── plan.md
+├── research.md
+├── data-model.md
+├── quickstart.md
+├── contracts/
+│   └── vault-guidance-loading.md
+└── tasks.md                 # Created by /speckit-tasks, not this plan
+```
+
+### Plugin resources (planned implementation layout)
+
+```text
+plugin root/
+├── plugin.json
+└── skills/
+    ├── vault-orientation/
+    │   ├── SKILL.md
+    │   └── VAULT-REFERENCE.md
+    └── <each vault-facing skill>/
+        └── SKILL.md         # Explicitly loads the canonical reference
+```
+
+**Structure Decision**: Keep the shared reference with the portable vault-orientation skill under the fixed `skills/` plugin directory, as recommended in the vault-guidance brainstorm. Other vault-facing skills must explicitly load that one canonical resource. The precise installed-path resolution must be proven with the supported Copilot CLI before relying on it; public documentation confirms discovery of files in a skill's own directory, but does not fully specify cross-skill relative-path resolution.
+
+## Complexity Tracking
+
+No constitution violations require justification.
