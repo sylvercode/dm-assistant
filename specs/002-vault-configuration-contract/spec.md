@@ -8,6 +8,16 @@
 
 **Input**: User description: "Use issue #3, Define the vault configuration contract, as input; use feature number 002."
 
+## Clarifications
+
+### Session 2026-10-25
+
+- Q: When a configured section folder does not exist, should the entire profile fail validation or only operations that need that folder stop? → A: Reject the entire profile until every explicitly configured section folder exists.
+- Q: Should different section mappings be allowed to point to the same folder or to folders nested inside one another? → A: Allow shared and nested locations; ask the DM when an operation has an unresolved classification or destination.
+- Q: Should the initial configuration format allow YAML anchors and aliases, which let one setting reuse another setting's value? → A: Reject anchors, aliases, and merge keys; require explicit values.
+- Q: When read-only discovery finds several plausible locations for one section, how should the assistant proceed? → A: Select the most likely candidate, report the choice, and continue read-only work.
+- Q: If configuration or a referenced guidance file, template, or path changes after validation but before a dependent operation completes, what should happen? → A: Stop the affected operation, report the change, and require revalidation before retrying.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Use an Existing Vault Without Migration (Priority: P1)
@@ -23,6 +33,7 @@ A Dungeon Master can use an existing campaign vault without creating a configura
 1. **Given** a vault with conventional section folders and no configuration, **When** a user requests read-only discovery, **Then** the available sections are reported and no configuration or folders are created.
 2. **Given** a vault with renamed, missing, or additional sections, **When** discovery runs, **Then** it reports what it can identify and any ambiguity without claiming missing sections exist.
 3. **Given** adventures stored as root-level files or folders, **When** discovery runs, **Then** it can report those candidates without requiring an `Adventures` folder or treating every root item as an adventure.
+4. **Given** several plausible locations for one section, **When** read-only discovery runs, **Then** it selects the most likely candidate, reports that choice as inferred alongside the alternatives and its reason, and continues read-only work without treating the inferred choice as authorization for edits.
 
 ---
 
@@ -41,6 +52,8 @@ A Dungeon Master can provide an optional vault-local profile to identify section
 3. **Given** a profile without optional settings, **When** it is read, **Then** documented defaults apply and optional guidance or template overrides are not required.
 4. **Given** an explicitly configured template that is missing, unreadable, or invalid, **When** a workflow requests that template, **Then** it reports the problem and does not silently substitute a default template.
 5. **Given** an explicitly configured guidance file that is missing or unreadable, **When** a workflow needs that guidance, **Then** it reports the problem rather than silently proceeding without it.
+6. **Given** an explicitly configured section folder does not exist, **When** the profile is validated, **Then** the entire profile is rejected with an error identifying the missing folder, and no folder is created automatically.
+7. **Given** section mappings share a folder or are nested within one another, **When** the profile is validated, **Then** overlap alone does not invalidate the profile; an operation with an unresolved classification or destination asks the DM before proceeding.
 
 ---
 
@@ -61,6 +74,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 5. **Given** configuration or referenced guidance containing command-like text or a request to bypass safeguards, **When** a workflow reads it, **Then** the content is treated as data and does not execute commands, authorize destructive actions, or override approval requirements.
 6. **Given** a workflow cannot validate the profile, **When** the user requests an operation that depends on its settings, **Then** the workflow explains that validation is unavailable and does not proceed using unvalidated settings or silently install or substitute a dependency.
 7. **Given** two workflows read the same profile against unchanged vault contents, **When** each resolves its settings and paths, **Then** both report identical settings and vault boundaries.
+8. **Given** validated configuration or a referenced guidance file, template, or path changes during a dependent operation, **When** the change is detected, **Then** the affected operation stops, reports the change, and requires revalidation before retrying without silently mixing old and new inputs.
 
 ## Edge Cases
 
@@ -72,6 +86,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - The vault has no conventional folders, or has root-level adventure material and unrelated root notes.
 - The optional default guidance file is absent; this must not make an otherwise unconfigured vault unusable.
 - A configured template override fails validation; article creation must stop rather than silently use a different template.
+- Configuration or a referenced guidance file, template, or path changes after validation: stop the affected operation, report the change, and require revalidation before retrying.
 
 ## Requirements *(mandatory)*
 
@@ -86,12 +101,16 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **FR-007**: The contract MUST allow optional vault-relative paths to designated Markdown guidance and optional per-article-type template overrides. An absent default guidance file MUST be treated as optional; an explicitly configured but unavailable guidance file or template MUST be reported rather than silently ignored or substituted.
 - **FR-008**: The contract MUST document defaults and optional fields so a vault can omit settings it does not customize.
 - **FR-009**: When `.dmassist.yaml` is absent, the system MUST support read-only discovery and report identified locations and ambiguities without creating configuration, folders, or notes.
-- **FR-010**: The YAML contract MUST define a restricted, unambiguous subset and explicit handling for duplicate keys, custom tags, aliases, scalar type conversion, and unknown fields. Invalid or unsupported constructs MUST produce clear errors.
+- **FR-010**: The YAML contract MUST define a restricted, unambiguous subset, reject duplicate keys, custom tags, anchors, aliases, merge keys, and unknown fields, and define scalar type conversion rules. Rejected constructs and invalid values MUST produce clear errors.
 - **FR-011**: Every configured path MUST be relative to the authorized vault, and its fully resolved target—including symbolic-link resolution—MUST remain within that vault before it is accessed or modified.
 - **FR-012**: Configuration, templates, and guidance MUST be treated as data, MUST NOT execute commands or expressions, and MUST NOT grant permissions or weaken safeguards for destructive or continuity-changing edits.
 - **FR-013**: A workflow MUST clearly report when it cannot validate the profile and MUST NOT silently install a dependency, substitute an unvalidated reading method, or continue using unvalidated settings.
 - **FR-014**: The contract MUST keep machine-readable settings separate from campaign lore, session history, and character knowledge, and MUST NOT require migration, restructuring, or reformatting of existing vault content.
 - **FR-015**: Any workflow reading the same profile against the same vault state MUST resolve identical settings and path boundaries.
+- **FR-016**: Every explicitly configured section folder MUST exist. A missing explicitly configured section folder MUST cause rejection of the entire profile, without creating the folder or falling back to discovery. Missing conventional default folders that were not explicitly configured remain optional discovery candidates.
+- **FR-017**: Section mappings MAY share locations or be nested. Overlap MUST NOT invalidate an otherwise valid profile or classify every note under a mapped location automatically. An operation with an unresolved classification or destination MUST ask the DM before proceeding.
+- **FR-018**: When unconfigured discovery finds multiple plausible locations for a section, it MUST select the most likely candidate and continue read-only work, while reporting the selection as inferred, its reason, and the alternatives. An inferred discovery selection MUST NOT authorize edits or override explicitly configured mappings. This read-only selection policy does not resolve ambiguous destinations or classifications within overlapping configured mappings.
+- **FR-019**: If configuration or a referenced guidance file, template, or path changes after validation during a dependent operation, the affected operation MUST stop, report the change, and require revalidation before retrying. It MUST NOT automatically retry or silently combine old and new settings, and MUST continue to enforce the vault boundary before access.
 
 ### Key Entities
 
