@@ -20,7 +20,7 @@ A Dungeon Master starts a script-backed workflow and needs to know that the envi
 
 **Acceptance Scenarios**:
 
-1. **Given** a documented supported environment with all required components, **When** the user starts a script-backed operation, **Then** the operation passes its prerequisite check and continues.
+1. **Given** a documented supported environment with all required components, including a validator compatible with the published JSON Schema dialect when configuration is used, **When** the user starts a script-backed operation, **Then** the operation passes its prerequisite check and continues.
 2. **Given** a missing or unsupported runtime or required module, **When** the user starts a script-backed operation, **Then** the user receives a specific prerequisite message, no prerequisite is installed or upgraded automatically, and no vault content is changed.
 3. **Given** a blocked scripted operation, **When** the assistant can still help without the script, **Then** that independent read-only assistance remains available.
 4. **Given** a new release of the script-backed workflows, **When** the project publishes its supported-environment guidance, **Then** the guidance identifies the latest stable versions selected, the exact versions and selection date, and how to obtain the runtime and each add-on; repeatability and failure behavior are checked in every supported environment, and installing the plugin itself does not require the runtime.
@@ -62,6 +62,29 @@ A Dungeon Master needs consistent results from mechanical operations and control
 6. **Given** campaign content or paths that resemble executable input, **When** an operation processes them, **Then** they are treated as data and are not executed or interpolated into a command.
 7. **Given** an operation that reports an error, **When** diagnostic information is recorded or shown, **Then** it omits full note contents and keeps campaign data local.
 
+---
+
+### User Story 4 - Validate Vault Configuration Before Use (Priority: P1)
+
+A Dungeon Master may use an optional vault configuration profile to identify existing campaign folders and references. Script-backed workflows must load and validate that profile consistently before relying on it, and stop with an actionable error when its contents or referenced files are invalid or have changed.
+
+**Why this priority**: The configuration contract in feature 002 depends on runtime validation to prevent malformed settings, unsafe paths, or stale references from directing later work incorrectly.
+
+**Independent Test**: Exercise a valid profile and profiles with duplicate keys, invalid versions, unknown fields, invalid scalar values, missing configured folders, paths outside the vault, and changed references. Confirm valid profiles resolve consistently and each invalid or stale profile stops dependent work before unsafe access or writes.
+
+**Acceptance Scenarios**:
+
+1. **Given** no `.dmassist.yaml` exists at the authorized vault root, **When** a workflow requests configuration-dependent discovery, **Then** it follows the separate configuration contract's read-only discovery behavior and creates no profile, folder, or note.
+2. **Given** a profile contains malformed or unsupported YAML, duplicate keys, an absent, invalid, or unsupported version, unknown fields, explicit nulls, or values rejected by the published profile schema, **When** a workflow loads the profile, **Then** it reports a clear validation error and does not use the profile. YAML aliases or merge keys are accepted only when supported by the selected reader and the resolved profile passes schema validation.
+3. **Given** a supported YAML string, boolean, numeric, or date/time scalar is used for a string-valued setting, **When** the profile is normalized, **Then** it becomes a non-empty string using a locale-independent representation, booleans use lowercase text, dates and timestamps use ISO 8601, collection values and nulls are rejected, and the version remains integer `1`.
+4. **Given** a syntactically valid profile normalizes successfully, **When** the workflow validates it, **Then** the version-1 JSON Schema is applied to the normalized profile, documented defaults are applied only for omitted settings, and schema default annotations do not mutate or fill the profile by themselves.
+5. **Given** an explicitly configured built-in or custom section folder is missing, **When** the profile is validated, **Then** the entire profile is rejected without creating the folder or falling back to discovery; omitted conventional folders remain optional discovery candidates.
+6. **Given** a configured profile path, party note, preparation location, or custom section path is relative to the vault, **When** its final destination is resolved, **Then** traversal and symbolic links are checked and any destination outside the authorized vault is refused before access. Shared or nested section mappings remain valid, but an unresolved classification or destination is referred to the Dungeon Master.
+7. **Given** an explicitly configured guidance file or template is needed but is missing, unreadable, or invalid, **When** the workflow requests it, **Then** the workflow reports the failure and does not silently skip it or substitute another source; an absent optional default guidance candidate does not by itself invalidate the profile.
+8. **Given** the same profile and referenced vault content are unchanged, **When** separate operations resolve the profile, **Then** they produce the same settings and vault boundaries.
+9. **Given** the profile or a referenced guidance file, template, or path changes during an operation that depends on it, **When** the change is detected, **Then** that operation stops, reports the change, and requires revalidation before retrying without mixing old and new inputs.
+10. **Given** an explicitly configured party note, preparation location, section folder, guidance file, or template is needed, **When** the workflow checks that reference, **Then** it verifies existence, readability, and the expected file or folder type and stops dependent work if the reference is invalid rather than selecting a substitute.
+
 ### Edge Cases
 
 - The PowerShell runtime (the program that runs scripts) is installed but outside the supported versions, or a required add-on is absent or unsupported.
@@ -71,13 +94,17 @@ A Dungeon Master needs consistent results from mechanical operations and control
 - A note changes between preview and write, or a multi-note operation fails after processing only some targets.
 - Markdown notes (plain-text files used for vault content) use different text encodings (saved character representations) or line endings, or contain text that resembles shell commands.
 - An error report could expose campaign content by including full note text or supplied paths unnecessarily.
+- The configuration profile contains YAML merge/alias syntax, duplicate keys, ambiguous date-like scalars, explicit nulls, or scalar values whose parsed types differ from their declared setting types.
+- The profile is structurally valid but references a missing configured folder, unreadable guidance, or invalid template.
+- A profile or referenced file changes after validation but before its dependent operation completes.
+- Multiple configured section mappings overlap and a note's classification or operation destination cannot be determined from the profile.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: The project MUST document the operating environments supported for script-backed workflows and the prerequisites for each one.
-- **FR-002**: For each project release, the project MUST identify the latest stable PowerShell runtime and required add-ons, including `powershell-yaml` for reading YAML (a human-readable settings format). It MUST record their exact versions and the date those versions were selected.
+- **FR-002**: For each project release, the project MUST identify the latest stable PowerShell runtime and required add-ons, including `powershell-yaml` for reading YAML (a human-readable settings format) and a validator compatible with the published JSON Schema dialect. It MUST record their exact versions and the date those versions were selected.
 - **FR-003**: The project MUST document how users obtain the prerequisites for supported environments without automatically installing or upgrading them during a workflow.
 - **FR-004**: Before a script-backed operation runs, the system MUST verify that the required runtime and modules are available at supported versions. If a prerequisite is missing or unsupported, it MUST explain what is needed and stop that operation before any vault edits.
 - **FR-005**: Installing the current plugin scaffold MUST NOT require PowerShell; only future script-backed workflows require the documented runtime.
@@ -91,6 +118,16 @@ A Dungeon Master needs consistent results from mechanical operations and control
 - **FR-013**: Writes MUST preserve existing Markdown text, formatting, and text encoding (the saved representation of characters) except for the requested change.
 - **FR-014**: Error reports and logs MUST avoid unnecessary campaign content and keep campaign data on the user's device.
 - **FR-015**: Before script-backed operations are relied upon, the project MUST test repeatability and failure behavior in every supported environment.
+- **FR-016**: The runtime MUST load the optional `.dmassist.yaml` profile only from the root of the explicitly authorized vault. If the profile is absent, dependent discovery MUST remain read-only and MUST NOT create a profile, folder, or note.
+- **FR-017**: The runtime MUST reject malformed or unsupported YAML, duplicate mapping keys, an absent, invalid, or unsupported profile version, unknown fields, explicit nulls, and invalid values with a clear error before using the profile.
+- **FR-018**: The runtime MUST normalize supported YAML string, boolean, numeric, and date/time scalar values for string-valued profile settings to non-empty strings using locale-independent representations; booleans MUST use lowercase text and dates or timestamps MUST use ISO 8601. It MUST reject null and collection values for string fields and preserve the profile version as integer `1`.
+- **FR-019**: The runtime MUST validate the normalized version-1 profile against the published JSON Schema. It MUST apply contract defaults only to omitted settings; JSON Schema default annotations MUST NOT be treated as applying or mutating those values.
+- **FR-020**: The runtime MUST require every explicitly configured built-in or custom section directory to exist and MUST reject the entire profile if one is missing. Omitted conventional default directories MUST remain optional discovery candidates; validation MUST NOT create directories or fall back from an invalid explicit mapping.
+- **FR-021**: Every configured path, including party note, preparation location, section, custom section, guidance, and template paths, MUST be resolved relative to the authorized vault and checked after traversal and symbolic-link resolution. Any target outside the vault MUST be refused before access or modification.
+- **FR-022**: The runtime MUST permit shared or nested section mappings without treating overlap alone as invalid. When an operation cannot determine a note's classification or destination from overlapping mappings, it MUST stop and ask the Dungeon Master.
+- **FR-023**: When an explicitly configured guidance file or template is needed but is missing, unreadable, or invalid, the runtime MUST report the error and stop the dependent operation without silently skipping the source or substituting another. An absent optional default guidance candidate MUST NOT by itself invalidate the profile.
+- **FR-024**: The runtime MUST resolve unchanged profile and referenced vault state deterministically. If the profile or a referenced guidance file, template, or path changes during a dependent operation, the runtime MUST stop that operation, report the change, and require revalidation before retrying; it MUST NOT automatically retry or combine old and new inputs.
+- **FR-025**: Before a dependent operation uses an explicitly configured party note, preparation location, section folder, guidance file, or template, the runtime MUST verify that the target exists, is readable, and has the expected file or folder type. If the target is unavailable or invalid, it MUST report the problem and stop dependent work without silently selecting a substitute.
 
 **Acceptance Coverage**:
 
@@ -98,6 +135,13 @@ A Dungeon Master needs consistent results from mechanical operations and control
 - FR-006–FR-009: User Story 2, scenarios 1–4.
 - FR-010–FR-014: User Story 3, scenarios 1–7.
 - FR-015: User Story 1, scenarios 1 and 4.
+- FR-016–FR-025: User Story 4, scenarios 1–10.
+
+**Configuration Contract Boundary**:
+
+- Feature 002 owns the profile's field definitions, defaults, optionality, read-only discovery selection policy, machine-readable schema artifact and schema/contract consistency, custom-field semantics, and other contract behavior that does not depend on runtime or filesystem access.
+- This feature owns the runtime work explicitly delegated by feature 002: YAML parsing and normalization, duplicate-key rejection, applying schema validation, verifying configured paths and referenced files, deterministic resolution, and revalidation when inputs change.
+- The delegated runtime requirements correspond to feature 002 FR-010–FR-011, FR-013, FR-015–FR-017, FR-019–FR-021, and the runtime-specific boundary in FR-024, plus the schema-validation operation from FR-022. They are covered by this feature's FR-016–FR-025. Feature 002's contract and schema artifacts remain authoritative for configuration semantics outside this runtime scope.
 
 ### Key Entities
 
@@ -106,6 +150,9 @@ A Dungeon Master needs consistent results from mechanical operations and control
 - **Authorized Vault Boundary**: The user-designated vault root against which resolved targets are checked.
 - **Operation Result**: A consistently ordered outcome with status, relevant results, error information, and a completion code (a value other tools use to identify success or failure).
 - **Change Preview**: A description of proposed file changes against the state reviewed before an authorized write.
+- **Vault Configuration Profile**: The optional `.dmassist.yaml` settings document at the authorized vault root.
+- **Normalized Profile**: The settings produced after supported YAML scalars are converted to the published version-1 schema's expected types and values.
+- **Configured Reference**: A vault-relative section, guidance, party, or template path whose final destination and required existence/readability are checked before use.
 
 ## Success Criteria *(mandatory)*
 
@@ -119,6 +166,14 @@ A Dungeon Master needs consistent results from mechanical operations and control
 - **SC-006**: At least 4 of 5 Dungeon Masters in a usability walkthrough correctly identify the next step for a missing prerequisite, invalid vault target, and operation failure from the user-facing messages.
 - **SC-007**: 100% of reviewed diagnostics avoid including full note contents, and campaign data remains on the user's device.
 - **SC-008**: Every supported environment passes repeatability checks showing the same read-only request returns the same result, and missing-prerequisite and operation-failure checks produce the expected message without unintended vault changes.
+- **SC-009**: 100% of tested malformed YAML, duplicate-key, invalid-version, unknown-field, null, and schema-invalid profiles are rejected before their settings are used.
+- **SC-010**: 100% of tested supported scalar values normalize to the specified locale-independent representation, while null and collection values for string fields and non-integer version values are rejected.
+- **SC-011**: 100% of tested normalized profiles are validated against the published version-1 schema; omitted defaults follow the written contract and schema annotations alone do not alter profile values.
+- **SC-012**: 100% of tested explicitly configured missing section directories reject the entire profile without creating folders or falling back to discovery, while omitted conventional directories remain optional.
+- **SC-013**: 100% of tested traversal and symbolic-link escapes across section, guidance, and template paths are refused before out-of-vault access or modification; valid shared or nested mappings remain accepted, with unresolved destinations escalated to the Dungeon Master.
+- **SC-014**: 100% of tested missing, unreadable, or invalid explicitly configured guidance and templates stop the dependent operation without silent omission or substitution; an absent optional default guidance candidate does not reject the profile.
+- **SC-015**: 100% of tested changes to a profile or referenced guidance, template, or path during a dependent operation stop the operation and require revalidation; unchanged inputs resolve to equivalent settings and vault boundaries.
+- **SC-016**: 100% of tested explicitly configured party notes, preparation locations, section folders, guidance files, and templates are checked for existence, readability, and expected file or folder type before use; invalid references stop dependent work without substitution.
 
 ## Assumptions
 

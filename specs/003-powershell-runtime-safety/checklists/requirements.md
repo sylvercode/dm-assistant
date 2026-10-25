@@ -31,4 +31,6 @@
 
 ## Notes
 
-- No remaining checklist issues found. Key technical terms are explained in context, and SC-005 and SC-008 now measure character preservation and repeatability, prerequisite, and failure behavior across supported environments.
+- No remaining checklist issues found. Key technical terms are explained in context, and success criteria measure character preservation plus repeatability, prerequisite, and failure behavior across supported environments.
+- Cross-checked the runtime-owned obligations delegated by `specs/002-vault-configuration-contract/spec.md`: YAML parsing and normalization, duplicate-key rejection, schema validation, vault-contained path and reference validation, explicit section existence, overlap handling, deterministic resolution, and stale-input revalidation are covered by FR-016–FR-025 and User Story 4.
+- Feature 002 remains responsible for the configuration field contract, defaults, discovery policy, and schema artifact; this feature specifies runtime validation and safety behavior, not implementation of the configuration feature itself.
