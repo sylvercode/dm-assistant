@@ -1,65 +1,85 @@
 # Vault Configuration Contract: Future Validation Guide
 
-**Status: Design-only.** This guide describes how a future implementation
-should be prepared and validated. The repository is an empty Agent Plugins 1.0
-scaffold: it has no vault-profile loader, discovery workflow, runtime scripts,
-or test suite. Nothing in this guide is currently runnable, and the contract
-must not be treated as implemented behavior.
+**Status: Design-only.** This guide specifies future validation coverage for
+the version-1 profile schema. The repository is an Agent Plugins 1.0 scaffold:
+it has no vault-profile loader, discovery workflow, runtime scripts, or test
+suite. Nothing here is currently runnable, and these scenarios do not claim
+that executable validation exists.
 
-## Before implementation
+## Scope and setup
 
-1. Use an isolated fixture vault, not the plugin directory or a real campaign
-   vault. The authorized vault must come from explicit workspace context or
-   user input; no test should infer it from the plugin installation.
-2. Use the version-1 schema and validation rules defined in the
-   [configuration contract](contracts/vault-configuration-contract.md) as the
-   implementation target. No additional contract decisions are pending in this
-   guide.
-3. This feature does not select a parser or runtime. Issue #4 owns reader
-   selection, PowerShell/module versions, platform support, provisioning, and
-   executable runtime tests. There is no current loader or command to run.
-4. Use the scenarios below as schema acceptance coverage. Once Issue #4
-   provides a reader, run them as integration tests and add the test command
-   alongside that implementation.
+The schema artifact,
+[`contracts/dmassist.schema.json`](contracts/dmassist.schema.json), declares
+JSON Schema Draft 2020-12 and accepts a normalized JSON-compatible
+version-1 profile, not YAML text. The profile's `version: 1` is its
+application-level format version, not the schema dialect. Use the written
+[configuration contract](contracts/vault-configuration-contract.md) as the
+reference for behavior not expressible in JSON Schema.
 
-## Scenario setup and expected outcomes
+When a future schema validation harness exists:
 
-Use deterministic fixture contents and assert both the result and the absence
-of unauthorized changes. These scenarios map to the measurable outcomes in
-the [spec](spec.md) and the detailed rules in the
-[configuration contract](contracts/vault-configuration-contract.md); they
-summarize test intent rather than restating the schema.
+1. Validate constructed normalized JSON instances against the shipped schema.
+   Do not treat a YAML fixture as direct schema input.
+2. Keep fixtures isolated from the plugin installation and any real campaign
+   vault. Schema scenarios must not access or modify filesystem paths.
+3. Assert both the validation result and, where relevant, that validation has
+   not mutated the input instance.
+4. Do not invent a current command or runner. Issue #4 owns parser/runtime
+   selection, provisioning, and integration test commands.
 
-| Scenario | Fixture/action | Deterministic expected outcome |
+## Future JSON Schema validation scenarios
+
+These are schema-level cases over normalized objects. For each invalid case,
+expect rejection under the published schema; exact validator wording is
+implementation-specific.
+
+| Scenario | Normalized instance / assertion | Expected schema outcome |
 | --- | --- | --- |
-| Valid profile resolution | In the fixture vault, create `.dmassist.yaml` using the version-1 schema defined in the configuration contract. Create each explicitly mapped built-in and custom section directory. Include a custom section with a purpose description, a custom template type, and, if tested, existing party, preparation, guidance, and template references. Resolve twice against the unchanged fixture. | Validation succeeds; configured mappings, custom-section descriptions, and custom template types are available to workflows, omitted built-in settings resolve only to documented defaults/candidates, and both resolutions return identical settings and canonical in-vault boundaries. No note content or vault structure changes. |
-| Unconfigured, read-only discovery | Remove the profile. Provide conventional folders plus root-level adventure candidates and unrelated root content; request discovery only. | Discovery reports existing evidence and missing sections, does not call every root item an adventure, and creates or modifies no file, folder, or profile. |
-| YAML reader/schema integration | With the reader selected under Issue #4, test its supported YAML syntax and scalar conversion, along with duplicate keys, unknown fields, invalid mapping shapes, explicit nulls, empty values, and malformed input. | Reader-supported syntax is parsed according to its documented behavior; the resulting profile is accepted only if it satisfies this schema. Duplicate keys, unknown fields, parser errors, nulls, empty values, and invalid field values fail clearly before dependent work. No partial settings or fallback discovery; no files change. |
-| Missing, invalid, or unsupported version | Test a missing version, a non-integer/invalid version, and a syntactically valid newer unsupported version. | Each profile is rejected with a version-specific error. The newer profile is not interpreted under version-1 rules, and no dependent operation proceeds. |
-| Vault boundary, including symlink | Test a traversal/absolute path and a vault-local symlink whose resolved target is outside the authorized root. Also include a symlink resolving within the root as a control case. | Escaping paths are rejected before outside-target access or modification; the in-vault symlink is accepted only if all other checks pass. A textual path prefix is not sufficient proof of containment. |
-| Missing explicitly configured section folder | Configure one section to a non-existent path while other configured paths are valid. | The entire profile is rejected and identifies the missing mapping. No folder is created, no partial profile is used, and no discovery fallback replaces the rejected setting. Omitted conventional defaults remain optional candidates. |
-| Custom section identification | Configure a custom section with a valid identifier, existing in-vault path, and concise description of its use. Then test an invalid identifier and a missing description. | A valid section is available by identifier, and its description is used only as classification context; it does not automatically classify every contained note or grant permission. Invalid identifiers, missing/extra fields, or a missing explicitly mapped folder reject the profile with a clear error. |
-| Custom template type | Register a custom template identifier under `templates.custom`, then request an article of that type. Test a duplicate built-in identifier and a missing or unreadable custom template. | A valid custom type selects its configured vault template. Invalid or conflicting identifiers fail validation; an unavailable template stops the dependent operation, with no silent fallback to a built-in plugin template. |
-| Optional versus explicitly configured missing guidance/template | First omit guidance and template overrides and omit the optional default guidance file. Then separately configure a missing guidance path and a missing template override and request the dependent operation. | Absence of the optional default guidance candidate does not invalidate the profile. An explicitly configured unavailable guidance file stops work that requires it; an explicitly configured unavailable template stops that article operation and is not silently replaced. A plugin default is eligible only when no override was explicitly configured and that default exists. |
-| Overlapping section mappings | Map two section keys to the same directory, then test nested directories. Request a task whose note classification or destination cannot be determined from the request and evidence. | Both profiles pass overlap validation. The unresolved operation pauses for DM clarification and makes no write; overlap does not imply that every contained note belongs to either section. |
-| Ambiguous unconfigured discovery | Create two plausible candidates for one section. Test a clearly stronger candidate, then an equal-evidence tie. | Discovery selects the strongest candidate and reports that the choice is inferred, its evidence/reason, and the alternatives. For equal evidence, it uses the contract's stable lexicographic path tie-break and reports the tie. It continues read-only; the inference does not authorize edits. |
-| Stale state requires revalidation | Validate a profile, then change the profile or a referenced guidance/template file or path before a dependent operation completes. | The affected operation stops, identifies the changed dependency, and requires revalidation before retry. It does not automatically retry, mix old and new inputs, or write using stale state; it rechecks the vault boundary before further access. |
+| Minimal valid profile | `{"version": 1}` | Accept. Omitted optional properties remain omitted in the instance. |
+| Valid customized profile | Include valid built-in section overrides, a `sections.custom` entry with `path` and non-empty `description`, `party.note`, a valid preparation configuration, `guidance.path`, built-in template overrides, and a `templates.custom` entry. | Accept the normalized profile without inspecting or resolving any path. |
+| Required and version constraints | Try `{}`, `{"version": 2}`, `{"version": 1.5}`, `{"version": "1"}`, `{"version": null}`, and a boolean version. | Reject a missing, unsupported, non-integer, or wrong-type version; only numeric integer `1` is valid. |
+| Unknown fields at each object boundary | Add an unsupported property at the root and separately within `sections`, a custom section definition, `party`, `preparation`, `guidance`, `templates`, or a custom template map where that object is closed. | Reject each added property. Unknown-property rejection must not be tested only at the root. |
+| Custom identifiers and required fields | Test valid custom IDs matching `^[a-z][a-z0-9_]*$`; invalid uppercase, leading digit, hyphen, and empty IDs; built-in section/template name collisions; custom section entries missing either `path` or `description`; and entries with extra fields. | Accept valid new IDs and exact custom section definitions. Reject invalid/colliding IDs, missing required members, and extra members. |
+| Custom template values | Test valid custom template IDs mapped to non-empty strings, plus invalid IDs, built-in collisions, empty values, nulls, and non-string normalized values. | Accept valid mappings; reject invalid names and values. No file is opened. |
+| Preparation mode conditions | Check `session_section` with no `path` and optional valid `heading`; reject it with `path`. Check `separate_folder` with required `path` and no `heading`; reject missing `path` or present `heading`. Also test a missing or unsupported `mode`, and an empty `preparation` object. | Accept only the declared mode-specific shapes. The schema's `mode` requirement applies when `preparation` is present. |
+| Null, empty, type, and shape constraints | Put null, an empty string, a number, boolean, array, or object in representative string-valued locations; put null or the wrong JSON shape in mapping-valued locations. Test `sections: {}` and `templates: {}` as valid empty mappings. | Reject nulls, empty strings, wrong scalar types, and invalid mapping shapes. Accept empty `sections` and `templates` objects as specified. |
+| Default annotations are not applied | Inspect schema `default` annotations for built-in section defaults, `sections.custom`, the preparation object and heading, `templates`, and `templates.custom`. Validate instances omitting those properties, then compare the instances before and after validation. | Confirm annotations match the written contract. Validation accepts otherwise valid omissions but does not insert defaults or mutate the instance. The contract/runtime—not the schema validator—determines effective defaults and optional candidates. |
+| Schema/contract consistency | Compare each schema property, required member, type, enum, pattern, unknown-property rule, preparation conditional, and default annotation with the corresponding version-1 contract rule. Include the built-in name exclusions for custom IDs. | Report any mismatch as a schema/contract defect; schema acceptance alone does not replace contract behavior. Do not extend this comparison to YAML parsing or filesystem checks. |
 
-## Coverage and implementation handoff
+Coverage should account for every structural and value constraint expressible
+over the normalized profile, as required by **SC-006**. In particular,
+schema tests can establish that path fields are non-empty strings; they cannot
+establish that a path is safe, exists, is readable, or remains within a vault.
 
-- The no-profile and mutation assertions cover **SC-001** and the preservation
-  promise in **SC-004**.
-- The accepted/rejected field, YAML, version, path, dependency, and state-change
-  cases provide implementation coverage for **SC-002**, **SC-003**, and
-  **SC-005**.
-- Keep preparation separate from actual-play outcomes and keep player-facing
-  handouts free of DM-only facts as independent workflow safeguards; a passing
-  configuration test does not authorize content edits or disclosure.
-- Issue #4 must supply the reader/runtime test command, fixtures, and supported
-  runtime/dependency record. Until then, these are schema-level expected
-  outcomes, not evidence that a reader or runtime behavior has passed.
+## Separate Issue #4 integration scenarios
 
-See [plan](plan.md), [research](research.md), and [data model](data-model.md)
-for the proposed runtime and design details. See the repository
-[README](../../README.md) and [architecture](../../docs/architecture.md) for
-the current scaffold boundaries: neither provides a configuration runtime.
+The following are not JSON Schema test cases. Issue #4 owns the future reader,
+scalar-normalization layer, validator integration, runtime, and associated
+integration tests. These scenarios must remain separate from validation of
+normalized JSON instances:
+
+| Responsibility | Future integration scenario | Expected outcome |
+| --- | --- | --- |
+| YAML parser and syntax | Exercise supported YAML syntax with the reader selected under Issue #4; separately test malformed or unsupported syntax. | Reader behavior follows its documented support; parser failures stop profile loading before dependent work. |
+| Scalar normalization | Feed YAML string, boolean, numeric, and date/time scalars in string-valued fields; test locale-independent conversion, lowercase boolean text, ISO 8601 dates/timestamps, explicit nulls, collections, and integer `version: 1`. | Normalize supported scalar values to the contract's required strings before schema validation. Reject explicit nulls and collections in scalar positions; preserve `version` as integer `1`. |
+| Duplicate YAML keys | Provide duplicate mapping keys at relevant levels, including cases a parser might otherwise overwrite during object construction. | Detect and reject duplicates during parsing; JSON Schema cannot detect keys already discarded by the parser. |
+| Filesystem, vault boundaries, and paths | In an explicitly authorized isolated fixture vault, test configured directory/file existence and readability, invalid relative/absolute/traversal paths, and symbolic links resolving inside and outside the vault. | Enforce existence and component-aware canonical vault containment before access; reject escapes. These are runtime checks, not schema assertions. |
+| Stale inputs | Change the profile, a referenced guidance/template input, or a relevant path after validation and before a dependent operation completes. | Stop affected work, identify the change, and require revalidation before retry. Do not mix old and new inputs or proceed on stale validation. |
+
+Issue #4 also owns defining the future fixture format and executable test
+command. No parser, validator dependency, runtime version, or command is
+prescribed here.
+
+## Design safeguards
+
+Future integration coverage must preserve read-only discovery when no profile
+is present and must not create or reorganize vault content. Keep preparation
+separate from actual-play outcomes, do not silently resolve contradictions or
+rewrite run adventure plans, and keep DM-only facts and revealing links out of
+player-facing handouts. A passing schema validation is not authorization to
+access a path or perform an edit.
+
+See [spec](spec.md), [research](research.md), and [data model](data-model.md)
+for feature scope and ownership. The repository
+[README](../../README.md) and [architecture](../../docs/architecture.md)
+describe the current scaffold; neither provides a configuration runtime.
