@@ -2,7 +2,7 @@
 
 ## Installed plugin resource lookup
 
-**Decision**: Use GitHub Copilot CLI as the supported client for installed-resource validation. Keep one canonical shared reference bundled with the vault-orientation skill in the plugin's fixed `skills/` tree, and require each vault-facing skill to load it explicitly before interpreting or changing campaign notes. Treat successful lookup from an installed plugin, independent of current working directory, as a release acceptance check.
+**Decision**: Use GitHub Copilot CLI as the supported client for installed-resource validation. Keep one canonical shared reference bundled with the vault-orientation skill in the plugin's fixed `skills/` tree. An activated skill receives its own base directory and related-files listing independently of the process working directory. Current official documentation does not provide a cross-skill filesystem lookup contract. Treat the installed lookup required by FR-012 as an empirical release gate, and do not begin dependent implementation until a supported mechanism is demonstrated.
 
 **Rationale**: The repository's local installation procedure uses `copilot plugin install .`, `copilot plugin list`, and a new interactive session for skill discovery. The official Agent Plugins 1.0 contract fixes skills under `skills/<skill-name>/SKILL.md` and supports files distributed with a skill; it does not offer a configurable plugin-wide shared-resource directory. The brainstorm recommends a single reference bundled with a vault-orientation skill to avoid duplicated rules.
 
@@ -95,8 +95,48 @@ to use the local summaries.
 - [GitHub Copilot plugins](https://docs.github.com/en/copilot/concepts/customizations/plugins) — Agent Plugins 1.0 portability and fixed component locations.
 - [Add skills to GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills) — skill directory resources and discovery commands.
 - [Copilot CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference) — plugin installation/list behavior.
+- [Copilot CLI skills](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/skills) — per-skill base-directory and related-resource behavior.
+- [Copilot CLI MCP servers](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers) — `copilot mcp list` and `copilot mcp get` readiness/status surfaces.
 - `README.md` — repository's local install and new-session discovery steps.
 - `docs/architecture.md` — component boundaries and campaign-vault separation.
 - `docs/vault-guidance-brainstorm.md` — recommended three-layer guidance model and loading sequence.
 - [Obsidian Link Resolver](https://github.com/sylvercode/obsidian-link-resolver) — resolver release, MCP startup requirements, and tool contract.
 - [Obsidian Aliases](https://obsidian.md/help/aliases), [Obsidian Tags](https://obsidian.md/help/tags), [Obsidian Internal links](https://obsidian.md/help/links), and [Obsidian Callouts](https://obsidian.md/help/callouts) — primary references for local, paraphrased convention defaults; none is a runtime dependency.
+
+## Updated research: clarified loading order and resource verification
+
+The implementation order is governed by the updated specification: identify
+the authorized vault location without reading campaign notes; verify required
+dependencies are available and authorized for that vault; load the shared
+reference and designated vault-local guidance; establish campaign/group and
+whether the requested output includes a handout or read-aloud section; then
+access campaign notes. Dependency readiness and vault authorization are
+distinct checks. Copilot CLI's MCP status/tool discovery can establish server
+readiness without resolving a link, but server presence alone does not prove
+the intended vault is authorized.
+
+Current Copilot CLI documentation describes a runtime-provided base directory
+and related-files listing for an activated skill's own resources. It does not
+document a cross-skill filesystem lookup primitive. Plugin manifests can name
+independent skill paths, so sibling adjacency is not a portable lookup
+contract. The canonical shared-reference design remains preferred, but
+cross-skill lookup must be empirically verified in the installed client from
+multiple working directories before dependent skill implementation. If it
+fails, treat it as a blocker and select a supported packaging/loading approach;
+do not infer success from a skill loading its own resource.
+
+The Resolver's source/contract documentation describes its allowed vault roots
+as a server-startup allow-list that requests cannot widen. Copilot CLI
+documents `copilot mcp get` as reporting server status and available tools.
+These support checking tool readiness separately from vault authorization.
+Exact CLI JSON output and a safe, generally available authorization
+introspection mechanism remain unverified. Do not claim an untested command
+schema or resolve a campaign link merely to establish authorization.
+
+The skill inventory acceptance is a static inventory and source audit only:
+enumerate all immediate-child `skills/*/SKILL.md` files, confirm an exact
+one-to-one match with `skills/README.md`, and inspect every vault-facing
+skill's declared preflight. It does not require runtime invocation of every
+vault-facing skill. SC-004 retains an informal short walkthrough with the
+existing threshold of at least 4 of 5 DMs; examples and scoring are not
+standardized.

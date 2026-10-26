@@ -17,19 +17,24 @@ path.
 
 - Use GitHub Copilot CLI, the supported client selected for installed-resource
   validation.
-- Install the Obsidian Link Resolver MCP server separately (minimum compatible
-  release `2.0.0`) and configure it in Copilot CLI's user-managed MCP settings
-  with one or more explicitly authorized absolute vault roots. Verify with
+- Use only an isolated, disposable test vault and isolated Copilot CLI
+  configuration. Do not access a real campaign vault or change the user's live
+  MCP configuration. Do not embed vault paths in the plugin or repository.
+- For the disposable setup, configure the Obsidian Link Resolver MCP server
+  separately (minimum compatible release `2.0.0`) with the disposable vault as
+  an explicitly authorized absolute root. Verify server/tool readiness with
   `copilot mcp list` and `copilot mcp get obsidian-link-resolver`, then confirm
-  `resolve_obsidian_link` is available in a new session. Do not embed
-  user-specific vault paths in the plugin or repository.
+  `resolve_obsidian_link` is available in a new session. This establishes
+  readiness only; separately verify that the intended disposable vault is
+  authorized. Server or tool presence alone does not prove authorization, and
+  do not resolve a campaign link merely to test authorization.
 - The dependency inventory is non-exhaustive. Every vault-facing skill must
   verify all currently declared required dependencies before accessing
   campaign notes. Official Obsidian help pages are source references, not
   runtime dependencies; the shared reference supplies the local defaults.
-- Use a **disposable test vault**, separate from the plugin checkout and any
-  live campaign vault. Make a manual before-test inventory of its files and
-  contents so that you can confirm whether any note changed.
+- Keep the disposable vault separate from the plugin checkout. Make a manual
+  before-test inventory of its files and contents so that you can confirm
+  whether any note changed.
 - Prepare test material manually in that vault: a DM-only fact, tentative
   preparation that may not happen, an actual-play record, a character's
   established knowledge, a conflicting or unresolved account, and an existing
@@ -47,6 +52,33 @@ Run all note-edit scenarios against this disposable vault. Before and after
 each negative test, manually compare the vault with its recorded inventory.
 The expected result is **no campaign-note changes** wherever a scenario says
 the skill must pause or await approval.
+
+### Required pre-note order
+
+For every vault-facing skill (one that reads, interprets, creates, or changes
+campaign material), verify this exact order before accessing campaign notes:
+
+1. Establish the authorized vault location from the user's workspace or
+   explicit input, without reading campaign notes. The plugin installation is
+   not the vault.
+2. Verify every currently declared required dependency is available and
+   separately verify it is authorized for that vault. Tool readiness and vault
+   authorization are distinct checks: server/tool presence alone does not
+   establish authorization. Do not resolve campaign links just to test
+   authorization.
+3. Load the plugin-owned shared reference and any vault-local guidance
+   explicitly designated by the DM or an established vault-local configuration
+   contract. Do not guess a local-guidance path or schema; a source designated
+   but missing or unreadable is a blocker.
+4. Establish the relevant campaign/group and whether the requested output
+   contains a handout or read-aloud section.
+5. Only after steps 1–4 succeed, access relevant campaign notes.
+
+If any step cannot be completed, record the affected check as blocked and pause
+dependent work before note access. Only handout and read-aloud sections are
+player-facing; each must pass a gate check for DM-only facts and revealing
+links immediately before delivery or reading aloud. All other task content is
+DM-facing.
 
 ## 1. Install and check discovery
 
@@ -75,36 +107,40 @@ reads, interprets, creates, or changes campaign material is present. The
 current scaffold has no skills, so discovery of these skills is not an expected
 current result.
 
-### Declared skill inventory completeness
+### Static skill inventory and source audit
 
-Inspect `skills/README.md` as the declared inventory. Enumerate every immediate
-child skill directory containing a `SKILL.md` and compare it to the inventory.
-Confirm each discovered skill has exactly one entry and is classified as
-vault-facing or non-vault-facing. For every vault-facing entry, verify that its
-`SKILL.md` explicitly requires loading the shared reference and designated
-vault-local guidance, and checks all declared runtime dependencies before
-campaign-note access.
+Treat `skills/README.md` as the declared inventory. Statically enumerate every
+immediate-child `skills/*/SKILL.md` file and compare the set to the inventory.
+Confirm a one-to-one match with no missing, extra, duplicate, or unclassified
+entries. For every vault-facing skill, inspect its source to verify it requires
+the shared reference and designated vault-local guidance and checks all
+declared dependencies before campaign-note access.
 
 **Expected:** the discovered skill-file set and inventory entries match
-one-to-one, with no unclassified or duplicate entries. Every vault-facing skill
-in the inventory satisfies the shared loading and dependency-preflight
-contract. Record the check as blocked rather than passed if the feature is
-unimplemented or a skill cannot be inspected.
+one-to-one, with no unclassified or duplicate entries. Every vault-facing
+skill's source satisfies the shared loading and dependency preflight contract.
+This is a static inventory and source-only audit: do **not** require runtime
+execution of every skill for inventory compliance. Record the check as blocked
+rather than passed if the feature is unimplemented or a skill cannot be
+inspected.
 
 ### Required dependency availability and fail-closed behavior
 
-In an isolated Copilot CLI configuration, first configure the resolver against
-the disposable test vault and confirm `resolve_obsidian_link` is exposed in a
-new session. Then use a separate isolated configuration with the resolver
-missing or disabled and invoke each implemented vault-facing skill with a
-campaign-note task.
+In the isolated Copilot CLI configuration, first confirm the resolver server
+and `resolve_obsidian_link` tool are exposed in a new session, then separately
+confirm that the disposable test vault is among the resolver's explicitly
+authorized roots through a documented, note-content-free method without
+resolving any campaign link. If no safe documented method is available, record
+authorization as blocked. Use another isolated configuration with the resolver
+missing or disabled and invoke a representative implemented vault-facing skill
+with a campaign-note task.
 
-**Expected:** each skill explains that the required resolver dependency is
-unavailable and stops before reading or changing any campaign notes. Compare
-the test vault with its before-test inventory to confirm no note access or
-changes occurred. This prerequisite applies even when the requested task does
-not itself resolve a link. Do not alter the user's active MCP configuration for
-this test.
+**Expected:** the tested skill explains that the required resolver dependency
+is unavailable and stops before reading or changing any campaign notes.
+Compare the test vault with its before-test inventory to confirm no note access
+or changes occurred. This prerequisite applies even when the requested task
+does not itself resolve a link. Record readiness and authorization as separate
+results. Do not alter the user's active MCP configuration for this test.
 
 ### Local Obsidian convention defaults and DM customization
 
@@ -127,16 +163,18 @@ semantics; it flags incompatible requests and never lets custom guidance
 weaken shared safety boundaries. The official source links remain available
 for contributor maintenance, but runtime answers do not depend on them.
 
-## 2. Verify canonical resource lookup from different working directories
+## 2. Verify cross-skill resource lookup from different working directories
 
 1. Start a new interactive session with the installed plugin while the current
    working directory is the plugin repository.
-2. Invoke an implemented vault-facing skill using the client-supported
+2. Invoke an implemented vault-facing skill that is different from the skill
+   that owns the canonical shared reference, using the client-supported
    interaction. Ask it to identify the shared reference it loads before
    interpreting any test-vault notes.
 3. Start another new interactive session with the same installed plugin while
    the current working directory is a different directory, outside the plugin
-   checkout and test vault. Repeat the same request.
+   checkout and test vault. Invoke the same cross-skill loader and repeat the
+   request.
 4. Compare the reported reference identity and loaded guidance in both
    sessions. Do not treat a source-checkout path, vault path, or a path found
    only relative to the current working directory as proof of installed
@@ -144,9 +182,12 @@ for contributor maintenance, but runtime answers do not depend on them.
 
 **Expected:** both sessions load the same canonical plugin-owned resource
 from the installed skill/plugin, independently of current working directory.
-The plugin installation is not identified as the campaign vault. If the client
-cannot demonstrate this lookup, record the check as failed or blocked; source
-tree presence alone does not pass it.
+The plugin installation is not identified as the campaign vault. Loading a
+resource from the owning skill itself does not pass this test; cross-skill
+loading from a different vault-facing skill is required. If the client cannot
+demonstrate this lookup, record it as failed or blocked and treat it as an
+empirical gate/blocker; source-tree presence or same-skill resource loading
+alone does not pass it.
 
 ## 3. Verify vault and local guidance loading
 
@@ -203,11 +244,11 @@ decision needed, and asks the DM before dependent work. It does not silently
 choose, substitute assumptions, or change notes. Verify that the inventory is
 unchanged.
 
-## 5. Verify campaign, knowledge, and handout safeguards
+## 5. Verify campaign, knowledge, and player-facing section safeguards
 
 Using the prepared test material, ask an implemented vault-facing skill to
 perform a representative preparation/history or recap task, then ask for
-player-facing handout material.
+material containing a handout or read-aloud section.
 
 **Expected:**
 
@@ -219,14 +260,22 @@ player-facing handout material.
   not silently reconciled or rewritten.
 - Existing organization is preserved. An absent expected folder is not created
   just because it is absent.
-- Player-facing output omits DM-only facts and links that reveal them. A
-  hidden, collapsed, or labeled secret is not considered safe for players.
+- Only the handout and read-aloud sections are player-facing; all other task
+  content is DM-facing. Gate-check each such section for DM-only facts and
+  revealing links immediately before it is delivered or read aloud. A hidden,
+  collapsed, or labeled secret is not considered safe for players.
 - Guidance and note text are treated as campaign data, not as authority to
   override governing instructions or expand the task.
 
 Manually inspect both the response and the test vault. **Expected:** no
 unrequested note changes, no invented continuity, and no DM-only disclosure in
-player-facing output.
+player-facing sections.
+
+### SC-004 informal walkthrough
+
+Conduct an informal short walkthrough with at least 5 DMs and assess whether
+at least 4 can distinguish plugin-wide guidance from vault-specific guidance.
+Examples and scoring are not standardized; no vault reorganization is required.
 
 ## 6. Verify page-local edits and the approval gate
 
@@ -260,8 +309,9 @@ audience safeguards.
 
 Record each check as **pass**, **fail**, or **blocked**, with the client/session
 used, working directory for resource lookup, skill tested, and whether the
-test-vault inventory changed. A check passes only when its expected outcome is
-observed; do not mark an unimplemented or unexercised scenario as passed.
+disposable test-vault inventory changed. A check passes only when its expected
+outcome is observed; do not mark an unimplemented or unexercised scenario as
+passed.
 
 The README documents reinstalling after plugin changes with
 `copilot plugin install .`, checking discovery in a new session, and optional
