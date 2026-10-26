@@ -157,10 +157,12 @@ campaign-note access.
 
 No designated vault-local guidance is a valid state, not a missing-source
 failure. Once the authorized vault, dependencies, shared reference, and
-campaign/output context are established, a straightforward read-only lookup
-may use provisional layout assumptions. Pause when uncertainty affects the
-findings or next action; provisional assumptions never authorize note writes.
-A designated-but-missing or unreadable source still blocks dependent work.
+campaign/output context are established, a lookup limited to the specific
+information requested may read relevant notes identified without relying on
+an uncertain folder or note-role mapping. Keep the lookup read-only. Pause
+when uncertainty affects the findings or next action; provisional assumptions
+never authorize note writes. A designated-but-missing or unreadable source
+still blocks dependent work.
 
 Updates to character/group knowledge or world facts require an actual-play
 record or explicit DM judgment where permitted. DM judgment alone is

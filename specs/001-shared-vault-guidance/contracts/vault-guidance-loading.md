@@ -77,14 +77,15 @@ order, before accessing campaign notes:
 
 If no vault-local guidance has been designated, a local guidance file is not
 required merely because none exists. After all other pre-note checks pass, a
-straightforward read-only lookup may use provisional assumptions about the
-existing layout. If uncertainty affects the lookup's findings or next action,
-pause and ask the DM before further note access. Provisional assumptions never
-authorize creating or changing notes. A source that was designated but is
-missing or unreadable is not equivalent to no source having been designated;
-pause dependent work before campaign-note access. If any other required
-preflight step fails or its outcome cannot be established, pause and ask the
-DM before proceeding.
+lookup limited to the specific information requested may read relevant notes
+identified without relying on an uncertain folder or note-role mapping. It
+must remain read-only. If uncertainty affects the lookup's findings or next
+action, pause and ask the DM before further note access. Provisional layout
+assumptions never authorize creating or changing notes. A source that was
+designated but is missing or unreadable is not equivalent to no source having
+been designated; pause dependent work before campaign-note access. If any
+other required preflight step fails or its outcome cannot be established,
+pause and ask the DM before proceeding.
 
 ## Loading and interpretation sequence
 
@@ -144,9 +145,10 @@ a handout/read-aloud section, note mapping, guidance, or note role has multiple
 reasonable interpretations that affect the next action, the skill must state
 the competing interpretations, identify the decision needed, and ask the DM.
 It must not silently choose an interpretation or substitute assumptions for
-required guidance. With no local guidance designated, provisional layout
-assumptions are allowed only for an otherwise straightforward read-only lookup;
-pause if they affect findings or the next action.
+required guidance. With no local guidance designated, a lookup limited to the
+specific information requested may read relevant notes identified without
+relying on an uncertain folder or note-role mapping; it remains read-only and
+pauses if uncertainty affects findings or the next action.
 
 When a missing/unreadable required source, unverified dependency/authorization
 check, or material ambiguity is known before note access, the skill must not

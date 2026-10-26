@@ -76,9 +76,10 @@ campaign material), verify this exact order before accessing campaign notes:
 
 If any step cannot be completed, record the affected check as blocked and pause
 dependent work before note access. No designated local guidance is a valid
-state: after all other checks pass, it permits a straightforward read-only
-lookup with provisional layout assumptions, but not a write; pause if
-uncertainty affects findings or the next action. Only handout and read-aloud
+state: after all other checks pass, it permits a read-only lookup limited to
+the specific information requested, using relevant notes identified without
+relying on an uncertain folder or note-role mapping. It does not permit writes;
+pause if uncertainty affects findings or the next action. Only handout and read-aloud
 sections are player-facing; each must pass a gate check for DM-only facts and
 revealing links immediately before delivery or reading aloud. All other task
 content is DM-facing.
@@ -155,15 +156,16 @@ configuration for this test.
 ### No designated local guidance
 
 In the disposable vault, explicitly state that no vault-local guidance has
-been designated and request a straightforward read-only lookup using a known
-note. After confirming every other preflight check passes, ask a follow-up
-whose answer or next action depends on an uncertain layout assumption.
+been designated and request a read-only lookup limited to a specific fact in
+a known note. After confirming every other preflight check passes, ask a
+follow-up whose answer or next action depends on an uncertain folder or
+note-role mapping.
 
-**Expected:** the first lookup may use provisional layout assumptions and
-reports uncertainty; it makes no note changes. When the uncertainty affects
-the findings or next action, the skill pauses before further note access and
-asks the DM. A designated-but-missing or unreadable source must instead block
-dependent note work.
+**Expected:** the first lookup reads only the relevant known note(s), does not
+rely on uncertain folder or note-role mappings, and makes no note changes.
+When uncertainty affects the findings or next action, the skill pauses before
+further note access and asks the DM. A designated-but-missing or unreadable
+source must instead block dependent note work.
 
 ### Local Obsidian convention defaults and DM customization
 

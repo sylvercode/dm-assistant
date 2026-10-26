@@ -61,9 +61,10 @@ Conceptual attributes:
   absent, unreadable, or conflicting.
 - **No-designation state**: a valid state distinct from a designated source
   that is missing or unreadable. After all other pre-note checks pass, it
-  permits a straightforward read-only lookup using provisional layout
-  assumptions; consequential ambiguity pauses further note access, and
-  provisional assumptions never authorize writes.
+  permits a lookup limited to the specific information requested, using
+  relevant notes identified without relying on an uncertain folder or
+  note-role mapping. This lookup is read-only; consequential ambiguity pauses
+  further note access, and provisional assumptions never authorize writes.
 - **Customization scope**: campaign-specific choices and conventions may
   customize general defaults; native syntax/semantics and shared safety
   invariants remain authoritative.
@@ -164,9 +165,11 @@ bundled paraphrased guidance, not runtime dependencies.
   guidance; establish the campaign/group and whether requested output includes
   a handout or read-aloud section; only then access campaign notes.
 - No designated local guidance is valid. It is not a missing-source failure;
-  after all other checks pass, it permits only a straightforward read-only
-  lookup using provisional layout assumptions. Pause if assumptions affect
-  findings or the next action, and never write based on them.
+  after all other checks pass, it permits a lookup limited to the specific
+  information requested, using relevant notes identified without relying on
+  an uncertain folder or note-role mapping. The lookup is read-only. Pause if
+  uncertainty affects findings or the next action, and never write based on
+  provisional assumptions.
 - If a handout or read-aloud section is to be handed out or read aloud, gate
   check that section for DM-only facts and revealing links immediately before
   delivery or reading. All other task content is DM-facing.
@@ -197,8 +200,8 @@ bundled paraphrased guidance, not runtime dependencies.
 2. **No substitution by guesswork.** Do not guess which local guidance is
    designated, treat the plugin as the vault, infer an absent folder should be
    created, or silently substitute assumptions for a designated missing
-   source. Provisional layout assumptions are permitted only for the
-   no-designated-guidance read-only lookup described above.
+   source. The bounded, read-only lookup described above is permitted only
+   when no local guidance was designated.
 3. **Context is sufficiently specific.** Establish the authorized vault and
    relevant campaign/group before acting on notes. Resolve ambiguity that
    affects the next action with DM direction.

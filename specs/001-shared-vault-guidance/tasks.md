@@ -89,8 +89,9 @@ access, verifies each dependency's readiness and vault authorization, loads
 the shared reference and any designated local guidance, establishes
 campaign/group and output-section context, then accesses notes. Verify that
 unverifiable authorization results in no campaign-note access, and that no
-designated local guidance permits only an unambiguous, straightforward
-read-only lookup using provisional layout assumptions. Also confirm the
+designated local guidance permits only a read-only lookup limited to the
+requested information, using relevant notes identified without relying on an
+uncertain folder or note-role mapping. Also confirm the
 installed reference is identical from multiple working directories and local
 defaults cover both internal-link formats.
 
@@ -113,9 +114,9 @@ defaults cover both internal-link formats.
   T001 to load `VAULT-REFERENCE.md` from the installed plugin, not from the
   current directory, source checkout, or campaign vault. Require the skill to
   load only vault-local guidance designated by the DM or an established
-  vault-configuration contract, without guessing its path or schema. Make the
-  entire ordered preflight an explicit fail-closed gate before any
-  campaign-note access, including a default of no access whenever vault
+  vault-configuration contract, if applicable, without guessing its path or
+  schema. Make the entire ordered preflight an explicit fail-closed gate before
+  any campaign-note access, including a default of no access whenever vault
   authorization is unverifiable or any other required preflight step fails.
   Follow the ordered preflight in
   `specs/001-shared-vault-guidance/contracts/vault-guidance-loading.md`:
@@ -125,10 +126,11 @@ defaults cover both internal-link formats.
   local guidance; establish
   campaign/group and whether output includes a handout or read-aloud section;
   then access campaign notes. Treat no designated local guidance as a valid
-  state: permit a straightforward read-only lookup using provisional layout
-  assumptions only after all other checks pass, pause if ambiguity affects
-  findings or the next action, and never create or change notes on those
-  assumptions.
+  state: permit a read-only lookup limited to the specific information
+  requested, using relevant notes identified without relying on an uncertain
+  folder or note-role mapping, only after all other checks pass. Pause if
+  uncertainty affects findings or the next action, and never create or change
+  notes based on provisional assumptions.
 
 **Checkpoint**: The orientation skill follows the full ordered preflight and
 uses the same installed canonical resource from multiple working directories.
@@ -146,7 +148,9 @@ guidance, designated-but-missing local guidance, no designated local guidance,
 unavailable resolver, unverifiable vault authorization, and ambiguous
 campaign/mapping context. Confirm blocked scenarios cause no campaign-note
 reads or changes; confirm the no-designated-guidance case allows only a
-straightforward read-only lookup when all other preflight checks pass.
+read-only lookup limited to the requested information, using relevant notes
+identified without relying on an uncertain folder or note-role mapping, when
+all other preflight checks pass.
 
 ### Implementation for User Story 2
 
@@ -155,11 +159,12 @@ straightforward read-only lookup when all other preflight checks pass.
   local source, dependency, or context; explain dependent work; and pause it
   before campaign-note access or changes. Distinguish a designated-but-missing
   local source from no source being designated. Do not require or invent a
-  local guidance file; when none was designated, allow a straightforward
-  read-only lookup after the other preflight checks pass, using provisional
-  layout assumptions only while they do not affect findings or the next
-  action. Pause before further note access if consequential ambiguity arises.
-  No provisional assumption authorizes creating or changing notes. For other
+  local guidance file; when none was designated, allow a read-only lookup
+  limited to the specific information requested, using relevant notes
+  identified without relying on an uncertain folder or note-role mapping,
+  after the other preflight checks pass. Pause before further note access if
+  uncertainty affects findings or the next action. Provisional assumptions
+  never authorize creating or changing notes. For other
   missing required sources, identify the source and affected work, pause
   before note access, and ask the DM. State competing interpretations and the
   needed decision when ambiguity matters. Re-establish guidance and context
@@ -263,7 +268,7 @@ integrated feature within the agreed static/runtime verification scope.
   in `specs/001-shared-vault-guidance/quickstart.md`. Use the README's local
   installation and discovery instructions. Validate installed discovery,
   cross-skill canonical-reference loading from multiple working directories,
-  offline Obsidian defaults, no-designated-guidance read-only behavior,
+  offline Obsidian defaults, bounded no-designated-guidance read-only behavior,
   blocked cases with no note access, failure/ambiguity pauses, continuity and
   editing safeguards, actual-play-or-DM-judgment knowledge updates, and
   handout/read-aloud gate checks. Run resolver-dependent scenarios only after
