@@ -8,6 +8,16 @@
 
 **Input**: User description: "Use issue 4 as input and create number 003 spec since 001 and 002 are in creation in another worktree."
 
+## Clarifications
+
+### Session 2026-10-25
+
+- Q: If a multi-note operation fails after changing some notes, what should the workflow do? → A: Stop on the first failure, preserve changes already made, and report exactly which notes changed and which did not.
+- Q: How should a Dungeon Master approve a proposed change that affects multiple notes, deletes or reorganizes notes, or broadly changes established campaign facts? → A: Show a preview, then require clear confirmation for that specific preview; approval does not cover other changes.
+- Q: Which operating systems must future script-backed workflows support? → A: Windows, macOS, and Linux where the required PowerShell runtime and add-ons are available.
+- Q: May script-backed workflows send usage or diagnostic telemetry off the user's device? → A: No; do not send usage or diagnostic telemetry off-device.
+- Q: What information should every script-backed operation return so another workflow can reliably interpret its outcome? → A: Return the operation, completion status and code, changed and unchanged targets, remaining work, and any error details.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Run a Script-Backed Workflow Safely (Priority: P1)
@@ -20,7 +30,7 @@ A Dungeon Master starts a script-backed workflow and needs to know that the envi
 
 **Acceptance Scenarios**:
 
-1. **Given** a documented supported environment with all required components, including a validator compatible with the published JSON Schema dialect when configuration is used, **When** the user starts a script-backed operation, **Then** the operation passes its prerequisite check and continues.
+1. **Given** Windows, macOS, or Linux with all required components, including a validator compatible with the published JSON Schema dialect when configuration is used, **When** the user starts a script-backed operation, **Then** the platform is supported and the operation passes its prerequisite check. A platform where the required components cannot be supported reliably is explicitly identified as unsupported.
 2. **Given** a missing or unsupported runtime or required module, **When** the user starts a script-backed operation, **Then** the user receives a specific prerequisite message, no prerequisite is installed or upgraded automatically, and no vault content is changed.
 3. **Given** a blocked scripted operation, **When** the assistant can still help without the script, **Then** that independent read-only assistance remains available.
 4. **Given** a new release of the script-backed workflows, **When** the project publishes its supported-environment guidance, **Then** the guidance identifies the latest stable versions selected, the exact versions and selection date, and how to obtain the runtime and each add-on; repeatability and failure behavior are checked in every supported environment, and installing the plugin itself does not require the runtime.
@@ -54,13 +64,14 @@ A Dungeon Master needs consistent results from mechanical operations and control
 
 **Acceptance Scenarios**:
 
-1. **Given** a completed operation, **When** its result is returned, **Then** the result follows a consistent, labeled format and order and includes the documented completion code (the value other tools use to recognize success or failure).
+1. **Given** a completed operation, **When** its result is returned, **Then** it uses the same labeled fields and order as other results and identifies the operation, completion status and code, changed targets, unchanged targets, remaining work, and any error details.
 2. **Given** an operation that encounters an error, **When** it reports completion, **Then** it cannot present a partial outcome as full success and identifies the error clearly.
-3. **Given** an inspection or a change to more than one note, any deletion or reorganization, or a change to established campaign facts beyond the specific text edit requested in one named note, **When** the operation is requested, **Then** inspection makes no changes and the edit requires a preview and explicit Dungeon Master approval.
+3. **Given** an inspection or a change to more than one note, any deletion or reorganization, or a change to established campaign facts beyond the specific text edit requested in one named note, **When** the operation is requested, **Then** inspection makes no changes and the edit requires showing the proposed changes and receiving the Dungeon Master's explicit confirmation for that exact preview before writing.
 4. **Given** a target file changed after a preview, **When** the proposed write is applied, **Then** the workflow detects the change and refuses to overwrite it.
 5. **Given** an explicitly requested local edit, **When** it is applied without an intervening change, **Then** existing Markdown text, formatting, and saved character representation are preserved except for the requested change.
 6. **Given** campaign content or paths that resemble executable input, **When** an operation processes them, **Then** they are treated as data and are not executed or interpolated into a command.
-7. **Given** an operation that reports an error, **When** diagnostic information is recorded or shown, **Then** it omits full note contents and keeps campaign data local.
+7. **Given** an operation that reports an error, **When** diagnostic information is recorded or shown, **Then** it omits unnecessary campaign content and remains on the user's device; the workflow sends no usage or diagnostic telemetry off-device.
+8. **Given** a multi-note operation fails after changing one or more notes, **When** the failure occurs, **Then** the operation stops without attempting remaining notes or undoing completed changes, identifies exactly which notes changed and which did not, and reports partial completion.
 
 ---
 
@@ -92,6 +103,7 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - A path uses `..` to move above the vault folder, or a link to another location (symbolic link), to resolve outside the vault.
 - The starting folder changes, is unavailable, or differs from the vault and plugin locations.
 - A note changes between preview and write, or a multi-note operation fails after processing only some targets.
+- A multi-note write fails after at least one successful change; completed changes must be reported accurately and must not be silently undone.
 - Markdown notes (plain-text files used for vault content) use different text encodings (saved character representations) or line endings, or contain text that resembles shell commands.
 - An error report could expose campaign content by including full note text or supplied paths unnecessarily.
 - The configuration profile contains YAML merge/alias syntax, duplicate keys, ambiguous date-like scalars, explicit nulls, or scalar values whose parsed types differ from their declared setting types.
@@ -103,7 +115,7 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 
 ### Functional Requirements
 
-- **FR-001**: The project MUST document the operating environments supported for script-backed workflows and the prerequisites for each one.
+- **FR-001**: The project MUST support Windows, macOS, and Linux for script-backed workflows when the required runtime and add-ons are available and can be supported reliably. It MUST document the supported operating environments and prerequisites for each; any excluded environment MUST be identified as unsupported.
 - **FR-002**: For each project release, the project MUST identify the latest stable PowerShell runtime and required add-ons, including `powershell-yaml` for reading YAML (a human-readable settings format) and a validator compatible with the published JSON Schema dialect. It MUST record their exact versions and the date those versions were selected.
 - **FR-003**: The project MUST document how users obtain the prerequisites for supported environments without automatically installing or upgrading them during a workflow.
 - **FR-004**: Before a script-backed operation runs, the system MUST verify that the required runtime and modules are available at supported versions. If a prerequisite is missing or unsupported, it MUST explain what is needed and stop that operation before any vault edits.
@@ -112,11 +124,11 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - **FR-007**: The system MUST check the final destination of every supplied path, including paths that use `..` or links to another location, against the user-authorized vault folder. It MUST refuse missing or unclear targets rather than assuming the plugin directory is the vault or creating unrequested folders.
 - **FR-008**: Paths and campaign content MUST be treated only as data, not as instructions to run or text to combine with commands. The system MUST NOT change or bypass operating-system script-running policies, user permissions, or security software to enable an operation.
 - **FR-009**: Inspection operations MUST be read-only by default.
-- **FR-010**: The system MUST return results in a consistent, labeled format that other tools can read (the same named fields in each result) with a documented completion status and completion code (a value other tools can use to recognize success or failure). Errors MUST be clear, and incomplete work MUST NOT be described as fully complete.
-- **FR-011**: Changes to more than one note, any deletion or reorganization, or changes to established campaign facts beyond the specific text edit requested in one named note MUST show the proposed changes and require explicit Dungeon Master approval before writing. A clearly requested text edit confined to one named note MUST NOT require redundant approval.
+- **FR-010**: The system MUST return results in a consistent, labeled format that other tools can read, using the same fields and order for every operation: operation, completion status, completion code (a value other tools can use to recognize success or failure), changed targets, unchanged targets, remaining work, and error details when present. Errors MUST be clear, and incomplete work MUST NOT be described as fully complete.
+- **FR-011**: Changes to more than one note, any deletion or reorganization, or changes to established campaign facts beyond the specific text edit requested in one named note MUST show the proposed changes and require explicit Dungeon Master confirmation for that exact preview before writing. A clearly requested text edit confined to one named note MUST NOT require redundant approval. Approval of one preview MUST NOT authorize other or later changes.
 - **FR-012**: Before writing, the system MUST check whether each target note changed since it was read or previewed. If a target changed, the system MUST refuse to overwrite it and report the conflict.
 - **FR-013**: Writes MUST preserve existing Markdown text, formatting, and text encoding (the saved representation of characters) except for the requested change.
-- **FR-014**: Error reports and logs MUST avoid unnecessary campaign content and keep campaign data on the user's device.
+- **FR-014**: Error reports and logs MUST avoid unnecessary campaign content and remain on the user's device. Script-backed workflows MUST NOT send usage or diagnostic telemetry off-device.
 - **FR-015**: Before script-backed operations are relied upon, the project MUST test repeatability and failure behavior in every supported environment.
 - **FR-016**: The runtime MUST load the optional `.dmassist.yaml` profile only from the root of the explicitly authorized vault. If the profile is absent, dependent discovery MUST remain read-only and MUST NOT create a profile, folder, or note.
 - **FR-017**: The runtime MUST reject malformed or unsupported YAML, duplicate mapping keys, an absent, invalid, or unsupported profile version, unknown fields, explicit nulls, and invalid values with a clear error before using the profile.
@@ -128,12 +140,13 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - **FR-023**: When an explicitly configured guidance file or template is needed but is missing, unreadable, or invalid, the runtime MUST report the error and stop the dependent operation without silently skipping the source or substituting another. An absent optional default guidance candidate MUST NOT by itself invalidate the profile.
 - **FR-024**: The runtime MUST resolve unchanged profile and referenced vault state deterministically. If the profile or a referenced guidance file, template, or path changes during a dependent operation, the runtime MUST stop that operation, report the change, and require revalidation before retrying; it MUST NOT automatically retry or combine old and new inputs.
 - **FR-025**: Before a dependent operation uses an explicitly configured party note, preparation location, section folder, guidance file, or template, the runtime MUST verify that the target exists, is readable, and has the expected file or folder type. If the target is unavailable or invalid, it MUST report the problem and stop dependent work without silently selecting a substitute.
+- **FR-026**: If a multi-note write fails after one or more notes have been changed, the operation MUST stop without attempting remaining notes or automatically undoing completed changes. It MUST report partial completion and identify exactly which notes changed and which did not.
 
 **Acceptance Coverage**:
 
 - FR-001–FR-005: User Story 1, scenarios 1–4.
 - FR-006–FR-009: User Story 2, scenarios 1–4.
-- FR-010–FR-014: User Story 3, scenarios 1–7.
+- FR-010–FR-014 and FR-026: User Story 3, scenarios 1–8.
 - FR-015: User Story 1, scenarios 1 and 4.
 - FR-016–FR-025: User Story 4, scenarios 1–10.
 
@@ -148,7 +161,7 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - **Supported Environment**: An operating environment with its approved runtime and required module prerequisites and provisioning guidance.
 - **Operation Request**: The explicit vault, campaign/group, and operation context needed to perform one mechanical task.
 - **Authorized Vault Boundary**: The user-designated vault root against which resolved targets are checked.
-- **Operation Result**: A consistently ordered outcome with status, relevant results, error information, and a completion code (a value other tools use to identify success or failure).
+- **Operation Result**: A consistently ordered outcome with the operation, completion status and code, changed and unchanged targets, remaining work, and error details when present.
 - **Change Preview**: A description of proposed file changes against the state reviewed before an authorized write.
 - **Vault Configuration Profile**: The optional `.dmassist.yaml` settings document at the authorized vault root.
 - **Normalized Profile**: The settings produced after supported YAML scalars are converted to the published version-1 schema's expected types and values.
@@ -162,9 +175,9 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - **SC-002**: Users can perform the same operation from at least two different starting folders and receive results for the same explicitly selected vault.
 - **SC-003**: 100% of tested attempts to reach notes outside the authorized vault are refused before those notes are read or changed.
 - **SC-004**: In each of three acceptance cases—a completed request, a request blocked before any changes, and a request stopped after some work—the result states `complete`, `not completed`, or `partially completed` as appropriate and identifies any remaining work. 100% of results match their case, and none describes incomplete work as complete.
-- **SC-005**: In 100% of tested edits, unrelated note text, formatting, and characters remain as originally saved; changes made after review are not overwritten; and changes across multiple notes, deletions, reorganization, or broad changes to established campaign facts are not made without approval.
+- **SC-005**: In 100% of tested edits, unrelated note text, formatting, and characters remain as originally saved; changes made after review are not overwritten; and changes across multiple notes, deletions, reorganization, or broad changes to established campaign facts are not made unless the Dungeon Master confirms the exact preview shown for that change.
 - **SC-006**: At least 4 of 5 Dungeon Masters in a usability walkthrough correctly identify the next step for a missing prerequisite, invalid vault target, and operation failure from the user-facing messages.
-- **SC-007**: 100% of reviewed diagnostics avoid including full note contents, and campaign data remains on the user's device.
+- **SC-007**: 100% of reviewed diagnostics avoid including full note contents and remain on the user's device; no usage or diagnostic telemetry is sent off-device.
 - **SC-008**: Every supported environment passes repeatability checks showing the same read-only request returns the same result, and missing-prerequisite and operation-failure checks produce the expected message without unintended vault changes.
 - **SC-009**: 100% of tested malformed YAML, duplicate-key, invalid-version, unknown-field, null, and schema-invalid profiles are rejected before their settings are used.
 - **SC-010**: 100% of tested supported scalar values normalize to the specified locale-independent representation, while null and collection values for string fields and non-integer version values are rejected.
