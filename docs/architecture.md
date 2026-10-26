@@ -96,10 +96,10 @@ open questions, and acceptance scenarios.
    safeguards into a reference bundled with a vault-orientation skill. Verify
    installed-resource lookup and explicitly require every vault-facing skill to
    read it, along with designated `.dmassist-guidance.md` guidance.
-2. **Define the configuration contract.** Design the deferred `.dmassist.yaml`
-   schema and defaults, covering section mappings, party context, guidance paths,
-   and template overrides. Define validation and missing/invalid configuration
-   behavior without forcing existing vaults to migrate.
+2. **Define the configuration contract.** The proposed `.dmassist.yaml`
+   version-1 contract, defaults, and machine-readable schema are documented in
+   `specs/002-vault-configuration-contract/`. A reader, validator integration,
+   and runtime behavior are not implemented.
 3. **Establish the script runtime.** Choose supported platforms and provisioning
    for latest stable `pwsh` and required modules, including powershell-yaml.
    Review dependencies and record exact versions; define shared inputs,

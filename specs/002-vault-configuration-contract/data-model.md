@@ -70,9 +70,9 @@ templates:
 | `sections.custom.<id>.description` | Non-empty string | Required for each custom section | Describes the intended content/use of that category to help workflows identify relevant notes. Treated as descriptive data, not instructions or authorization. |
 | **Party context** | Mapping, zero or one per profile | Optional | Represents the one active party context supported per vault. Shared-campaign selection is out of scope. |
 | `party.note` | Relative Markdown file path string | Required if `party` is present; otherwise absent | Reference to the active party's note; the note remains the source of party knowledge. It is not copied into the profile. Validate its boundary before access; if unavailable when needed, report the problem rather than selecting another note. |
-| **Preparation location** | Mapping, zero or one per profile | Optional | Keeps tentative preparation distinct from recorded outcomes. |
-| `preparation.mode` | String enum: `session_section` or `separate_folder` | `session_section` | `session_section` means a section titled by `preparation.heading` in a session note. `separate_folder` requires `preparation.path`. The default is documented by a JSON Schema annotation and applied during runtime resolution. |
-| `preparation.heading` | Non-empty string | `Preparation` in `session_section` mode; forbidden in `separate_folder` mode | Heading text for tentative preparation within a session note, separate from recorded outcomes. |
+| **Preparation location** | Mapping, zero or one per profile | Optional; if omitted, the effective default is `{mode: "session_section", heading: "Preparation"}` | Keeps tentative preparation distinct from recorded outcomes. If present, the mapping must include `mode`; an empty mapping is invalid. |
+| `preparation.mode` | String enum: `session_section` or `separate_folder` | Required when `preparation` is present; the omitted-property default is `session_section` | `session_section` means a section titled by `preparation.heading` in a session note. `separate_folder` requires `preparation.path`. The omitted-property default is documented by a JSON Schema annotation and applied during runtime resolution; it does not make `mode` optional in a present mapping. |
+| `preparation.heading` | Non-empty string | Optional in `session_section` mode; defaults to `Preparation`; forbidden in `separate_folder` mode | Heading text for tentative preparation within a session note, separate from recorded outcomes. |
 | `preparation.path` | Relative directory path string | Required only for `separate_folder`; otherwise forbidden | Dedicated preparation directory. It must already exist and remain inside the vault. It does not become a session outcome merely by containing prepared material. |
 | **Guidance path** | Object with one relative Markdown file path string | Optional; when omitted, the optional root-level `.dmassist-guidance.md` is the default candidate | If present, `guidance.path` is required. An absent default candidate is not an error. An explicit path replaces that candidate; it must remain inside the vault. An unavailable or unreadable designated file is reported when needed, not silently ignored. Runtime resolution handles the optional default candidate; schema validation does not check whether the file exists. |
 | **Built-in template overrides** | Object mapping built-in article-type identifiers to relative Markdown file path strings | Optional | Selects DM-owned templates in the vault for supported built-in types. Paths are checked against the vault boundary at runtime. An explicitly selected missing, unreadable, or invalid template is an error for the dependent authoring operation, not a reason to substitute a plugin default. With no override, the relevant plugin default may be used. |
@@ -108,11 +108,13 @@ preparation settings, and rejects unknown properties. In particular:
    requires exactly `path` and non-empty `description`; custom identifiers
    match `[a-z][a-z0-9_]*` and cannot duplicate built-in section names.
 3. `party`, when present, requires `note`.
-4. `preparation` supports `session_section` and `separate_folder` modes.
-   The former permits `heading` and forbids `path`; the latter requires
-   `path` and forbids `heading`. The documented defaults for `mode` and
-   `heading` are applied during runtime resolution, not by mutating the
-   schema instance.
+4. Omitting `preparation` resolves to `session_section` mode with the
+   `Preparation` heading. If `preparation` is present, `mode` is required;
+   `session_section` permits an optional `heading` and forbids `path`, while
+   `separate_folder` requires `path` and forbids `heading`. An omitted
+   `heading` in `session_section` mode resolves to `Preparation`. These
+   defaults are applied during runtime resolution, not by mutating the schema
+   instance.
 5. `guidance`, when present, requires `path`. `templates` may contain
    built-in template overrides and custom template mappings; custom template
    identifiers match `[a-z][a-z0-9_]*` and cannot duplicate built-in types.

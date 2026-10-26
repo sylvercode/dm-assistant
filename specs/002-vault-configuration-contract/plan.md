@@ -34,11 +34,14 @@ dependencies.
 vault; plugin-owned defaults remain in the installed plugin. No campaign data
 is copied into the profile.
 
-**Testing**: No build, test, or lint commands exist in this scaffold. Validate
-the JSON Schema document and check it against valid/invalid normalized-profile
-examples and the written contract. Treat YAML parsing, duplicate-key
-detection, scalar normalization, and path-boundary behavior as future
-integration tests owned by Issue #4.
+**Testing**: No repository build, test, or lint commands exist in this
+scaffold. As a design-artifact verification, validate the schema against the
+Draft 2020-12 meta-schema and representative valid/invalid normalized-profile
+instances from `quickstart.md` using a standards-compliant validator. This
+one-off verification does not add a repository/runtime dependency or imply a
+loader exists. Treat YAML parsing, duplicate-key detection, scalar
+normalization, validator integration, and path-boundary behavior as future
+runtime/integration work owned by Issue #4.
 
 **Target Platform**: Not specified for the schema. Runtime platform support is
 owned by Issue #4.

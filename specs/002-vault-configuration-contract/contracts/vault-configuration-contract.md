@@ -98,9 +98,9 @@ files. A minimal valid profile is `version: 1`.
 | `sections.custom.<id>.description` | With each custom section | Non-empty string; no default | Briefly describes the section's intended content so workflows can use it to identify relevant material. It is descriptive data, not executable instructions or authorization. |
 | `party` | No | Mapping; no active party is selected by default | If present, it must contain `note` and no other key. This selects the one active party; it does not store party facts. |
 | `party.note` | With `party` | String vault-relative path to one existing Markdown file | Boundary and file type are checked when loaded; missing or unreadable note is reported when a workflow needs party context. There is no fallback to another party. |
-| `preparation` | No | Mapping; `{mode: "session_section", heading: "Preparation"}` | Only the mode-specific keys described below are accepted. |
-| `preparation.mode` | With `preparation` | String enum: `session_section` or `separate_folder` | Any other value is an error. |
-| `preparation.heading` | No; used in `session_section` mode | Non-empty string; defaults to `Preparation` | Heading text, not a path or executable expression. It identifies preparation within a session note, separate from actual-play outcomes. |
+| `preparation` | No | Mapping; if omitted, its effective default is `{mode: "session_section", heading: "Preparation"}` | If present, it must contain `mode`; only the mode-specific keys described below are accepted. An empty mapping is invalid and does not request the omitted-property default. |
+| `preparation.mode` | Required when `preparation` is present | String enum: `session_section` or `separate_folder`; when the entire `preparation` property is omitted, its resolved mode is `session_section` | Any other value is an error. The omitted-property default does not make `mode` optional inside a present mapping. |
+| `preparation.heading` | Optional in `session_section` mode; forbidden in `separate_folder` mode | Non-empty string; defaults to `Preparation` in `session_section` mode | Heading text, not a path or executable expression. It identifies preparation within a session note, separate from actual-play outcomes. |
 | `preparation.path` | In `separate_folder` mode | String vault-relative directory path; no default | Required in this mode. The folder must already exist and pass section directory path checks. |
 | `guidance` | No | Mapping; no explicit path by default | If present, it must contain `path` only. With no explicit path, `.dmassist-guidance.md` at vault root is an optional candidate. |
 | `guidance.path` | With `guidance` | String vault-relative Markdown file path; no explicit-path default | If configured, missing, unreadable, or invalid guidance is reported when a workflow requires it; it is not silently skipped or replaced by the default candidate. |
@@ -116,9 +116,10 @@ meaning to a built-in taxonomy. Its required description provides context for
 identifying relevant content, but does not automatically classify every note
 in the mapped directory. Every configured custom path is an explicitly
 configured section folder, so a missing path rejects the whole profile. A
-missing `sections` member does not mean that default folders must exist. Preparation
-may be omitted, may select a session-note heading, or may select an already
-existing separate folder:
+missing `sections` member does not mean that default folders must exist.
+Omitting `preparation` selects the effective default of a `Preparation`
+heading in session notes. If the property is present, `mode` is required; it
+may select a session-note heading or an already existing separate folder:
 
 ```yaml
 preparation:

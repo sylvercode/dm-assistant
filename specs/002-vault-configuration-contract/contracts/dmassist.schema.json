@@ -108,6 +108,7 @@
     "preparation": {
       "type": "object",
       "additionalProperties": false,
+      "description": "When omitted, runtime resolution uses session_section mode with the Preparation heading. When present, mode is required; an empty object is invalid.",
       "default": {
         "mode": "session_section",
         "heading": "Preparation"
