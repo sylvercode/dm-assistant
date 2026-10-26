@@ -90,14 +90,16 @@ No constitution violations require justification.
 ### Documentation (this feature)
 
 ```text
-specs/002-vault-configuration-contract/
-├── plan.md
-├── research.md
-├── data-model.md
-├── quickstart.md
-└── contracts/
-    ├── vault-configuration-contract.md
-    └── dmassist.schema.json
+repository-root/
+├── schemas/
+│   └── dmassist.schema.json
+└── specs/002-vault-configuration-contract/
+    ├── plan.md
+    ├── research.md
+    ├── data-model.md
+    ├── quickstart.md
+    └── contracts/
+        └── vault-configuration-contract.md
 ```
 
 ### Source Code (repository root)
@@ -114,6 +116,15 @@ with a written contract and a Draft 2020-12 schema artifact, without adding a
 skill, script, hook, integration, or reader implementation to the empty
 scaffold. Schema validation operates on the normalized profile structure;
 parser selection and runtime work are explicitly deferred to Issue #4.
+
+**Schema resource location**: `schemas/dmassist.schema.json` at the repository
+root is the current source location for this design artifact, not a confirmed
+installed-plugin resource path. Agent Plugins 1.0 documents recognized
+component locations and resources bundled with skills, but does not establish
+that an arbitrary root-level schema directory will be included or discoverable
+after installation. Issue #4 must choose the final location alongside the
+skill/runtime component that consumes the schema and verify that the installed
+plugin includes it and that the loader can locate and use it.
 
 ## Complexity Tracking
 

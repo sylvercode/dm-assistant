@@ -32,6 +32,7 @@ describe where to add future content. They are not plugin components.
 | Copilot agents | `com.github.copilot/agents/<name>.agent.md` | Copilot-specific assistant profiles and orchestration. |
 | MCP integration (future) | `mcp.json` | Register actual tool servers using the Agent Plugins MCP schema. |
 | Copilot hooks (future) | `com.github.copilot/hooks/hooks.json` | Lifecycle automation when a concrete need exists. |
+| Vault configuration schema | `schemas/dmassist.schema.json` | Canonical JSON Schema for the proposed normalized version-1 vault profile; no runtime validator is implemented. |
 
 Agent Plugins 1.0 discovers skills and MCP configuration at fixed locations.
 Do not add legacy component-path fields such as `skills`, `agents`, or

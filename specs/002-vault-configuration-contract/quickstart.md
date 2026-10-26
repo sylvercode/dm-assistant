@@ -8,8 +8,8 @@ that executable validation exists.
 
 ## Scope and setup
 
-The schema artifact,
-[`contracts/dmassist.schema.json`](contracts/dmassist.schema.json), declares
+The canonical schema artifact,
+[`schemas/dmassist.schema.json`](../../schemas/dmassist.schema.json), declares
 JSON Schema Draft 2020-12 and accepts a normalized JSON-compatible
 version-1 profile, not YAML text. The profile's `version: 1` is its
 application-level format version, not the schema dialect. Use the written

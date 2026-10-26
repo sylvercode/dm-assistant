@@ -34,6 +34,7 @@ The following conventions describe the intended workflow for users and future AI
 The proposed `.dmassist.yaml` version-1 contract, defaults, and machine-readable
 JSON Schema are documented in
 [`specs/002-vault-configuration-contract/`](specs/002-vault-configuration-contract/).
+The canonical schema artifact is [`schemas/dmassist.schema.json`](schemas/dmassist.schema.json).
 No configuration reader or runtime validator is implemented; those remain
 runtime work. Plugin-added support files use dot-prefixed names to stay hidden
 from Obsidian's normal note view. Campaign articles remain ordinary, visible

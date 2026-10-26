@@ -31,8 +31,8 @@ description: "Remaining work for the Vault Configuration Contract"
 
 **Independent Test**: Confirm omitted `preparation` resolves to `session_section` with heading `Preparation`; a present mapping requires `mode`, rejects `{}`, and uses the `Preparation` heading when `session_section` omits `heading`. Confirm Draft 2020-12 schema validation accepts/rejects the cases documented in `quickstart.md` and does not mutate input instances to apply defaults.
 
-- [x] T001 [US2] Align preparation omission defaults and present-mapping requirements across `specs/002-vault-configuration-contract/spec.md`, `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`, `specs/002-vault-configuration-contract/contracts/dmassist.schema.json`, `specs/002-vault-configuration-contract/data-model.md`, and `specs/002-vault-configuration-contract/quickstart.md`.
-- [x] T002 [US2] Validate `specs/002-vault-configuration-contract/contracts/dmassist.schema.json` against the Draft 2020-12 meta-schema and representative valid/invalid normalized cases drawn from `specs/002-vault-configuration-contract/quickstart.md`; verify defaults remain annotations and the validator leaves instances unchanged, without adding a repository/runtime dependency.
+- [x] T001 [US2] Align preparation omission defaults and present-mapping requirements across `specs/002-vault-configuration-contract/spec.md`, `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`, `schemas/dmassist.schema.json`, `specs/002-vault-configuration-contract/data-model.md`, and `specs/002-vault-configuration-contract/quickstart.md`.
+- [x] T002 [US2] Validate `schemas/dmassist.schema.json` against the Draft 2020-12 meta-schema and representative valid/invalid normalized cases drawn from `specs/002-vault-configuration-contract/quickstart.md`; verify defaults remain annotations and the validator leaves instances unchanged, without adding a repository/runtime dependency.
 
 **Checkpoint**: The preparation contract is consistent and the schema artifact passes standards-compliant verification; this does not imply a YAML reader or runtime validator exists.
 
@@ -43,7 +43,7 @@ description: "Remaining work for the Vault Configuration Contract"
 **Purpose**: Keep repository-level status accurate and verify traceability across the design artifacts.
 
 - [x] T003 [P] Update `README.md`, `docs/architecture.md`, and `docs/vault-guidance-brainstorm.md` to identify the proposed contract/schema as documented while keeping reader and runtime behavior clearly unimplemented.
-- [x] T004 Review `specs/002-vault-configuration-contract/spec.md`, `specs/002-vault-configuration-contract/plan.md`, `specs/002-vault-configuration-contract/research.md`, `specs/002-vault-configuration-contract/data-model.md`, `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`, `specs/002-vault-configuration-contract/contracts/dmassist.schema.json`, `specs/002-vault-configuration-contract/quickstart.md`, `specs/002-vault-configuration-contract/tasks.md`, `README.md`, `docs/architecture.md`, and `docs/vault-guidance-brainstorm.md` for consistent defaults, schema/runtime ownership, and proposal-versus-implementation language.
+- [x] T004 Review `specs/002-vault-configuration-contract/spec.md`, `specs/002-vault-configuration-contract/plan.md`, `specs/002-vault-configuration-contract/research.md`, `specs/002-vault-configuration-contract/data-model.md`, `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`, `schemas/dmassist.schema.json`, `specs/002-vault-configuration-contract/quickstart.md`, `specs/002-vault-configuration-contract/tasks.md`, `README.md`, `docs/architecture.md`, and `docs/vault-guidance-brainstorm.md` for consistent defaults, schema/runtime ownership, and proposal-versus-implementation language.
 
 ## Dependencies & Execution Order
 

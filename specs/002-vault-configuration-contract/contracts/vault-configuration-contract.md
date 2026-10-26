@@ -22,8 +22,8 @@ authorize reads or writes outside the vault.
 
 ## Version 1 profile and JSON Schema
 
-The accompanying [`dmassist.schema.json`](dmassist.schema.json) is the
-machine-readable JSON Schema for version 1. It uses JSON Schema Draft 2020-12
+The accompanying [`schemas/dmassist.schema.json`](../../../schemas/dmassist.schema.json)
+is the canonical machine-readable JSON Schema for version 1. It uses JSON Schema Draft 2020-12
 and validates the profile's normalized object structure and values. It
 complements this written contract; it does not replace the contract's
 definitions of effective defaults, observable behavior, path safety, or

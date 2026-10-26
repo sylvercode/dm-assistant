@@ -10,8 +10,8 @@ All paths in the profile are vault-relative. A path is usable only if its fully 
 
 ## Schema Artifact and Normalized Profile
 
-The machine-readable schema deliverable is
-`contracts/dmassist.schema.json`. It describes the normalized version-1
+The canonical machine-readable schema deliverable is
+[`schemas/dmassist.schema.json`](../../schemas/dmassist.schema.json). It describes the normalized version-1
 profile structure and uses JSON Schema Draft 2020-12, declared with
 `$schema`; this dialect is distinct from the profile's application-level
 `version: 1`.
