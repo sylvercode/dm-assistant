@@ -133,6 +133,39 @@ Exact CLI JSON output and a safe, generally available authorization
 introspection mechanism remain unverified. Do not claim an untested command
 schema or resolve a campaign link merely to establish authorization.
 
+### Foundational verification procedures
+
+T001 must use a disposable installed-plugin fixture with two skills: an owner
+skill containing a unique sentinel resource and a consumer skill instructed
+to load that resource. Test the consumer from both the fixture/plugin working
+directory and a different working directory, and verify the sentinel rather
+than relying on source-tree presence or a path relative to the current
+directory. Remove the fixture after recording the exact supported method and
+evidence. If the client does not provide a supported cross-skill lookup, keep
+the gate blocked until a documented alternative is selected and tested.
+
+T002 must use an isolated Copilot CLI configuration and a disposable vault.
+The documented MCP status/tool checks can establish Resolver readiness, but
+are not authorization evidence. Test only a documented, note-content-free
+signal that confirms the exact disposable vault root is authorized; do not
+resolve a link or inspect/change live user MCP configuration. The
+authorization-introspection method remains unverified. If no safe supported
+signal can be demonstrated, record authorization as blocked and do not permit
+campaign-note access.
+
+### No-designated-guidance and knowledge boundaries
+
+No designated vault-local guidance is a valid state, not a missing-source
+failure. Once the authorized vault, dependencies, shared reference, and
+campaign/output context are established, a straightforward read-only lookup
+may use provisional layout assumptions. Pause when uncertainty affects the
+findings or next action; provisional assumptions never authorize note writes.
+A designated-but-missing or unreadable source still blocks dependent work.
+
+Updates to character/group knowledge or world facts require an actual-play
+record or explicit DM judgment where permitted. DM judgment alone is
+sufficient; an evidence log or session reference is not required.
+
 The skill inventory acceptance is a static inventory and source audit only:
 enumerate all immediate-child `skills/*/SKILL.md` files, confirm an exact
 one-to-one match with `skills/README.md`, and inspect every vault-facing

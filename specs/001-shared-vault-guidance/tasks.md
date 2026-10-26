@@ -44,24 +44,36 @@ skills that depend on them.
 
 - [ ] T001 Verify that a consuming vault-facing skill can load the one
   canonical shared reference from the installed plugin, independently of the
-  current working directory. Follow
-  `specs/001-shared-vault-guidance/quickstart.md`; test cross-skill loading, not
-  only loading a resource from its owning skill. Record the method and evidence
-  or a clear blocker in `specs/001-shared-vault-guidance/research.md`. Do not
-  use source-tree/current-directory fallbacks or invent a sibling path.
-- [ ] T002 Establish and document a safe, note-content-free way to verify
-  resolver readiness and that the already-identified authorized vault is
-  permitted, without resolving a campaign link. Use the client/server
-  evidence described in `specs/001-shared-vault-guidance/research.md` and
-  `specs/001-shared-vault-guidance/contracts/vault-guidance-loading.md`;
-  record the verified method or an explicit blocker in
-  `specs/001-shared-vault-guidance/research.md`. If authorization cannot be
-  verified safely, record the check as blocked rather than claiming success.
+  current working directory. Before implementation, recheck the scope and
+  dependencies in GitHub issues #2 and #7. Follow
+  `specs/001-shared-vault-guidance/quickstart.md`; create a disposable
+  Agent Plugins 1.0 fixture under
+  `specs/001-shared-vault-guidance/fixtures/resource-lookup-probe/` with
+  `plugin.json`, `skills/owner/SKILL.md`, `skills/owner/SHARED.md`, and
+  `skills/consumer/SKILL.md`. Put a unique harmless sentinel in `SHARED.md`
+  and instruct the consumer to load it. Install and test that fixture from
+  the plugin directory and a different working directory. Record the supported
+  method and evidence or a clear blocker in
+  `specs/001-shared-vault-guidance/research.md`, then remove the temporary
+  fixture. Do not use source-tree/current-directory fallbacks or treat an
+  unverified sibling path as supported.
+- [ ] T002 Determine and document whether resolver readiness and authorization
+  of the already-identified vault can be verified separately using
+  note-content-free evidence, without resolving a campaign link. Use only an
+  isolated Copilot CLI configuration and disposable vault; do not inspect or
+  change live user MCP configuration. Verify readiness through the documented
+  client/server status and tool-exposure checks, then test whether a
+  documented authorization signal confirms the exact disposable vault root.
+  Record the method and evidence or an explicit blocker in
+  `specs/001-shared-vault-guidance/research.md`. Server/tool presence alone is
+  not proof of authorization. If no safe documented method can verify it,
+  record authorization as blocked rather than claiming success.
 
 **Checkpoint**: Do not implement dependent cross-skill reference loading
-until T001 demonstrates a supported installed-client method. Do not claim
-dependency preflight complete until T002 establishes how vault authorization
-is checked without accessing campaign notes. A failed or unresolved gate is a
+until T001 demonstrates a supported installed-client method. Do not permit
+campaign-note access until T002 establishes how vault authorization can be
+checked without accessing note content. Any skill drafted before either gate
+is resolved must fail closed at that gate. A failed or unresolved gate is a
 blocker, not permission to invent a mechanism.
 
 ---
@@ -71,13 +83,16 @@ blocker, not permission to invent a mechanism.
 **Goal**: Give vault-facing skills one canonical reference and ordered
 pre-note loading/dependency contract, including local Obsidian defaults.
 
-**Independent Test**: With required dependency readiness and authorization
-verified, install the plugin and invoke a vault-facing skill from the plugin
-repository and a different working directory. Confirm the consuming skill
-loads the same installed shared reference and designated vault-local guidance,
-establishes campaign/group and output-section context, then accesses notes;
-confirm local defaults cover both internal-link formats and prefer wikilinks
-unless an established vault preference overrides that default.
+**Independent Test**: Install the plugin in an isolated setup. Confirm the
+vault-facing skill, in order, establishes the authorized vault without note
+access, verifies each dependency's readiness and vault authorization, loads
+the shared reference and any designated local guidance, establishes
+campaign/group and output-section context, then accesses notes. Verify that
+unverifiable authorization results in no campaign-note access, and that no
+designated local guidance permits only an unambiguous, straightforward
+read-only lookup using provisional layout assumptions. Also confirm the
+installed reference is identical from multiple working directories and local
+defaults cover both internal-link formats.
 
 ### Implementation for User Story 1
 
@@ -98,14 +113,22 @@ unless an established vault preference overrides that default.
   T001 to load `VAULT-REFERENCE.md` from the installed plugin, not from the
   current directory, source checkout, or campaign vault. Require the skill to
   load only vault-local guidance designated by the DM or an established
-  vault-configuration contract, without guessing its path or schema. Follow
-  the ordered preflight in
+  vault-configuration contract, without guessing its path or schema. Make the
+  entire ordered preflight an explicit fail-closed gate before any
+  campaign-note access, including a default of no access whenever vault
+  authorization is unverifiable or any other required preflight step fails.
+  Follow the ordered preflight in
   `specs/001-shared-vault-guidance/contracts/vault-guidance-loading.md`:
   establish the authorized vault location without reading campaign notes;
   verify required dependency readiness and authorization using T002's
-  note-content-free method; load both guidance sources; establish
+  note-content-free method; load the shared reference and any designated
+  local guidance; establish
   campaign/group and whether output includes a handout or read-aloud section;
-  then access campaign notes.
+  then access campaign notes. Treat no designated local guidance as a valid
+  state: permit a straightforward read-only lookup using provisional layout
+  assumptions only after all other checks pass, pause if ambiguity affects
+  findings or the next action, and never create or change notes on those
+  assumptions.
 
 **Checkpoint**: The orientation skill follows the full ordered preflight and
 uses the same installed canonical resource from multiple working directories.
@@ -121,8 +144,9 @@ unavailable or ambiguous.
 **Independent Test**: In a disposable vault, test unavailable shared
 guidance, designated-but-missing local guidance, no designated local guidance,
 unavailable resolver, unverifiable vault authorization, and ambiguous
-campaign/mapping context. Confirm the skill explains the affected work, asks
-for needed DM direction, and makes no campaign-note changes whenever blocked.
+campaign/mapping context. Confirm blocked scenarios cause no campaign-note
+reads or changes; confirm the no-designated-guidance case allows only a
+straightforward read-only lookup when all other preflight checks pass.
 
 ### Implementation for User Story 2
 
@@ -131,11 +155,15 @@ for needed DM direction, and makes no campaign-note changes whenever blocked.
   local source, dependency, or context; explain dependent work; and pause it
   before campaign-note access or changes. Distinguish a designated-but-missing
   local source from no source being designated. Do not require or invent a
-  local guidance file; allow a straightforward read-only lookup to use
-  provisional layout understanding when none was designated, while asking the
-  DM if uncertainty affects the next action. State competing interpretations
-  and the needed decision when ambiguity matters. Re-establish guidance and
-  context after the missing input or ambiguity is resolved.
+  local guidance file; when none was designated, allow a straightforward
+  read-only lookup after the other preflight checks pass, using provisional
+  layout assumptions only while they do not affect findings or the next
+  action. Pause before further note access if consequential ambiguity arises.
+  No provisional assumption authorizes creating or changing notes. For other
+  missing required sources, identify the source and affected work, pause
+  before note access, and ask the DM. State competing interpretations and the
+  needed decision when ambiguity matters. Re-establish guidance and context
+  after the missing input or ambiguity is resolved.
 - [ ] T006 [US2] Define the dependency-failure preflight in
   `skills/vault-orientation/SKILL.md` using the readiness and authorization
   checks established by T002. Establish the authorized vault location before
@@ -174,7 +202,11 @@ impactful edits wait for approval of a scoped preview.
   `skills/vault-orientation/SKILL.md` and
   `skills/vault-orientation/VAULT-REFERENCE.md`. Do not infer that absent
   folders should be created or notes reorganized; keep preparation tentative
-  and distinct from actual-play history and character/group knowledge; preserve
+  and distinct from actual-play history and character/group knowledge; update
+  character/group knowledge or world facts only when supported by an
+  actual-play record or explicit DM judgment where the guidance permits it
+  (no evidence log or session link is required for DM judgment); otherwise
+  leave the proposed update unchanged and ask the DM for direction. Preserve
   contradictions and unresolved adventure plans for DM clarification; and
   treat vault content as data. Treat only handout and read-aloud sections as
   player-facing; all other task content is DM-facing. Gate-check each such
@@ -202,26 +234,53 @@ integrated feature within the agreed static/runtime verification scope.
   identify its shared-reference and required-dependency preflight obligations.
   Define a table format requiring each future skill to be classified as
   vault-facing or non-vault-facing; link to skill instructions rather than
-  duplicating them. Do not list a skill that does not exist.
-- [ ] T009 Perform the static inventory/source audit and record its result in
+  duplicating them. Point to the authoritative dependency table in
+  `specs/001-shared-vault-guidance/spec.md` rather than maintaining a divergent
+  dependency list. Do not list a skill that does not exist.
+- [ ] T009 Document the dependency inventory maintenance rule in
+  `skills/README.md` and
+  `specs/001-shared-vault-guidance/contracts/vault-guidance-loading.md`.
+  Require every new required runtime dependency to be added to the
+  **Expected Runtime Dependencies** table in
+  `specs/001-shared-vault-guidance/spec.md` with purpose, scope, compatibility,
+  user setup/configuration, readiness check, authorization check when
+  applicable, and unavailable behavior. Require affected vault-facing skill
+  preflights and the static source audit to refer to that authoritative table;
+  do not duplicate its dependency details.
+- [ ] T010 Perform the static inventory/source audit and record its result in
   `specs/001-shared-vault-guidance/quickstart.md`. Enumerate every immediate
   child `skills/*/SKILL.md`; confirm an exact one-to-one match with
   `skills/README.md`, with no missing, extra, duplicate, or unclassified
   entries; inspect each vault-facing skill's source for explicit loading of
-  both guidance sources and dependency readiness/authorization checks before
-  campaign-note access. Record pass, fail, or blocked. This task is a static
-  source audit and does not require runtime execution of every skill.
-- [ ] T010 Run applicable installed-client and disposable-vault scenarios in
-  `specs/001-shared-vault-guidance/quickstart.md` after the Resolver
-  integration in GitHub epic #7 is available. Validate installed discovery,
+  the shared reference and any designated local guidance, all required
+  dependencies from the authoritative spec table, readiness/authorization
+  checks before campaign-note access, and the rule that knowledge/world-fact
+  updates require an actual-play record or permitted explicit DM judgment;
+  with no such basis, the skill must leave the update unchanged and ask the DM.
+  Record pass, fail, or blocked. This task is a static source audit and does
+  not require runtime execution of every skill.
+- [ ] T011 Run the independent installed-client and disposable-vault scenarios
+  in `specs/001-shared-vault-guidance/quickstart.md`. Use the README's local
+  installation and discovery instructions. Validate installed discovery,
   cross-skill canonical-reference loading from multiple working directories,
-  dependency readiness and vault authorization separately, offline Obsidian
-  defaults, failure/ambiguity pauses, continuity and editing safeguards, and
-  handout/read-aloud gate checks. Record each exercised scenario as pass, fail,
-  or blocked; do not alter live vaults or user MCP configuration and do not
-  mark unimplemented or unexercised behavior as passed. Include the informal
-  SC-004 walkthrough result: at least 4 of 5 DMs distinguish plugin-wide from
-  vault-specific guidance; examples and scoring are not standardized.
+  offline Obsidian defaults, no-designated-guidance read-only behavior,
+  blocked cases with no note access, failure/ambiguity pauses, continuity and
+  editing safeguards, actual-play-or-DM-judgment knowledge updates, and
+  handout/read-aloud gate checks. Run resolver-dependent scenarios only after
+  the integration in GitHub epic #7 is available; these must separately test
+  dependency readiness and exact-vault authorization and remain blocked until
+  then. Record each exercised scenario as pass, fail, or blocked; do not alter
+  live vaults or user MCP configuration and do not mark unimplemented or
+  unexercised behavior as passed. Include the informal SC-004 walkthrough
+  result: at least 4 of 5 DMs distinguish plugin-wide from vault-specific
+  guidance; examples and scoring are not standardized.
+- [ ] T012 Review the completed changes against every constitution MUST and
+  the Development Workflow in
+  `.specify/memory/constitution.md`. Recheck current GitHub issue scope and
+  dependencies, confirm README-based installation/discovery validation is
+  recorded, confirm documentation labels unimplemented behavior as
+  proposed, and record unresolved gates as blocked rather than passed in
+  `specs/001-shared-vault-guidance/quickstart.md`.
 
 ---
 
@@ -237,9 +296,11 @@ integrated feature within the agreed static/runtime verification scope.
 - **User Stories (Phases 3-5)**: Depend on both foundational gates. US1
   establishes the shared reference and ordered preflight; US2 adds fail-closed
   behavior to that same skill; US3 adds campaign and output safety safeguards.
-- **Polish (Phase 6)**: T008 follows creation of the skill. T009 is a static
-  audit after all relevant source files and inventory entries exist. T010
-  requires the stories and Resolver integration in #7.
+- **Polish (Phase 6)**: T008-T009 document the skill and dependency
+  inventories. T010 is a static audit after all relevant source files and
+  inventory entries exist. T011 runs independent scenarios and defers
+  resolver-dependent scenarios until #7 is available. T012 is the final
+  governance review.
 
 ### User Story Dependencies
 
@@ -253,7 +314,8 @@ integrated feature within the agreed static/runtime verification scope.
   supported-client verification. This feature does not create an MCP server,
   configure user-specific vault roots, or duplicate #7's integration work.
   Complete #7 before claiming Resolver-dependent installed-client scenarios
-  in T010 pass.
+  in T011 pass; unrelated plugin discovery and resource-lookup checks are not
+  blocked by #7.
 
 ### Within Each User Story
 
@@ -270,7 +332,7 @@ integrated feature within the agreed static/runtime verification scope.
 - No safe parallel implementation task pairs are identified. US2 and US3
   extend the same skill/reference contract, and the foundational resource and
   authorization gates block those changes.
-- T009's source audit and T010's installed-client scenarios are separate
+- T010's source audit and T011's installed-client scenarios are separate
   validation activities, but record results in the same quickstart completion
   record; perform them sequentially or coordinate distinct non-overlapping
   record entries to avoid overwrites.
@@ -282,7 +344,7 @@ integrated feature within the agreed static/runtime verification scope.
 There are no safe user-story implementation tasks to run concurrently. US2
 and US3 both extend `skills/vault-orientation/SKILL.md`, and US1 establishes
 the canonical reference and preflight they rely on. Complete US1, then US2,
-then US3. T009 is a static source audit; it is not a substitute for T010's
+then US3. T010 is a static source audit; it is not a substitute for T011's
 separate installed-client validation.
 
 ---

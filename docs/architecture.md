@@ -57,10 +57,19 @@ runtime execution of every skill.
 The planned pre-note sequence is: establish the authorized vault location
 without reading campaign notes; verify every declared required dependency is
 available and authorized for that vault; load the plugin-owned shared reference
-and designated vault-local guidance; establish the campaign/group and identify
-any handout or read-aloud section; then access campaign notes. Before a handout
-is handed out or a read-aloud section is spoken, gate-check that section for
-DM-only facts and revealing links. All other task content is DM-facing.
+and any designated vault-local guidance; establish the campaign/group and
+identify any handout or read-aloud section; then access campaign notes. No
+designated local guidance is a valid state, not a missing-source failure. After
+all other checks pass, a straightforward lookup may use provisional layout
+assumptions for read-only work only; consequential uncertainty pauses further
+note access, and provisional assumptions never authorize writes. Before a
+handout is handed out or a read-aloud section is spoken, gate-check that
+section for DM-only facts and revealing links. All other task content is
+DM-facing.
+
+Updates to character/group knowledge or world facts require an actual-play
+record or explicit DM judgment where permitted. Explicit DM judgment is
+sufficient without an evidence log or session link.
 
 The
 [Vault Guidance Brainstorm](vault-guidance-brainstorm.md) explores how future

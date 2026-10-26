@@ -59,6 +59,11 @@ Conceptual attributes:
   established vault-local configuration contract. The skill must not guess.
 - **Content/location**: guidance text and its vault-local source, which may be
   absent, unreadable, or conflicting.
+- **No-designation state**: a valid state distinct from a designated source
+  that is missing or unreadable. After all other pre-note checks pass, it
+  permits a straightforward read-only lookup using provisional layout
+  assumptions; consequential ambiguity pauses further note access, and
+  provisional assumptions never authorize writes.
 - **Customization scope**: campaign-specific choices and conventions may
   customize general defaults; native syntax/semantics and shared safety
   invariants remain authoritative.
@@ -135,11 +140,15 @@ Conceptual attributes:
 - **Compatibility**: supported tool/interface and compatible version.
 - **Setup**: user-owned installation and configuration.
 - **Readiness check**: evidence that the supported client exposes the expected
-  capability and authorizes the intended vault.
+  capability; authorization for the intended vault is verified separately.
+- **Authorization check**: note-content-free evidence that the dependency is
+  authorized for the established vault, when applicable.
 - **Unavailable behavior**: a clear fail-closed result before campaign-note
   access or edits.
 
-The initial dependency is the Obsidian Link Resolver MCP server,
+The authoritative, extensible, non-exhaustive inventory is the **Expected
+Runtime Dependencies** table in `spec.md`. The initial dependency is the
+Obsidian Link Resolver MCP server,
 `obsidian-link-resolver` version `2.0.0` or later, exposing
 `resolve_obsidian_link`. The user configures authorized vault roots in Copilot
 CLI; private paths are not stored in the plugin. Official Obsidian help pages
@@ -154,6 +163,10 @@ bundled paraphrased guidance, not runtime dependencies.
   vault; load the plugin-owned shared reference and designated vault-local
   guidance; establish the campaign/group and whether requested output includes
   a handout or read-aloud section; only then access campaign notes.
+- No designated local guidance is valid. It is not a missing-source failure;
+  after all other checks pass, it permits only a straightforward read-only
+  lookup using provisional layout assumptions. Pause if assumptions affect
+  findings or the next action, and never write based on them.
 - If a handout or read-aloud section is to be handed out or read aloud, gate
   check that section for DM-only facts and revealing links immediately before
   delivery or reading. All other task content is DM-facing.
@@ -183,7 +196,9 @@ bundled paraphrased guidance, not runtime dependencies.
    direction as appropriate.
 2. **No substitution by guesswork.** Do not guess which local guidance is
    designated, treat the plugin as the vault, infer an absent folder should be
-   created, or silently substitute assumptions for missing guidance.
+   created, or silently substitute assumptions for a designated missing
+   source. Provisional layout assumptions are permitted only for the
+   no-designated-guidance read-only lookup described above.
 3. **Context is sufficiently specific.** Establish the authorized vault and
    relevant campaign/group before acting on notes. Resolve ambiguity that
    affects the next action with DM direction.
@@ -191,8 +206,11 @@ bundled paraphrased guidance, not runtime dependencies.
    tree. Honor confirmed mappings and preserve existing organization and
    unrelated content.
 5. **Knowledge and continuity remain distinct.** Preparation alone does not
-   establish actual events or character knowledge. Preserve contradictions and
-   run adventure plans; do not silently reconcile or rewrite them.
+   establish actual events or character knowledge. Updates to character/group
+   knowledge or world facts require an actual-play record or explicit DM
+   judgment where permitted; no evidence log or session link is required for
+   DM judgment. Preserve contradictions and run adventure plans; do not
+   silently reconcile or rewrite them.
 6. **Audience boundary is preserved.** Only handout and read-aloud sections are
    player-facing; all other task content is DM-facing. Gate-check each such
    section for DM-only facts and revealing links immediately before handing it
@@ -222,11 +240,11 @@ currently implemented runtime states or persisted fields.
 | **Invoked** | A vault-facing skill receives a campaign task. | Begin the ordered pre-note checks; do not interpret or change campaign notes yet. |
 | **Establishing vault** | The skill identifies the intended vault from the user's workspace or explicit input. | Establish the authorized vault location without reading campaign notes. If it cannot be established, move to **Paused**. |
 | **Verifying dependencies** | The authorized vault location is established. | Verify every declared required dependency is available and authorized for that vault. If any dependency is unavailable or misconfigured, move to **Paused** before accessing campaign notes. |
-| **Loading guidance** | Required dependencies are verified for the authorized vault. | Load the canonical shared reference and designated vault-local guidance. If either source is missing or unreadable, move to **Paused**. |
+| **Loading guidance** | Required dependencies are verified for the authorized vault. | Load the canonical shared reference and any designated vault-local guidance. If the shared reference or a designated source is missing or unreadable, move to **Paused**. No designated local guidance is a valid state. |
 | **Resolving context** | Required guidance is available. | Establish the relevant campaign/group and identify whether requested output includes a handout or read-aloud section. If context is missing or a consequential ambiguity remains, move to **Paused**. |
 | **Ready** | The ordered pre-note checks are complete and needed context is unambiguous. | Access and interpret relevant campaign notes; perform only work allowed by the safeguards. If the vault, dependencies, guidance, campaign, or group changes, repeat the ordered checks before continuing. |
 | **Gate-checking player-facing section** | A handout or read-aloud section is ready to be handed out or read aloud. | Immediately before delivery or reading, check that section for DM-only facts and revealing links; do not deliver/read it until it passes. All other task content remains DM-facing. |
-| **Paused** | A required dependency or source is unavailable, or missing/ambiguous context affects the next action. | Name the dependency, source, or competing interpretations, explain which requested work depends on it, ask the DM for direction, and leave campaign notes unchanged. After direction, retry the affected check; do not presume unrelated work is authorized. |
+| **Paused** | A required dependency or source is unavailable, or missing/ambiguous context affects the next action. | If the issue is known before note access, do not access campaign notes or make changes. If consequential layout ambiguity emerges during the permitted no-guidance read-only lookup, stop before further note access and make no changes. Name the dependency, source, or competing interpretations, explain which requested work depends on it, ask the DM for direction, and retry the affected check after direction; do not presume unrelated work is authorized. This state does not apply solely because no local guidance was designated. |
 | **Awaiting approval** | A proposed change is broad, destructive, restructuring, or continuity-changing. | Present a scoped preview and wait for DM approval. Approval permits only the previewed change within the authorized vault; absent or declined approval means do not apply it. |
 | **Applying approved change** | The DM approved the applicable preview and the context remains valid. | Apply only the approved change. If context changes or the proposed scope changes, refresh/re-resolve and obtain approval for the revised proposal as needed. |
 

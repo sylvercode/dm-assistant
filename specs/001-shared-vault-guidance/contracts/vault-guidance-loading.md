@@ -15,13 +15,13 @@ currently exists.
   dependency readiness and the task's vault and campaign context before
   interpreting or changing campaign notes. Apply the safeguards below and
   report when it cannot safely proceed.
-- **Required runtime dependencies:** A non-exhaustive inventory of external
-  tools/services that every vault-facing skill must verify for readiness and
-  authorization to the established vault before campaign-note access. The
-  initial dependency is the Obsidian Link Resolver MCP server for every
-  vault-facing skill; future dependencies may be added with purpose, scope,
-  compatibility, setup, readiness check, authorization check, and failure
-  behavior.
+- **Required runtime dependencies:** The authoritative, non-exhaustive
+  inventory is the **Expected Runtime Dependencies** table in
+  `specs/001-shared-vault-guidance/spec.md`. Every vault-facing skill must
+  verify each listed dependency for readiness and authorization to the
+  established vault before campaign-note access. Future entries require
+  purpose, scope, compatibility, setup, readiness check, and failure behavior;
+  do not maintain a divergent dependency list.
 - **Plugin-owned shared reference:** Define common meanings and non-negotiable
   safeguards shared across vault-facing skills. It includes locally available,
   paraphrased defaults for Obsidian aliases, tags, wikilinks and Markdown-style
@@ -76,13 +76,15 @@ order, before accessing campaign notes:
    campaign notes.
 
 If no vault-local guidance has been designated, a local guidance file is not
-required merely because none exists. If no profile or local guidance is
-available, a straightforward read-only lookup may use a provisional
-understanding of the existing layout; identify uncertainty and ask the DM if
-it affects the next action. A source that was designated but is missing or
-unreadable is not equivalent to no source having been designated. If any
-required preflight step fails or its outcome cannot be established, pause and
-ask the DM before proceeding.
+required merely because none exists. After all other pre-note checks pass, a
+straightforward read-only lookup may use provisional assumptions about the
+existing layout. If uncertainty affects the lookup's findings or next action,
+pause and ask the DM before further note access. Provisional assumptions never
+authorize creating or changing notes. A source that was designated but is
+missing or unreadable is not equivalent to no source having been designated;
+pause dependent work before campaign-note access. If any other required
+preflight step fails or its outcome cannot be established, pause and ask the
+DM before proceeding.
 
 ## Loading and interpretation sequence
 
@@ -142,13 +144,18 @@ a handout/read-aloud section, note mapping, guidance, or note role has multiple
 reasonable interpretations that affect the next action, the skill must state
 the competing interpretations, identify the decision needed, and ask the DM.
 It must not silently choose an interpretation or substitute assumptions for
-required guidance.
+required guidance. With no local guidance designated, provisional layout
+assumptions are allowed only for an otherwise straightforward read-only lookup;
+pause if they affect findings or the next action.
 
-While blocked on missing or unreadable required guidance or a material
-ambiguity, the skill must not create, modify, move, delete, or reorganize
-campaign notes. It may report the issue and request the information needed to
-continue. Once the missing input or decision is resolved, the skill must
-re-establish the applicable context before proceeding.
+When a missing/unreadable required source, unverified dependency/authorization
+check, or material ambiguity is known before note access, the skill must not
+access campaign notes or create, modify, move, delete, or reorganize them. If
+consequential layout ambiguity emerges during the permitted no-guidance
+read-only lookup, stop before further note access and make no changes. The
+skill may report the issue and request the information needed to continue.
+Once the missing input or decision is resolved, it must re-establish the
+applicable context before proceeding.
 
 The dependency inventory is explicit but non-exhaustive. Each future required
 dependency must document its purpose and scope, compatible version/interface,
@@ -204,6 +211,10 @@ DM.
   distinct from actual-play records. A prepared event may go unused; preparation
   alone does not establish that an event occurred or that a character knows
   it. Missing actual outcomes require DM clarification, not invention.
+- **Knowledge/world updates require a permitted basis.** Update character or
+  group knowledge and world facts only when supported by an actual-play record
+  or explicit DM judgment where the guidance permits it. No evidence log or
+  session link is required for an explicit DM judgment.
 - **Character knowledge is not DM knowledge.** Distinguish established
   character/group knowledge from DM-only facts and things characters might
   discover. The DM's judgment can establish knowledge; an evidence log is not

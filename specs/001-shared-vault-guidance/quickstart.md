@@ -75,10 +75,13 @@ campaign material), verify this exact order before accessing campaign notes:
 5. Only after steps 1–4 succeed, access relevant campaign notes.
 
 If any step cannot be completed, record the affected check as blocked and pause
-dependent work before note access. Only handout and read-aloud sections are
-player-facing; each must pass a gate check for DM-only facts and revealing
-links immediately before delivery or reading aloud. All other task content is
-DM-facing.
+dependent work before note access. No designated local guidance is a valid
+state: after all other checks pass, it permits a straightforward read-only
+lookup with provisional layout assumptions, but not a write; pause if
+uncertainty affects findings or the next action. Only handout and read-aloud
+sections are player-facing; each must pass a gate check for DM-only facts and
+revealing links immediately before delivery or reading aloud. All other task
+content is DM-facing.
 
 ## 1. Install and check discovery
 
@@ -113,34 +116,54 @@ Treat `skills/README.md` as the declared inventory. Statically enumerate every
 immediate-child `skills/*/SKILL.md` file and compare the set to the inventory.
 Confirm a one-to-one match with no missing, extra, duplicate, or unclassified
 entries. For every vault-facing skill, inspect its source to verify it requires
-the shared reference and designated vault-local guidance and checks all
-declared dependencies before campaign-note access.
+the shared reference, handles any designated vault-local guidance, and checks
+all declared dependencies before campaign-note access.
 
 **Expected:** the discovered skill-file set and inventory entries match
 one-to-one, with no unclassified or duplicate entries. Every vault-facing
 skill's source satisfies the shared loading and dependency preflight contract.
-This is a static inventory and source-only audit: do **not** require runtime
-execution of every skill for inventory compliance. Record the check as blocked
-rather than passed if the feature is unimplemented or a skill cannot be
-inspected.
+Compare dependency checks to the authoritative **Expected Runtime
+Dependencies** table in `specs/001-shared-vault-guidance/spec.md`; do not
+accept a divergent or incomplete dependency inventory. Verify that
+knowledge/world-fact updates require an actual-play record or permitted
+explicit DM judgment, and that the skill leaves an update unchanged and asks
+the DM when neither basis exists. This is a static inventory and source-only
+audit: do **not** require runtime execution of every skill for inventory
+compliance. Record the check as blocked rather than passed if the feature is
+unimplemented or a skill cannot be inspected.
 
 ### Required dependency availability and fail-closed behavior
 
 In the isolated Copilot CLI configuration, first confirm the resolver server
-and `resolve_obsidian_link` tool are exposed in a new session, then separately
-confirm that the disposable test vault is among the resolver's explicitly
-authorized roots through a documented, note-content-free method without
-resolving any campaign link. If no safe documented method is available, record
-authorization as blocked. Use another isolated configuration with the resolver
-missing or disabled and invoke a representative implemented vault-facing skill
-with a campaign-note task.
+and `resolve_obsidian_link` tool are exposed in a new session. Then test
+whether a documented, note-content-free method confirms that the exact
+disposable test vault is among the resolver's explicitly authorized roots,
+without resolving any campaign link. Do not treat server/tool presence as
+authorization proof. If no safe documented method is available, record
+authorization as blocked and do not access notes. Use another isolated
+configuration with the resolver missing or disabled and invoke a
+representative implemented vault-facing skill with a campaign-note task.
 
 **Expected:** the tested skill explains that the required resolver dependency
-is unavailable and stops before reading or changing any campaign notes.
-Compare the test vault with its before-test inventory to confirm no note access
-or changes occurred. This prerequisite applies even when the requested task
-does not itself resolve a link. Record readiness and authorization as separate
-results. Do not alter the user's active MCP configuration for this test.
+is unavailable and stops before accessing campaign notes. Compare the test
+vault with its before-test inventory to confirm no note changes occurred, and
+inspect the test interaction/log for no note reads. This prerequisite applies
+even when the requested task does not itself resolve a link. Record readiness
+and authorization as separate results. Do not alter the user's active MCP
+configuration for this test.
+
+### No designated local guidance
+
+In the disposable vault, explicitly state that no vault-local guidance has
+been designated and request a straightforward read-only lookup using a known
+note. After confirming every other preflight check passes, ask a follow-up
+whose answer or next action depends on an uncertain layout assumption.
+
+**Expected:** the first lookup may use provisional layout assumptions and
+reports uncertainty; it makes no note changes. When the uncertainty affects
+the findings or next action, the skill pauses before further note access and
+asks the DM. A designated-but-missing or unreadable source must instead block
+dependent note work.
 
 ### Local Obsidian convention defaults and DM customization
 
@@ -217,7 +240,8 @@ afterward.
 
 **Expected:** the skill names the designated source and the failure, explains
 which requested work depends on it, asks for direction or restoration, and
-pauses that work. The test vault's campaign notes remain unchanged. A
+pauses before campaign-note access. The test vault's campaign notes remain
+unchanged. A
 designated-but-missing source is not the same as no local guidance having been
 designated.
 
@@ -229,7 +253,7 @@ canonical shared resource unavailable or unreadable as a manual fixture
 action, then ask for a campaign-note task.
 
 **Expected:** the skill names the shared source and failure, identifies the
-dependent work, and pauses without campaign-note changes. If the installed
+dependent work, and pauses before campaign-note access without changes. If the installed
 client provides no safe way to exercise this condition, record the case as
 blocked rather than claiming it passed.
 
@@ -250,12 +274,20 @@ Using the prepared test material, ask an implemented vault-facing skill to
 perform a representative preparation/history or recap task, then ask for
 material containing a handout or read-aloud section.
 
+Also request a character/group knowledge or world-fact update based only on
+tentative preparation and without actual-play evidence or DM judgment. Then
+repeat with explicit DM judgment establishing the update.
+
 **Expected:**
 
 - Tentative preparation is not presented as an event that occurred or as
   character knowledge without DM confirmation.
 - Established actual-play history and character/group knowledge remain
   distinct from DM-only facts and possible discoveries.
+- Updates to character/group knowledge or world facts are made only when
+  supported by an actual-play record or explicit DM judgment where the
+  guidance permits it. Explicit DM judgment needs no evidence log or session
+  link.
 - Contradictions and unresolved adventure plans are reported and preserved,
   not silently reconciled or rewritten.
 - Existing organization is preserved. An absent expected folder is not created

@@ -46,10 +46,13 @@ Future vault-facing skills—any workflow that reads, interprets, creates, or
 changes campaign material—must follow the shared vault-guidance contract. They
 will first confirm the authorized vault without reading campaign notes, verify
 that required tools are available and authorized for that vault, load the
-plugin's shared reference and designated vault-local guidance, and establish
-the campaign/group and any handout or read-aloud section before accessing
-campaign notes. These are planned safeguards, not behavior provided by the
-current scaffold.
+plugin's shared reference and any designated vault-local guidance, and
+establish the campaign/group and any handout or read-aloud section before
+accessing campaign notes. No designated local guidance is a valid state; after
+all other preflight checks pass, a straightforward lookup may use provisional
+layout assumptions for read-only work only. Pause if uncertainty affects the
+findings or next action; provisional assumptions never authorize note changes.
+These are planned safeguards, not behavior provided by the current scaffold.
 
 ### Vault Sections
 
@@ -80,11 +83,13 @@ The **Player** section describes player characters, not the real people playing 
 Record each character's knowledge in their article and shared group knowledge in the group article, with clear links between the group and its characters. Distinguish what a character currently knows from what they might discover and from DM-only world information. Players should roleplay based on their character's knowledge, not everything the player or DM knows.
 
 Party lore can hold shared knowledge with explicit exceptions for absent or
-uninformed characters. The DM's judgment is sufficient to establish character
-knowledge or change an exception; no evidence log is required. Label rumors and mistaken beliefs and reference the
-real facts in DM-facing notes, without exposing those facts to characters who do
-not know them. If the truth is unknown, record that uncertainty rather than
-inventing a correction.
+uninformed characters. Character/group knowledge or world-fact updates require
+an actual-play record or explicit DM judgment where permitted; the DM's
+judgment is sufficient to establish character knowledge or change an
+exception, with no evidence log or session link required. Label rumors and
+mistaken beliefs and reference the real facts in DM-facing notes, without
+exposing those facts to characters who do not know them. If the truth is
+unknown, record that uncertainty rather than inventing a correction.
 
 Use Obsidian tags to classify knowledge exceptions, rumors, and mistaken beliefs,
 with prose for details and links to supporting facts. The exact tag vocabulary
