@@ -112,13 +112,15 @@ defaults cover both internal-link formats.
   `name` and `description` frontmatter in
   `skills/vault-orientation/SKILL.md`. Follow the supported lookup verified in
   T001 to load `VAULT-REFERENCE.md` from the installed plugin, not from the
-  current directory, source checkout, or campaign vault. Require the skill to
-  load only vault-local guidance designated by the DM or an established
-  vault-configuration contract, if applicable, without guessing its path or
-  schema. Make the entire ordered preflight an explicit fail-closed gate before
-  any campaign-note access, including a default of no access whenever vault
-  authorization is unverifiable or any other required preflight step fails.
-  Follow the ordered preflight in
+  current directory, source checkout, or campaign vault (FR-012). Implement
+  the ordered preflight in FR-018, using its cross-referenced FR-003 through
+  FR-014 for detailed guidance, vault, dependency, context, and ambiguity
+  obligations. Require the skill to load only vault-local guidance designated
+  by the DM or an established vault-configuration contract, if applicable,
+  without guessing its path or schema. Make the entire ordered preflight an
+  explicit fail-closed gate before any campaign-note access, including a
+  default of no access whenever vault authorization is unverifiable or any
+  other required preflight step fails. Follow the loading contract in
   `specs/001-shared-vault-guidance/contracts/vault-guidance-loading.md`:
   establish the authorized vault location without reading campaign notes;
   verify required dependency readiness and authorization using T002's
@@ -157,18 +159,19 @@ all other preflight checks pass.
 - [ ] T005 [US2] Define missing, unreadable, and ambiguous input handling in
   `skills/vault-orientation/SKILL.md`. Name the failed shared or designated
   local source, dependency, or context; explain dependent work; and pause it
-  before campaign-note access or changes. Distinguish a designated-but-missing
-  local source from no source being designated. Do not require or invent a
-  local guidance file; when none was designated, allow a read-only lookup
-  limited to the specific information requested, using relevant notes
-  identified without relying on an uncertain folder or note-role mapping,
-  after the other preflight checks pass. Pause before further note access if
-  uncertainty affects findings or the next action. Provisional assumptions
-  never authorize creating or changing notes. For other
-  missing required sources, identify the source and affected work, pause
-  before note access, and ask the DM. State competing interpretations and the
-  needed decision when ambiguity matters. Re-establish guidance and context
-  after the missing input or ambiguity is resolved.
+  before campaign-note access or changes as required by FR-005 and FR-018.
+  Distinguish a designated-but-missing local source from no source being
+  designated. Do not require or invent a local guidance file; when none was
+  designated, allow a read-only lookup limited to the specific information
+  requested, using relevant notes identified without relying on an uncertain
+  folder or note-role mapping, after the other preflight checks pass. Pause
+  before further note access if uncertainty affects findings or the next
+  action. Provisional assumptions never authorize creating or changing notes.
+  For other missing required sources, identify the source and affected work,
+  pause before note access, and ask the DM. State competing interpretations
+  and the needed decision when ambiguity matters, as required by FR-006.
+  Re-establish guidance and context after the missing input or ambiguity is
+  resolved.
 - [ ] T006 [US2] Define the dependency-failure preflight in
   `skills/vault-orientation/SKILL.md` using the readiness and authorization
   checks established by T002. Establish the authorized vault location before

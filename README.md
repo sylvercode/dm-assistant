@@ -48,10 +48,10 @@ will first confirm the authorized vault without reading campaign notes, verify
 that required tools are available and authorized for that vault, load the
 plugin's shared reference and any designated vault-local guidance, and
 establish the campaign/group and any handout or read-aloud section before
-accessing campaign notes. No designated local guidance is a valid state; after
-all other preflight checks pass, a straightforward lookup may use provisional
-layout assumptions for read-only work only. Pause if uncertainty affects the
-findings or next action; provisional assumptions never authorize note changes.
+accessing campaign notes. With no designated local guidance, after all other
+preflight checks pass, a lookup may read only relevant notes identified without
+relying on uncertain folder or note-role mappings. The lookup remains read-only
+and pauses if uncertainty affects findings or the next action.
 These are planned safeguards, not behavior provided by the current scaffold.
 
 ### Vault Sections
