@@ -41,10 +41,14 @@ guidance. The current vault-orientation skill and bundled reference encode
 these boundaries, but installed-client behavior has not been validated.
 Campaign notes belong in your Obsidian vault, not in the plugin installation.
 
-The planned vault configuration is `.dmassist.yaml` at the vault root; its schema
-and defaults are deferred. Plugin-added support files use dot-prefixed names to
-stay hidden from Obsidian's normal note view. Campaign articles remain ordinary,
-visible Markdown notes.
+The proposed `.dmassist.yaml` version-1 contract, defaults, and machine-readable
+JSON Schema are documented in
+[`specs/002-vault-configuration-contract/`](specs/002-vault-configuration-contract/).
+The canonical schema artifact is [`schemas/dmassist.schema.json`](schemas/dmassist.schema.json).
+No configuration reader or runtime validator is implemented; those remain
+runtime work. Plugin-added support files use dot-prefixed names to stay hidden
+from Obsidian's normal note view. Campaign articles remain ordinary, visible
+Markdown notes.
 
 The vault is for the DM's eyes only. Documents meant to be shown to players are
 **handouts**, kept separate from DM commentary and hidden facts. A player-facing

@@ -40,6 +40,7 @@ not plugin components.
 | Skill inventory | `skills/README.md` | Declares every immediate-child skill directory containing `SKILL.md` and classifies each as vault-facing or non-vault-facing. It is contributor documentation, not a plugin component. |
 | MCP integration (future) | `mcp.json` | Register actual tool servers using the Agent Plugins MCP schema. |
 | Copilot hooks (future) | `com.github.copilot/hooks/hooks.json` | Lifecycle automation when a concrete need exists. |
+| Vault configuration schema | `schemas/dmassist.schema.json` | Canonical JSON Schema for the proposed normalized version-1 vault profile; no runtime validator is implemented. |
 
 Agent Plugins 1.0 discovers skills and MCP configuration at fixed locations.
 Do not add legacy component-path fields such as `skills`, `agents`, or
@@ -133,10 +134,10 @@ open questions, and acceptance scenarios.
    enabling dependent note access or claiming runtime behavior. Keep
    `skills/README.md` as the authoritative inventory and statically audit its
    exact match to skill files and each vault-facing skill's preflight.
-2. **Define the configuration contract.** Design the deferred `.dmassist.yaml`
-   schema and defaults, covering section mappings, party context, guidance paths,
-   and template overrides. Define validation and missing/invalid configuration
-   behavior without forcing existing vaults to migrate.
+2. **Define the configuration contract.** The proposed `.dmassist.yaml`
+   version-1 contract, defaults, and machine-readable schema are documented in
+   `specs/002-vault-configuration-contract/`. A reader, validator integration,
+   and runtime behavior are not implemented.
 3. **Establish the script runtime.** Choose supported platforms and provisioning
    for latest stable `pwsh` and required modules, including powershell-yaml.
    Review dependencies and record exact versions; define shared inputs,
