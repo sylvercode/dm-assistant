@@ -34,11 +34,14 @@ dependencies.
 vault; plugin-owned defaults remain in the installed plugin. No campaign data
 is copied into the profile.
 
-**Testing**: No build, test, or lint commands exist in this scaffold. Validate
-the JSON Schema document and check it against valid/invalid normalized-profile
-examples and the written contract. Treat YAML parsing, duplicate-key
-detection, scalar normalization, and path-boundary behavior as future
-integration tests owned by Issue #4.
+**Testing**: No repository build, test, or lint commands exist in this
+scaffold. As a design-artifact verification, validate the schema against the
+Draft 2020-12 meta-schema and representative valid/invalid normalized-profile
+instances from `quickstart.md` using a standards-compliant validator. This
+one-off verification does not add a repository/runtime dependency or imply a
+loader exists. Treat YAML parsing, duplicate-key detection, scalar
+normalization, validator integration, and path-boundary behavior as future
+runtime/integration work owned by Issue #4.
 
 **Target Platform**: Not specified for the schema. Runtime platform support is
 owned by Issue #4.
@@ -60,8 +63,16 @@ classification. The JSON Schema validates normalized profile structure and
 values; its `default` annotations document defaults but do not apply them.
 YAML parsing, duplicate-key rejection, scalar normalization, filesystem
 existence and boundary validation, and stale-input handling remain Issue #4
-runtime responsibilities. Stop and revalidate when the profile, referenced
-guidance or template, or a relevant path changes during a dependent operation.
+runtime responsibilities. Every future profile/discovery workflow must follow
+the Spec 001 vault-facing preflight: establish the authorized vault and verify
+required dependency readiness (initially `obsidian-link-resolver`/
+`resolve_obsidian_link`) and vault authorization separately before
+profile-dependent or campaign-note access; profile contents cannot establish
+or expand authorization. A present default guidance candidate that is
+unreadable, invalid, or unavailable blocks dependent interpretation or note
+work rather than being silently skipped.
+Stop and revalidate when the profile, referenced guidance or template, or a
+relevant path changes during a dependent operation.
 
 **Scale/Scope**: One active campaign/party per vault; six conventional section
 mappings, optional custom sections with descriptions, preparation, guidance,
@@ -87,14 +98,16 @@ No constitution violations require justification.
 ### Documentation (this feature)
 
 ```text
-specs/002-vault-configuration-contract/
-├── plan.md
-├── research.md
-├── data-model.md
-├── quickstart.md
-└── contracts/
-    ├── vault-configuration-contract.md
-    └── dmassist.schema.json
+repository-root/
+├── schemas/
+│   └── dmassist.schema.json
+└── specs/002-vault-configuration-contract/
+    ├── plan.md
+    ├── research.md
+    ├── data-model.md
+    ├── quickstart.md
+    └── contracts/
+        └── vault-configuration-contract.md
 ```
 
 ### Source Code (repository root)
@@ -111,6 +124,15 @@ with a written contract and a Draft 2020-12 schema artifact, without adding a
 skill, script, hook, integration, or reader implementation to the empty
 scaffold. Schema validation operates on the normalized profile structure;
 parser selection and runtime work are explicitly deferred to Issue #4.
+
+**Schema resource location**: `schemas/dmassist.schema.json` at the repository
+root is the current source location for this design artifact, not a confirmed
+installed-plugin resource path. Agent Plugins 1.0 documents recognized
+component locations and resources bundled with skills, but does not establish
+that an arbitrary root-level schema directory will be included or discoverable
+after installation. Issue #4 must choose the final location alongside the
+skill/runtime component that consumes the schema and verify that the installed
+plugin includes it and that the loader can locate and use it.
 
 ## Complexity Tracking
 

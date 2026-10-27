@@ -49,6 +49,12 @@ or mutate instance values during validation. This matches the contract's
 distinction between omitted settings, effective defaults, and optional
 discovery candidates.
 
+For preparation specifically, omitting the entire `preparation` property
+resolves to `session_section` mode with the `Preparation` heading. A present
+`preparation` mapping must include `mode`; an empty mapping does not request
+the omitted-property default. When `session_section` is selected, an omitted
+`heading` resolves to `Preparation`.
+
 **Alternatives considered:** Treating `default` as an instruction to mutate
 the profile was rejected because that behavior is not part of standard
 validation and would make validator behavior tool-dependent.

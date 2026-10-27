@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/sylvercode/dm-assistant/schemas/vault-configuration-contract/v1/dmassist.schema.json",
+  "$id": "https://github.com/sylvercode/dm-assistant/schemas/dmassist.schema.json",
   "title": "DM Assistant Vault Configuration Profile, Version 1",
   "description": "Validates the normalized version-1 profile structure and values. It does not parse YAML, apply defaults, or perform vault/runtime checks.",
   "type": "object",
@@ -108,6 +108,7 @@
     "preparation": {
       "type": "object",
       "additionalProperties": false,
+      "description": "When omitted, runtime resolution uses session_section mode with the Preparation heading. When present, mode is required; an empty object is invalid.",
       "default": {
         "mode": "session_section",
         "heading": "Preparation"

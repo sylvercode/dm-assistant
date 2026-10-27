@@ -23,21 +23,53 @@ The plugin will give an AI assistant a focused set of tools and guidance for wor
 
 ## Project Status
 
-This repository contains an Agent Plugins 1.0 scaffold: a plugin manifest and reserved directories for portable skills and Copilot-specific agents. No skills, agents, hooks, or MCP servers are implemented yet. The planned capabilities above are not currently available.
+This repository contains an Agent Plugins 1.0 plugin with a portable
+vault-orientation skill and its bundled shared reference. It does not include
+an Obsidian Link Resolver integration or automated vault runtime. Installed
+cross-skill resource loading was verified in a disposable two-skill fixture
+using owner-skill activation, not assumed sibling paths. The orientation skill
+must stop before campaign-note access when note-content-free authorization of
+the exact vault cannot be established. Other planned capabilities above are
+not currently available.
 
 See [Plugin Architecture](docs/architecture.md) for component locations, extension boundaries, and the separation between the plugin and campaign vaults.
 
 ## Intended Vault Structure and Workflow
 
-The following conventions describe the intended workflow for users and future AI guidance; the scaffold does not yet load or enforce them. Campaign notes belong in your Obsidian vault, not in the plugin installation.
+The following conventions describe the intended workflow for users and AI
+guidance. The current vault-orientation skill and bundled reference encode
+these boundaries, but installed-client behavior has not been validated.
+Campaign notes belong in your Obsidian vault, not in the plugin installation.
 
-The planned vault configuration is `.dmassist.yaml` at the vault root; its schema
-and defaults are deferred. Plugin-added support files use dot-prefixed names to
-stay hidden from Obsidian's normal note view. Campaign articles remain ordinary,
-visible Markdown notes.
+The proposed `.dmassist.yaml` version-1 contract, defaults, and machine-readable
+JSON Schema are documented in
+[`specs/002-vault-configuration-contract/`](specs/002-vault-configuration-contract/).
+The canonical schema artifact is [`schemas/dmassist.schema.json`](schemas/dmassist.schema.json).
+No configuration reader or runtime validator is implemented; those remain
+runtime work. Plugin-added support files use dot-prefixed names to stay hidden
+from Obsidian's normal note view. Campaign articles remain ordinary, visible
+Markdown notes.
 
 The vault is for the DM's eyes only. Documents meant to be shown to players are
-**handouts**, kept separate from DM commentary and hidden facts.
+**handouts**, kept separate from DM commentary and hidden facts. A player-facing
+section is limited to a handout or material the DM will read aloud; each must
+pass a check for DM-only facts and revealing links immediately before it is
+handed out or read aloud. All other task content is DM-facing.
+
+Every vault-facing skill—any workflow that reads, interprets, creates, or
+changes campaign material, including the current orientation skill—must follow
+the shared vault-guidance contract. It must establish the authorized vault
+without reading campaign notes, verify required tools and separate vault
+authorization, load the plugin's shared reference and any designated
+vault-local guidance, and establish the campaign/group and any handout or
+read-aloud section before accessing campaign notes. With no designated local
+guidance, after all other preflight checks pass, a lookup may read only
+relevant notes identified without relying on uncertain folder or note-role
+mappings. The lookup remains read-only and pauses if uncertainty affects
+findings or the next action. The orientation skill encodes these safeguards,
+but its unresolved exact-vault authorization gate requires it to fail closed;
+other skills must use the tested owner-activation pattern rather than assumed
+sibling paths. Source instructions alone do not validate runtime behavior.
 
 ### Vault Sections
 
@@ -68,11 +100,13 @@ The **Player** section describes player characters, not the real people playing 
 Record each character's knowledge in their article and shared group knowledge in the group article, with clear links between the group and its characters. Distinguish what a character currently knows from what they might discover and from DM-only world information. Players should roleplay based on their character's knowledge, not everything the player or DM knows.
 
 Party lore can hold shared knowledge with explicit exceptions for absent or
-uninformed characters. The DM's judgment is sufficient to establish character
-knowledge or change an exception; no evidence log is required. Label rumors and mistaken beliefs and reference the
-real facts in DM-facing notes, without exposing those facts to characters who do
-not know them. If the truth is unknown, record that uncertainty rather than
-inventing a correction.
+uninformed characters. Character/group knowledge or world-fact updates require
+an actual-play record or explicit DM judgment where permitted; the DM's
+judgment is sufficient to establish character knowledge or change an
+exception, with no evidence log or session link required. Label rumors and
+mistaken beliefs and reference the real facts in DM-facing notes, without
+exposing those facts to characters who do not know them. If the truth is
+unknown, record that uncertainty rather than inventing a correction.
 
 Use Obsidian tags to classify knowledge exceptions, rumors, and mistaken beliefs,
 with prose for details and links to supporting facts. The exact tag vocabulary
@@ -134,7 +168,13 @@ copilot plugin install .
 copilot plugin list
 ```
 
-The plugin should appear as `dm-assistant`. The empty scaffold does not add any agents or skills. Once components exist, check their discovery in a new interactive session with `/agent` and `/skills list`.
+The plugin should appear as `dm-assistant`. Start a new interactive session
+and check component discovery with `/agent` and `/skills list`; the
+vault-orientation skill should be listed. No Copilot-specific agents are
+currently included. See the feature
+[validation guide](specs/001-shared-vault-guidance/quickstart.md) for the
+unverified resource-loading and authorization gates; installation or skill
+discovery alone does not validate campaign-note access behavior.
 
 Copilot caches installed plugins. Re-run `copilot plugin install .` after changing the local plugin, then start a new session to test it.
 

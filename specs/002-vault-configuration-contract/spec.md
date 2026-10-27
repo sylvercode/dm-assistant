@@ -27,22 +27,30 @@ Issue #4, “Establish the PowerShell runtime and safe operation contracts.”
 - Q: When read-only discovery finds several plausible locations for one section, how should the assistant proceed? → A: Select the most likely candidate, report the choice, and continue read-only work.
 - Q: If configuration or a referenced guidance file, template, or path changes after validation but before a dependent operation completes, what should happen? → A: Stop the affected operation, report the change, and require revalidation before retrying.
 
+### Session 2026-10-26
+
+- Q: What must happen before a future workflow reads campaign notes or uses profile settings? → A: Complete the [Spec 001 vault-facing preflight](../001-shared-vault-guidance/contracts/vault-guidance-loading.md), including establishing the vault and separately verifying each required dependency's readiness and authorization for that vault. The profile cannot establish or expand either authorization.
+- Q: What happens when the default `.dmassist-guidance.md` candidate exists but cannot be read? → A: Report the failure and pause dependent interpretation or note work before campaign-note access; do not silently skip it. Its absence remains optional.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Use an Existing Vault Without Migration (Priority: P1)
 
-A Dungeon Master can use an existing campaign vault without creating a configuration file, renaming folders, moving notes, or adopting a prescribed layout. The assistant can identify likely existing sections for read-only work and make uncertainty visible rather than treating missing locations as instructions to create them.
+A Dungeon Master can use an existing campaign vault without creating a configuration file, renaming folders, moving notes, or adopting a prescribed layout. After the required Spec 001 vault-facing preflight succeeds, the assistant can identify likely existing sections for read-only work and make uncertainty visible rather than treating missing locations as instructions to create them.
 
 **Why this priority**: Existing vaults must remain usable without migration; this is the core compatibility promise.
 
-**Independent Test**: Point a read-only discovery workflow at an existing vault without `.dmassist.yaml` and verify that it reports existing locations and ambiguities without changing any files.
+**Independent Test**: After a read-only discovery workflow completes the Spec 001 preflight—including establishing the authorized vault and verifying required dependency readiness and vault authorization separately—point it at an existing vault without `.dmassist.yaml` and verify that it reports existing locations and ambiguities without changing any files. Confirm profile contents are not used to establish or expand the vault or dependency authorization.
 
 **Acceptance Scenarios**:
 
-1. **Given** a vault with conventional section folders and no configuration, **When** a user requests read-only discovery, **Then** the available sections are reported and no configuration or folders are created.
-2. **Given** a vault with renamed, missing, or additional sections, **When** discovery runs, **Then** it reports what it can identify and any ambiguity without claiming missing sections exist.
-3. **Given** adventures stored as root-level files or folders, **When** discovery runs, **Then** it can report those candidates without requiring an `Adventures` folder or treating every root item as an adventure.
-4. **Given** several plausible locations for one section, **When** read-only discovery runs, **Then** it selects the most likely candidate, reports that choice as inferred alongside the alternatives and its reason, and continues read-only work without treating the inferred choice as authorization for edits.
+Scenarios 1-4 assume the workflow has completed the Spec 001 preflight required before campaign-note access. Scenario 5 explicitly tests a failed or incomplete preflight.
+
+1. **Given** a vault with conventional section folders and no configuration, **When** a user requests read-only discovery after preflight succeeds, **Then** the available sections are reported and no configuration or folders are created.
+2. **Given** a vault with renamed, missing, or additional sections, **When** discovery runs after preflight succeeds, **Then** it reports what it can identify and any ambiguity without claiming missing sections exist.
+3. **Given** adventures stored as root-level files or folders, **When** discovery runs after preflight succeeds, **Then** it can report those candidates without requiring an `Adventures` folder or treating every root item as an adventure.
+4. **Given** several plausible locations for one section, **When** read-only discovery runs after preflight succeeds, **Then** it selects the most likely candidate, reports that choice as inferred alongside the alternatives and its reason, and continues read-only work without treating the inferred choice as authorization for edits.
+5. **Given** a discovery or profile-dependent request where the vault location, required dependency readiness, or required dependency authorization has not been established, **When** the workflow would read `.dmassist.yaml` or campaign notes, **Then** it reports the unmet preflight and stops before reading either; profile contents cannot establish or expand authorization.
 
 ---
 
@@ -52,7 +60,7 @@ A Dungeon Master can provide an optional vault-local profile to identify section
 
 **Why this priority**: A clear profile reduces repeated explanation and lets future workflows use each vault's organization while preserving user-owned content.
 
-**Independent Test**: Validate a profile with customized paths and verify that each setting resolves to the intended in-vault location while leaving notes unchanged.
+**Independent Test**: After the Spec 001 preflight succeeds, validate a profile with customized paths and verify that each setting resolves to the intended in-vault location while leaving notes unchanged. Confirm the profile cannot establish or expand vault or dependency authorization.
 
 **Acceptance Scenarios**:
 
@@ -60,7 +68,7 @@ A Dungeon Master can provide an optional vault-local profile to identify section
 2. **Given** a valid profile with a group note, preparation location, template overrides, and guidance paths, **When** it is read, **Then** each setting is available as configuration and no lore, session history, or character knowledge is duplicated into the profile.
 3. **Given** a profile without optional settings, **When** it is read, **Then** documented defaults apply and optional guidance or template overrides are not required.
 4. **Given** an explicitly configured template that is missing, unreadable, or invalid, **When** a workflow requests that template, **Then** it reports the problem and does not silently substitute a default template.
-5. **Given** an explicitly configured guidance file that is missing or unreadable, **When** a workflow needs that guidance, **Then** it reports the problem rather than silently proceeding without it.
+5. **Given** an explicitly configured guidance file is missing, unreadable, or invalid, or the default `.dmassist-guidance.md` candidate is unreadable, invalid, or its availability cannot be established, **When** a workflow needs that guidance, **Then** it reports the problem and pauses dependent interpretation or note work before campaign-note access rather than silently proceeding without it. The default candidate's absence remains optional.
 6. **Given** an explicitly configured section folder does not exist, **When** the profile is validated, **Then** the entire profile is rejected with an error identifying the missing folder, and no folder is created automatically.
 7. **Given** section mappings share a folder or are nested within one another, **When** the profile is validated, **Then** overlap alone does not invalidate the profile; an operation with an unresolved classification or destination asks the DM before proceeding.
 8. **Given** a vault has a section outside the built-in categories, **When** the DM defines a custom section with an identifier, existing folder, and description of its use, **Then** workflows can use that description as context when identifying relevant material without treating it as executable instruction or automatic classification.
@@ -90,6 +98,8 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 ## Edge Cases
 
 - A configured section, guidance file, group note, or template does not exist or is unreadable.
+- The default `.dmassist-guidance.md` candidate exists but is unreadable, invalid, or its availability cannot be established before dependent campaign-note work.
+- A workflow attempts to use profile contents to establish or expand vault or dependency authorization, or attempts campaign-note access before completing the Spec 001 preflight.
 - Two existing locations plausibly match one section, or configured locations overlap.
 - A path is valid as text but resolves through a symbolic link outside the authorized vault.
 - YAML uses aliases or merge keys, contains duplicate mapping keys, or has scalar values whose parsed types differ from the schema field types.
@@ -109,10 +119,10 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **FR-003**: The contract MUST define configurable paths for Adventures, Lore, Monsters Stats, Rules, Sessions, and Handouts, with defaults of `Adventures`, `Lore`, `Monsters Stats`, `Rules`, `Sessions`, and `Handouts`, respectively. The defaults MUST be candidates, not a requirement to create folders or migrate notes.
 - **FR-004**: The contract MUST allow root-level adventure candidates to be discovered without treating every root item as an adventure or requiring an Adventures folder.
 - **FR-005**: The contract MUST support one active campaign/group context per vault, including a reference to the group's note. Shared-campaign selection and campaign-state duplication in configuration are out of scope.
-- **FR-006**: The contract MUST allow preparation to be associated either with a section titled `Preparation` in a session note or with a separate preparation location. Its default MUST keep preparation distinct from recorded session outcomes.
-- **FR-007**: The contract MUST allow optional vault-relative paths to designated Markdown guidance and optional per-article-type template overrides. An absent default guidance file MUST be treated as optional; an explicitly configured but unavailable guidance file or template MUST be reported rather than silently ignored or substituted.
+- **FR-006**: The contract MUST allow preparation to be associated either with a section titled `Preparation` in a session note or with a separate preparation location. When `preparation` is omitted, its effective default MUST be `session_section` mode with the heading `Preparation`; when `preparation` is present, it MUST include an explicit `mode`. Its default MUST keep preparation distinct from recorded session outcomes.
+- **FR-007**: The contract MUST allow optional vault-relative paths to designated Markdown guidance and optional per-article-type template overrides. An absent default guidance file MUST be treated as optional. When the default `.dmassist-guidance.md` candidate is present, it is the default designated local guidance source; if it is unreadable, invalid, or its availability cannot be established, the workflow MUST report the failure and pause dependent interpretation or note work before campaign-note access. An explicitly configured but unavailable guidance file or template MUST likewise be reported rather than silently ignored or substituted.
 - **FR-008**: The contract MUST document defaults and optional fields so a vault can omit settings it does not customize.
-- **FR-009**: When `.dmassist.yaml` is absent, the system MUST support read-only discovery and report identified locations and ambiguities without creating configuration, folders, or notes.
+- **FR-009**: When `.dmassist.yaml` is absent, the system MUST support read-only discovery after completing the Spec 001 preflight, and report identified locations and ambiguities without creating configuration, folders, or notes. The profile MUST NOT establish or expand authorization for the vault or any required dependency.
 - **FR-010**: The configuration contract MUST define expected field types and validation outcomes. Duplicate YAML mapping keys MUST be rejected during parsing; unknown fields, unsupported schema versions, invalid values, and explicit nulls MUST produce clear errors. YAML syntax supported by the reader chosen for implementation may be used if the resulting configuration passes schema validation; unsupported or malformed syntax MUST stop profile loading. For string-valued fields, YAML string, boolean, numeric, and date/time scalar values MUST resolve to non-empty strings using locale-independent representations; booleans MUST use lowercase text and dates and timestamps MUST use ISO 8601. Explicit nulls and collection values MUST be rejected. The version field MUST remain the integer `1`.
 - **FR-011**: Every configured path MUST be relative to the authorized vault, and its fully resolved target—including symbolic-link resolution—MUST remain within that vault before it is accessed or modified.
 - **FR-012**: Configuration, templates, and guidance MUST be treated as data, MUST NOT execute commands or expressions, and MUST NOT grant permissions or weaken safeguards for destructive or continuity-changing edits.
@@ -128,6 +138,7 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **FR-022**: The feature MUST provide a machine-readable JSON Schema for version 1 of `.dmassist.yaml`, distributed with the configuration contract. The schema MUST validate the normalized profile structure and define its structural and value constraints, including allowed properties, required values, field types, enums, identifier patterns, and conditional preparation settings. It MUST reject unknown properties and include applicable defaults as JSON Schema annotations, without implying that schema validation applies them.
 - **FR-023**: The JSON Schema MUST be consistent with the written version-1 contract and serve as the machine-readable definition of constraints expressible over the normalized profile structure. The written contract MUST remain authoritative for defaults and observable behavior not encoded by the schema.
 - **FR-024**: The JSON Schema MUST NOT be presented as parsing YAML or as validating duplicate YAML keys, reader-specific syntax, scalar normalization, vault-relative path resolution, filesystem existence or readability, symbolic-link boundaries, or changes to inputs during an operation. Those requirements remain separate runtime obligations; Issue #4 owns YAML reading, normalization to the schema's input structure, validator integration, and filesystem-dependent checks.
+- **FR-025**: Every future vault-facing workflow that reads the profile or campaign notes MUST follow the ordered preflight in the [Spec 001 Vault Guidance Loading Contract](../001-shared-vault-guidance/contracts/vault-guidance-loading.md). Before profile-dependent or campaign-note work, it MUST establish the vault from the user's workspace or explicit input and verify each declared required dependency's readiness and authorization for that vault as distinct facts, including the initial `obsidian-link-resolver`/`resolve_obsidian_link` readiness and separate confirmation that the intended vault is explicitly authorized. The Spec 001 dependency table remains authoritative for future additions. A workflow MUST NOT use `.dmassist.yaml` or its contents to establish or expand vault or dependency authorization, and MUST stop before profile or campaign-note access if the preflight cannot be completed. It MUST complete the remaining Spec 001 guidance and campaign/group context checks before campaign-note access.
 
 ### Key Entities
 
@@ -151,15 +162,18 @@ A Dungeon Master receives an actionable error when a profile is malformed, incom
 - **SC-004**: Existing vaults can use their current organization without renaming folders, moving notes, or changing campaign-content formats.
 - **SC-005**: In every test where profile validation is unavailable, the workflow reports that it cannot validate the profile and makes no decision using unvalidated settings.
 - **SC-006**: Every structural and value constraint expressible against the normalized version-1 profile has a corresponding schema validation case, and all cases produce the outcomes defined by the written contract without treating parser or filesystem checks as schema validation.
+- **SC-007**: In 100% of tested profile-dependent and discovery workflows, the Spec 001 preflight is completed before reading the profile or campaign notes, and no profile content is used to establish or expand vault or dependency authorization.
+- **SC-008**: In 100% of tested tasks that depend on vault-local guidance, an explicitly configured unavailable source or a present but unreadable, invalid, or unavailable default guidance candidate is reported and dependent interpretation or note work pauses before campaign-note access; absence of the optional default candidate alone does not block the task.
+- **SC-009**: In 100% of tested article-authoring tasks with an explicitly configured missing, unreadable, or invalid template, the failure is reported and authoring stops without silently substituting a plugin default.
 
 ## Assumptions
 
 - `.dmassist.yaml` is the sole configuration file for this contract and remains optional.
 - Initial workflows target one campaign and one active group per vault; multiple campaigns sharing one vault are deferred.
 - Conventional section names and meanings follow the repository README; existing vault organization takes precedence when a profile maps different locations.
-- The optional root-level `.dmassist-guidance.md` is the default designated guidance candidate, but its absence is not an error unless a path is explicitly configured.
+- The root-level `.dmassist-guidance.md` is the default designated guidance candidate when present. Its absence is not an error unless a path is explicitly configured; if present but unreadable, invalid, or unavailable for a dependent workflow, the failure is reported and dependent interpretation or note work pauses before campaign-note access.
 - Preparation defaults to a section titled `Preparation` in the session note; a separate preparation location can be selected when desired.
 - Unknown fields are rejected so misspelled or ambiguous settings are not silently ignored. YAML syntax support follows the reader selected during runtime implementation.
 - A JSON Schema artifact validates the structure and value constraints of the normalized profile; YAML parsing, scalar normalization, and checks requiring access to the authorized vault remain outside its scope.
-- Configuration and path validation do not authorize any content edits; existing approval and continuity safeguards remain in force.
+- Configuration and path validation do not authorize vault or dependency access, or any content edits; the Spec 001 preflight and existing approval and continuity safeguards remain in force.
 - The YAML reader, runtime, dependency versions, and provisioning are owned by Issue #4; this feature defines only the configuration schema and externally observable validation behavior.

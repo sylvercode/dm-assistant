@@ -301,10 +301,12 @@ A minimal configuration could include:
 - Paths to additional vault-specific Markdown guidance the AI must read.
 
 Do not duplicate lore, session history, or character knowledge in configuration.
-The filename and location are `.dmassist.yaml` at the vault root. Schema and
-defaults will be decided later. Retain optional fields and a read-only discovery
-fallback for unconfigured vaults. Any additional plugin support files must follow
-the dot-prefix convention above.
+The filename and location are `.dmassist.yaml` at the vault root. The proposed
+version-1 schema and defaults are defined in
+`specs/002-vault-configuration-contract/`; a reader, validator integration, and
+runtime behavior remain future work. Retain optional fields and a read-only
+discovery fallback for unconfigured vaults. Any additional plugin support files
+must follow the dot-prefix convention above.
 
 The shared PowerShell loader should parse and validate configuration before
 skills or hooks consume it. Parsing YAML does not validate field types, supported
@@ -442,8 +444,6 @@ are needed for the article, report the limitation and ask the DM how to proceed.
 
 ## Open Questions
 
-- What schema and defaults should `.dmassist.yaml` use, including behavior for
-  missing, invalid, or newer schema versions? These decisions are deferred.
 - How will skills reliably locate the installed shared reference and additional
   vault-local Markdown guidance?
 - Which article-type identifiers and configuration fields will select template
@@ -471,8 +471,9 @@ initial single-campaign workflows.
 ## Suggested Development Sequence
 
 1. Review this report and settle the shared reference location and parser
-   provisioning. Use root-level `.dmassist.yaml`; design its schema and defaults
-   in a subsequent implementation step. Keep shared campaigns out of initial scope.
+   provisioning. Use root-level `.dmassist.yaml`; its proposed version-1 schema
+   and defaults are documented in Feature 002, while parser/runtime
+   implementation remains separate. Keep shared campaigns out of initial scope.
 2. Extract the agreed meanings and safeguards into the shared AI reference.
    When authoring skills are added, bundle their default templates and implement
    the custom-template selection contract without migrating existing notes.

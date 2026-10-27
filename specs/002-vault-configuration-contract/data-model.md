@@ -6,12 +6,21 @@
 
 The authorized campaign vault is obtained from the user's workspace or explicit input. It is not the plugin installation. The optional `.dmassist.yaml` profile is stored at the root of that vault; campaign notes, guidance, and DM-owned templates remain vault content. The profile stores organization and references only: it does not contain lore, session history, character knowledge, permissions, or executable instructions.
 
+Before a future workflow reads the profile or campaign notes, it must establish
+the vault and separately verify each declared required dependency's readiness
+and authorization for that vault, including readiness of the initial
+`obsidian-link-resolver`/`resolve_obsidian_link` dependency and explicit
+authorization of the intended vault. The profile cannot establish or expand
+either authorization. Before campaign-note access, complete the remaining
+ordered preflight in the
+[Spec 001 Vault Guidance Loading Contract](../001-shared-vault-guidance/contracts/vault-guidance-loading.md).
+
 All paths in the profile are vault-relative. A path is usable only if its fully resolved target, including symbolic links, remains inside the authorized vault. Plugin-bundled default templates are separate plugin resources and are not profile paths.
 
 ## Schema Artifact and Normalized Profile
 
-The machine-readable schema deliverable is
-`contracts/dmassist.schema.json`. It describes the normalized version-1
+The canonical machine-readable schema deliverable is
+[`schemas/dmassist.schema.json`](../../schemas/dmassist.schema.json). It describes the normalized version-1
 profile structure and uses JSON Schema Draft 2020-12, declared with
 `$schema`; this dialect is distinct from the profile's application-level
 `version: 1`.
@@ -70,11 +79,11 @@ templates:
 | `sections.custom.<id>.description` | Non-empty string | Required for each custom section | Describes the intended content/use of that category to help workflows identify relevant notes. Treated as descriptive data, not instructions or authorization. |
 | **Party context** | Mapping, zero or one per profile | Optional | Represents the one active party context supported per vault. Shared-campaign selection is out of scope. |
 | `party.note` | Relative Markdown file path string | Required if `party` is present; otherwise absent | Reference to the active party's note; the note remains the source of party knowledge. It is not copied into the profile. Validate its boundary before access; if unavailable when needed, report the problem rather than selecting another note. |
-| **Preparation location** | Mapping, zero or one per profile | Optional | Keeps tentative preparation distinct from recorded outcomes. |
-| `preparation.mode` | String enum: `session_section` or `separate_folder` | `session_section` | `session_section` means a section titled by `preparation.heading` in a session note. `separate_folder` requires `preparation.path`. The default is documented by a JSON Schema annotation and applied during runtime resolution. |
-| `preparation.heading` | Non-empty string | `Preparation` in `session_section` mode; forbidden in `separate_folder` mode | Heading text for tentative preparation within a session note, separate from recorded outcomes. |
+| **Preparation location** | Mapping, zero or one per profile | Optional; if omitted, the effective default is `{mode: "session_section", heading: "Preparation"}` | Keeps tentative preparation distinct from recorded outcomes. If present, the mapping must include `mode`; an empty mapping is invalid. |
+| `preparation.mode` | String enum: `session_section` or `separate_folder` | Required when `preparation` is present; the omitted-property default is `session_section` | `session_section` means a section titled by `preparation.heading` in a session note. `separate_folder` requires `preparation.path`. The omitted-property default is documented by a JSON Schema annotation and applied during runtime resolution; it does not make `mode` optional in a present mapping. |
+| `preparation.heading` | Non-empty string | Optional in `session_section` mode; defaults to `Preparation`; forbidden in `separate_folder` mode | Heading text for tentative preparation within a session note, separate from recorded outcomes. |
 | `preparation.path` | Relative directory path string | Required only for `separate_folder`; otherwise forbidden | Dedicated preparation directory. It must already exist and remain inside the vault. It does not become a session outcome merely by containing prepared material. |
-| **Guidance path** | Object with one relative Markdown file path string | Optional; when omitted, the optional root-level `.dmassist-guidance.md` is the default candidate | If present, `guidance.path` is required. An absent default candidate is not an error. An explicit path replaces that candidate; it must remain inside the vault. An unavailable or unreadable designated file is reported when needed, not silently ignored. Runtime resolution handles the optional default candidate; schema validation does not check whether the file exists. |
+| **Guidance path** | Object with one relative Markdown file path string | Optional; when omitted, a present root-level `.dmassist-guidance.md` is the default designated candidate | If present, `guidance.path` is required. Absence of the default candidate is not an error. An explicit path replaces that candidate; it must remain inside the vault. If a designated source is unreadable, invalid, or its availability cannot be established for dependent work, report the failure and pause dependent interpretation or note work before campaign-note access. Runtime resolution handles the default candidate; schema validation does not check whether the file exists or is readable. |
 | **Built-in template overrides** | Object mapping built-in article-type identifiers to relative Markdown file path strings | Optional | Selects DM-owned templates in the vault for supported built-in types. Paths are checked against the vault boundary at runtime. An explicitly selected missing, unreadable, or invalid template is an error for the dependent authoring operation, not a reason to substitute a plugin default. With no override, the relevant plugin default may be used. |
 | `templates.custom` | Object mapping custom article-type identifiers to relative Markdown file path strings | Optional; no custom template types by default | Enables the DM to register templates for other article needs. Identifiers must match `[a-z][a-z0-9_]*` and cannot duplicate a built-in type. |
 | `templates.custom.<id>` | Relative Markdown file path string | Required for each custom template type | The vault-owned template used when that custom article type is explicitly requested. It must remain inside the vault; missing, unreadable, or invalid templates stop the dependent operation. There is no plugin default for custom types. |
@@ -108,11 +117,13 @@ preparation settings, and rejects unknown properties. In particular:
    requires exactly `path` and non-empty `description`; custom identifiers
    match `[a-z][a-z0-9_]*` and cannot duplicate built-in section names.
 3. `party`, when present, requires `note`.
-4. `preparation` supports `session_section` and `separate_folder` modes.
-   The former permits `heading` and forbids `path`; the latter requires
-   `path` and forbids `heading`. The documented defaults for `mode` and
-   `heading` are applied during runtime resolution, not by mutating the
-   schema instance.
+4. Omitting `preparation` resolves to `session_section` mode with the
+   `Preparation` heading. If `preparation` is present, `mode` is required;
+   `session_section` permits an optional `heading` and forbids `path`, while
+   `separate_folder` requires `path` and forbids `heading`. An omitted
+   `heading` in `session_section` mode resolves to `Preparation`. These
+   defaults are applied during runtime resolution, not by mutating the schema
+   instance.
 5. `guidance`, when present, requires `path`. `templates` may contain
    built-in template overrides and custom template mappings; custom template
    identifiers match `[a-z][a-z0-9_]*` and cannot duplicate built-in types.
@@ -175,7 +186,7 @@ owns runtime and dependency handling.
 
 ### Profile lifecycle
 
-`Absent` → **read-only discovery**. The workflow may report existing and inferred locations without creating or changing configuration, folders, or notes. If multiple locations plausibly match one section, select the likeliest candidate, report it as inferred with the reason and alternatives, and continue read-only work. That choice cannot override explicit mappings or authorize edits.
+`Absent` → after the Spec 001 preflight succeeds, **read-only discovery**. The workflow may report existing and inferred locations without creating or changing configuration, folders, or notes. If multiple locations plausibly match one section, select the likeliest candidate, report it as inferred with the reason and alternatives, and continue read-only work. That choice cannot override explicit mappings or authorize edits. Profile content cannot establish or expand vault or dependency authorization.
 
 `Present` → `Unvalidated` → `Validating` → one of:
 
