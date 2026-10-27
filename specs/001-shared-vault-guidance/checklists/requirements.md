@@ -36,5 +36,6 @@
 - Installed-resource lookup is an explicit planning decision that must be verified in the supported client (FR-012, Assumptions).
 - Vault-local guidance designation is bounded to DM input or the separate vault-configuration contract; that contract's detailed discovery rules remain a dependency (FR-003, Assumptions).
 - Success criteria enumerate the skill population by its function and define the DM walkthrough threshold (SC-001, SC-004).
+- The declared inventory lists every immediate-child skill with a `SKILL.md`, classifies vault-facing status, and supports a one-to-one completeness audit against skill files (FR-017, SC-001).
 - Required runtime dependencies are explicitly inventoried, and the inventory is non-exhaustive (FR-013, FR-014). Aliases, tags, both internal-link formats, and callouts have locally bundled default guidance sourced from official docs, with no runtime fetch requirement and an explicit wikilink default/preference override (FR-015, FR-016).
 - This checklist validates specification quality, not implementation completion.

@@ -1,8 +1,12 @@
 # Plugin Architecture
 
 DM Assistant uses Agent Plugins 1.0. The repository root is the installable
-plugin directory. This scaffold contains metadata and reserved component
-directories only; it does not yet provide campaign workflows or tools.
+plugin directory. The repository includes a portable vault-orientation skill
+and its bundled shared reference, but no Resolver integration or automated
+vault runtime. Installed cross-skill loading passed a disposable fixture test
+using owner-skill activation and its runtime-provided resource path. The
+orientation skill must fail closed when
+exact-vault authorization cannot be established.
 
 ## Layout
 
@@ -10,7 +14,10 @@ directories only; it does not yet provide campaign workflows or tools.
 dm-assistant/
 |-- plugin.json
 |-- skills/
-|   `-- README.md
+|   |-- README.md
+|   `-- vault-orientation/
+|       |-- SKILL.md
+|       `-- VAULT-REFERENCE.md
 |-- com.github.copilot/
 |   `-- agents/
 |       `-- README.md
@@ -20,16 +27,17 @@ dm-assistant/
 `-- LICENSE
 ```
 
-The component directory READMEs preserve the reserved directories in Git and
-describe where to add future content. They are not plugin components.
+The component directory READMEs describe where to add future content. They are
+not plugin components.
 
 ## Component Boundaries
 
 | Component | Location | Responsibility |
 | --- | --- | --- |
 | Manifest | `plugin.json` | Plugin identity, version, and distribution metadata. |
-| Portable skills | `skills/<skill-name>/SKILL.md` | Task-specific workflows and any bundled templates or scripts. Each skill must be an immediate child of `skills/`. |
+| Portable skills | `skills/<skill-name>/SKILL.md` | Task-specific workflows and any bundled templates or scripts. Each skill must be an immediate child of `skills/`. The current vault-orientation skill bundles `VAULT-REFERENCE.md`. |
 | Copilot agents | `com.github.copilot/agents/<name>.agent.md` | Copilot-specific assistant profiles and orchestration. |
+| Skill inventory | `skills/README.md` | Declares every immediate-child skill directory containing `SKILL.md` and classifies each as vault-facing or non-vault-facing. It is contributor documentation, not a plugin component. |
 | MCP integration (future) | `mcp.json` | Register actual tool servers using the Agent Plugins MCP schema. |
 | Copilot hooks (future) | `com.github.copilot/hooks/hooks.json` | Lifecycle automation when a concrete need exists. |
 | Vault configuration schema | `schemas/dmassist.schema.json` | Canonical JSON Schema for the proposed normalized version-1 vault profile; no runtime validator is implemented. |
@@ -46,12 +54,39 @@ files remain in the user's Obsidian vault, outside the plugin installation.
 Future workflows must obtain the target vault from the user's workspace or
 explicit input, rather than assuming the plugin directory is the vault.
 
-The README describes intended vault conventions. The
+The README describes intended vault conventions. Any skill that reads,
+interprets, creates, or changes campaign material is vault-facing and must be
+listed as such in `skills/README.md`. Before implementation is considered
+complete, a static inventory and source audit must match every immediate-child
+`skills/*/SKILL.md` file to exactly one classified inventory entry and inspect
+each vault-facing skill for its required preflight. This audit does not require
+runtime execution of every skill.
+
+The planned pre-note sequence is: establish the authorized vault location
+without reading campaign notes; verify every declared required dependency is
+available and authorized for that vault; load the plugin-owned shared reference
+and any designated vault-local guidance; establish the campaign/group and
+identify any handout or read-aloud section; then access campaign notes. No
+designated local guidance is a valid state, not a missing-source failure. After
+all other checks pass, a lookup may read only relevant notes identified without
+relying on uncertain folder or note-role mappings. Keep that lookup read-only
+and pause if uncertainty affects findings or the next action. Before a handout
+is handed out or a read-aloud section is spoken, gate-check that section for
+DM-only facts and revealing links. All other task content is DM-facing.
+
+Updates to character/group knowledge or world facts require an actual-play
+record or explicit DM judgment where permitted. Explicit DM judgment is
+sufficient without an evidence log or session link.
+
+The
 [Vault Guidance Brainstorm](vault-guidance-brainstorm.md) explores how future
 skills could load a shared AI reference and vault-local guidance, with optional
-hooks. These are design inputs, not implemented runtime contracts. Define note
-templates, link-resolution behavior, and permissions for modifying campaign
-content alongside the workflows and tools that implement them.
+hooks. These are design inputs, not implemented runtime contracts. The
+[Shared Vault Guidance specification](../specs/001-shared-vault-guidance/spec.md)
+records the current proposed requirements; it does not mean those requirements
+are implemented. Define note templates, link-resolution behavior, and
+permissions for modifying campaign content alongside the workflows and tools
+that implement them.
 
 ## Planned Template Resources
 
@@ -93,10 +128,12 @@ These are future milestones, not implemented capabilities. Use the
 [Vault Guidance Brainstorm](vault-guidance-brainstorm.md) for detailed decisions,
 open questions, and acceptance scenarios.
 
-1. **Establish shared AI guidance.** Extract the agreed vault meanings and
-   safeguards into a reference bundled with a vault-orientation skill. Verify
-   installed-resource lookup and explicitly require every vault-facing skill to
-   read it, along with designated `.dmassist-guidance.md` guidance.
+1. **Establish shared AI guidance.** The canonical reference and
+   vault-orientation skill are present. Verify installed cross-skill resource
+   lookup and a note-content-free exact-vault authorization check before
+   enabling dependent note access or claiming runtime behavior. Keep
+   `skills/README.md` as the authoritative inventory and statically audit its
+   exact match to skill files and each vault-facing skill's preflight.
 2. **Define the configuration contract.** The proposed `.dmassist.yaml`
    version-1 contract, defaults, and machine-readable schema are documented in
    `specs/002-vault-configuration-contract/`. A reader, validator integration,
@@ -118,10 +155,13 @@ open questions, and acceptance scenarios.
    judgments without evidence logs. Preserve run adventure plans, report
    contradictions without resolving them, and keep handouts player-safe. Require
    approval for major changes, not redundant approval for requested local edits.
-7. **Validate in the installed client.** Exercise the brainstorm's acceptance
-   scenarios, verify resource and skill discovery after reinstalling the plugin,
-   and check generated notes in Obsidian. Cover failure cases, path boundaries,
-   preservation of user edits, and supported-platform behavior.
+7. **Validate in the installed client.** Verify resource and skill discovery
+   after reinstalling the plugin, exercise representative acceptance and
+   failure scenarios, and check generated notes in Obsidian. Cover dependency
+   authorization, player-facing handout/read-aloud gate checks, path boundaries,
+   preservation of user edits, and supported-platform behavior. The inventory
+   and source-compliance audit remains static; it does not require runtime
+   execution of every vault-facing skill.
 8. **Add integrations only for demonstrated gaps.** Introduce supported hooks,
    specialized agents, or MCP tools only when the working skills require them.
    Keep shared-campaign support and dynamic template expressions deferred until
