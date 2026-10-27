@@ -65,10 +65,14 @@ normalized JSON instances:
 | Duplicate YAML keys | Provide duplicate mapping keys at relevant levels, including cases a parser might otherwise overwrite during object construction. | Detect and reject duplicates during parsing; JSON Schema cannot detect keys already discarded by the parser. |
 | Filesystem, vault boundaries, and paths | In an explicitly authorized isolated fixture vault, test configured directory/file existence and readability, invalid relative/absolute/traversal paths, and symbolic links resolving inside and outside the vault. | Enforce existence and component-aware canonical vault containment before access; reject escapes. These are runtime checks, not schema assertions. |
 | Stale inputs | Change the profile, a referenced guidance/template input, or a relevant path after validation and before a dependent operation completes. | Stop affected work, identify the change, and require revalidation before retry. Do not mix old and new inputs or proceed on stale validation. |
+| Vault-facing preflight | Attempt profile-dependent work or campaign-note access before establishing the vault and separately verifying required dependency readiness and vault authorization, including readiness of `obsidian-link-resolver`/`resolve_obsidian_link` and explicit authorization of the intended vault. Also try to use profile contents to establish or expand authorization. | Block profile and campaign-note access until the Spec 001 preflight succeeds. Treat dependency readiness and vault authorization as distinct checks; never derive or expand authorization from `.dmassist.yaml`. |
+| Default guidance candidate unavailable | With no explicit `guidance.path`, provide an absent `.dmassist-guidance.md`, then separately provide a present but unreadable/invalid candidate or make its availability impossible to establish. Request work that depends on vault-local guidance. | Absence alone is optional. If unreadable/invalid or availability cannot be established for dependent work, report the failure and pause dependent interpretation or note work before campaign-note access; do not silently skip the candidate. |
 
 Issue #4 also owns defining the future fixture format and executable test
 command. No parser, validator dependency, runtime version, or command is
-prescribed here.
+prescribed here. Profile and discovery workflows must enforce the Spec 001
+preflight, including the initial resolver dependency; `.dmassist.yaml` cannot
+establish or expand vault or dependency authorization.
 
 ## Design safeguards
 
