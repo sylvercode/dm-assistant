@@ -1,10 +1,11 @@
 # Shared Vault Guidance Validation Quickstart
 
-**Status: validation guide for planned behavior.** This repository is currently
-an Agent Plugins 1.0 scaffold; it does not yet implement the skills, loader, or
-guidance resource described here. Do not treat a successful plugin install as
-proof that the planned behavior exists. Use this guide when those components
-are available, and record unsupported or blocked checks as such.
+**Status: validation guide for partially implemented guidance.** The plugin
+contains a vault-orientation skill and its bundled shared reference, but the
+Resolver integration and installed cross-skill loading and authorization
+behavior remain unverified. Do not treat plugin installation, skill discovery,
+or source-tree presence as proof that campaign-note access is safe. Record
+unsupported or unexercised checks as blocked.
 
 See [the feature specification](spec.md), [data model](data-model.md), and
 [loading contract](contracts/vault-guidance-loading.md) for requirements and
@@ -105,11 +106,10 @@ Start a **new** interactive session, then use the documented discovery checks:
 /skills list
 ```
 
-**Expected once implemented:** the vault-orientation skill and every
-implemented vault-facing skill are discoverable. Confirm that every skill that
-reads, interprets, creates, or changes campaign material is present. The
-current scaffold has no skills, so discovery of these skills is not an expected
-current result.
+**Expected:** the vault-orientation skill is discoverable. Confirm that every
+skill that reads, interprets, creates, or changes campaign material is
+present. Discovery alone does not prove that the shared reference loads from
+an installed plugin or that note-access safeguards work.
 
 ### Static skill inventory and source audit
 
@@ -307,9 +307,9 @@ player-facing sections.
 
 ### SC-004 informal walkthrough
 
-Conduct an informal short walkthrough with at least 5 DMs and assess whether
-at least 4 can distinguish plugin-wide guidance from vault-specific guidance.
-Examples and scoring are not standardized; no vault reorganization is required.
+Conduct an informal short walkthrough with 5 DMs and assess whether at least
+4 can distinguish plugin-wide guidance from vault-specific guidance. Examples
+and scoring are not standardized; no vault reorganization is required.
 
 ## 6. Verify page-local edits and the approval gate
 
@@ -351,3 +351,30 @@ The README documents reinstalling after plugin changes with
 `copilot plugin install .`, checking discovery in a new session, and optional
 removal with `copilot plugin uninstall dm-assistant`. Use those documented
 commands as needed; do not infer additional CLI commands from this guide.
+
+## Current implementation record
+
+This record includes the 2026-10-26 tests in Copilot CLI 1.0.103 against the
+user-supplied disposable setup. The initial preflight tests accessed no
+campaign notes; a later explicitly requested functional link-resolution test
+is recorded below. No live MCP configuration or existing vault notes were changed. See the latest
+test run in `research.md` for exact procedure, evidence, and limitations.
+
+| Check | Status | Evidence / limitation |
+| --- | --- | --- |
+| Static skill inventory and source audit (T010) | **Pass** | `skills/vault-orientation/SKILL.md` is the only immediate-child skill file and has one vault-facing entry in `skills/README.md`. Its source requires the bundled shared reference, designated local guidance, required dependency readiness and exact-vault authorization before note access, and an actual-play record or permitted DM judgment for knowledge/world-fact updates. |
+| Disposable installed fixture discovery | **Pass** | Installed and listed under isolated `COPILOT_HOME`; both fixture skills activated in fresh sessions without `--plugin-dir`. |
+| Full package install/reinstall and discovery | **Pass** | Installed a disposable copy of the complete plugin components as `dm-assistant` v0.1.0, listed it, reinstalled it, and activated `vault-orientation` in a fresh session without `--plugin-dir`. Read its installed reference and identified all four convention topics. Logs: `.temp\t011-package-check\discovery.md`. Uninstalled using the isolated home afterward. |
+| Missing shared reference | **Pass, resource-only** | Removed the reference only from the isolated installation. A fresh session activated the skill, attempted the exact installed resource path, observed `Path does not exist`, and reported dependent campaign work must pause without fallback copies or note access. Logs: `.temp\t011-package-check\missing-reference.md`. This non-campaign resource test does not bypass or validate the ordered authorization preflight. Permission-denied unreadability was not separately exercised. |
+| Cross-skill reference lookup (T001) | **Pass** | Consumer activated the resource-owning skill, then read the same installed sentinel resource from the fixture directory and a directory outside the repository. No sibling-path or current-directory fallback. |
+| Resolver readiness (T002) | **Pass** | Direct stdio initialization returned version `3.5.1` and both Resolver tools; a fresh CLI session exposed `resolve_obsidian_link`. No link-resolution call was made. |
+| Exact-vault authorization (T002) | **Deferred / blocked** | A proposed Resolver tool checking an exact path against the running server's active allow-list without note reads, link resolution, or permission changes could satisfy this. It is not currently exposed. Verify configured and unconfigured roots and wire the documented interface into the skill before closing T002. |
+| Explicit functional link-resolution test | **Pass, single case** | At the user's request, `[[Svalich Woods]]` from `7. Argynvostholt.md` resolved to `Locations/Svalich Woods.md`. No notes changed. This does not satisfy T002's note-content-free pre-access check. |
+| Orientation preflight smoke test | **Pass, constrained** | The actual skill recognized the explicit vault and exposed Resolver tools, then paused on unverified authorization without note reads or Resolver calls. The prompt required a preflight-only stop and Resolver calls were denied; this does not pass broader acceptance scenarios. |
+| Current issue scope (T012) | **Pass** | The open #2 issue covers shared vault guidance and preflight; the open #7 issue separately owns Resolver integration. No user vault path or MCP configuration is added here. |
+| Offline Obsidian defaults; missing-source, ambiguity, no-guidance, continuity, knowledge, player-safety, and approval scenarios | **Deferred / blocked** | Await T002, then exercise realistic DM-style installed-client scenarios against the disposable vault, inspecting outputs and before/after note state. Agent-driven scenarios are acceptable; a constrained smoke test alone is insufficient. |
+| SC-004 informal DM walkthrough | **Deferred / blocked** | Requires five human DMs, with at least four distinguishing plugin-wide from vault-specific guidance. No walkthrough was conducted; technical smoke tests cannot replace it. |
+
+The unresolved foundational gates remain blockers. The skill's fail-closed
+instructions are not evidence that installed-client runtime behavior has been
+validated.

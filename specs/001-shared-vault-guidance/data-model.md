@@ -4,9 +4,10 @@
 
 This document describes the concepts and target contracts in the
 [feature specification](spec.md). It does not define a runtime, loader, or
-configuration format. The repository is a documentation-and-metadata
-Agent Plugins 1.0 scaffold; these concepts and state behaviors are not currently
-implemented.
+configuration format. The repository contains a text-based vault-orientation
+skill and bundled reference, but no Resolver integration or automated vault
+runtime. Installed-client behavior and the authorization check remain
+unvalidated; source instructions do not establish runtime state or behavior.
 
 **All fields below are conceptual attributes inferred from current
 requirements—not a committed config schema, serialized record, or required

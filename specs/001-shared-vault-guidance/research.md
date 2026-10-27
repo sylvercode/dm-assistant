@@ -153,6 +153,134 @@ authorization-introspection method remains unverified. If no safe supported
 signal can be demonstrated, record authorization as blocked and do not permit
 campaign-note access.
 
+### Earlier prerequisite check (superseded by the test run below)
+
+- **T001 — blocked:** Copilot CLI `1.0.103` listed both fixture skills when
+  loaded with `--plugin-dir`. Review of the stopped prompt-mode attempts found
+  they did not test independent working directories: the fixture was nested
+  under the Git repository and resolved to the repository workspace, while
+  the purported alternate directory was also the repository root. Both
+  attempts looped on broad `glob` searches and were stopped before returning
+  the sentinel. They do not establish success or failure of cross-skill
+  loading. The fixture was removed; no supported cross-skill loading method
+  has been demonstrated.
+- **T002 — blocked:** `copilot mcp list` showed the configured GitHub servers
+  and no `obsidian-link-resolver` server. The user identified a local Resolver
+  executable; its help output requires one or more `--vault <DIR>` roots and
+  accepts `--diagnostics`, but `--version` is unsupported. This confirms the
+  executable documents an allow-list argument, not active-session readiness
+  or a note-content-free check of the exact authorized vault. The Resolver
+  remains unregistered; isolated readiness/tool exposure and exact-vault
+  authorization were not tested. No campaign-vault notes were accessed and
+  no live MCP configuration was changed.
+
+### User-directed theoretical implementation
+
+The user chose to continue with theoretical implementation while leaving T001
+and T002 unresolved. Accordingly, the orientation skill is written to use its
+own bundled resource through the documented per-skill resource mechanism and
+to stop before campaign-note access whenever the exact-vault authorization
+check cannot be established. This does not prove cross-skill resource loading,
+does not establish a Resolver authorization signal, and does not satisfy
+either foundational verification task. No additional vault-facing consumer
+skill is enabled.
+
+The earlier T001 probes will not be rerun as part of this implementation
+choice. The cross-skill gate remains open until a valid installed-client
+test uses a working directory outside the repository and returns the sentinel
+from a separate consumer skill.
+
+### Test run: 2026-10-26
+
+The user supplied a disposable vault with project-local Resolver configuration
+and authorized testing. These results supersede the earlier blocked lookup
+and readiness observations.
+
+- **T001 passed in Copilot CLI 1.0.103.** A disposable two-skill plugin was
+  installed with `copilot plugin install` under an isolated `COPILOT_HOME`.
+  The consumer invoked the owner through the `skill` tool; the owner then read
+  `SHARED.md` from its client-provided resource directory. Both runs returned
+  `VIOLET-CEDAR-9264` from the same
+  `installed-plugins\_direct\resource-lookup-probe\skills\dm-probe-owner\SHARED.md`
+  resource: once from the fixture directory and once from an empty directory
+  outside the Git repository. Neither run used `--plugin-dir`, glob, shell,
+  or an inferred sibling path. Separate `--plugin-dir` runs also passed.
+  Logs: `.temp\probe-installed-inside.md` and
+  `.temp\probe-installed-outside.md`. The fixture installation was removed
+  using the same isolated home after testing.
+- **T002 readiness passed; authorization remains blocked.** A direct stdio
+  MCP probe launched the configured executable with only the exact disposable
+  root supplied through `--vault`. `initialize` returned server version
+  `3.5.1`; `tools/list` exposed `resolve_obsidian_link` and
+  `generate_obsidian_link`. No tool was called and no campaign notes were
+  read by the test harness. A fresh CLI session in the user-authorized
+  disposable vault also exposed both Resolver tools. The launch arguments
+  establish how the harness started its own server, but do not establish a
+  generally available authorization-introspection method for an independently
+  running client server. Neither advertised tool supplies a note-content-free
+  authorized-roots query. Do not equate that absence with proof that no other
+  supported method exists. Evidence: `.temp\resolver-probe-result.json` and
+  `.temp\orientation-readiness.md`.
+- **Orientation authorization pause passed in a constrained smoke test.**
+  The real orientation skill activated, recognized the explicitly named vault
+  and Resolver tools, reported exact-vault authorization as unverified, and
+  stopped without any `view` or Resolver calls. Resolver execution was denied
+  by tool permissions, and the prompt explicitly required a preflight-only
+  stop, so this is not an unconstrained behavioral acceptance test. An earlier
+  run excluded Resolver tools entirely; its missing-tool report is not evidence
+  of server failure. Evidence: `.temp\orientation-readiness.md`.
+- **Remaining T011 scenarios blocked at this stage.** No campaign-note read/write, link
+  resolution, or editing scenario was run while exact-vault authorization
+  remained unverified. No human DM walkthrough was performed. No live MCP
+  configuration or existing vault notes were changed.
+
+### Deferred authorization and acceptance testing
+
+Additional independent T011 checks on 2026-10-26 passed in CLI 1.0.103:
+the complete plugin components were copied into a disposable package, installed
+and reinstalled under a new isolated `COPILOT_HOME`, and listed as
+`dm-assistant` v0.1.0. A fresh session without `--plugin-dir` activated
+`vault-orientation` and read its installed `VAULT-REFERENCE.md`, identifying
+aliases, tags, internal links, and callouts. In a separate fresh session after
+removing only the isolated installed reference, the read failed with
+`Path does not exist`; the response named the missing shared source and
+dependent work, required a pause, and did not seek fallback copies. Only
+`skill` and read-only `view` tools were available. These were explicit
+non-campaign resource checks, not end-to-end authorization-preflight tests.
+No campaign-note access occurred. Permission-denied unreadability was not
+separately exercised. Logs remain in `.temp\t011-package-check\discovery.md`
+and `.temp\t011-package-check\missing-reference.md`; the disposable plugin
+was uninstalled using its isolated home. The repository reference and live
+plugin settings were unchanged.
+
+T002 readiness has passed; authorization verification is deferred pending a
+documented note-content-free interface. A proposed Resolver tool could accept
+an exact vault path and report whether it is allowed by the running server's
+active startup allow-list. It must not read campaign notes, resolve links,
+modify the allow-list, or grant access. It must return explicit
+authorized/not-authorized results and surface errors so verification fails
+closed. No such tool was exposed in the tested server. If implemented and
+documented, test the configured disposable root and an unconfigured directory,
+then update the skill to use that verified interface. Do not invent its name,
+arguments, or response schema in runtime guidance before it exists.
+
+At the user's subsequent explicit request, a separate functional link test
+resolved `[[Svalich Woods]]` with context `7. Argynvostholt.md` to
+`Locations/Svalich Woods.md` in the disposable vault. The result was
+`resolved`, with no note modifications. Evidence:
+`.temp\explicit-svalich-link-result.json`. This confirms that link case works;
+it does not satisfy the pre-access, note-content-free authorization requirement.
+
+T011 needs realistic DM-style installed-client scenarios, not only the
+prompt-constrained preflight smoke test already recorded. After T002 is
+resolved, exercise the documented successful and blocked workflows in a
+disposable vault, inspecting responses and note changes. Technical scenarios
+can be agent-driven; they do not all require a human DM or a real campaign.
+SC-004 is a separate human requirement: five DMs must take the informal
+walkthrough, with at least four distinguishing plugin-wide from vault-specific
+guidance. No such walkthrough or remaining end-to-end scenario evidence is
+available, so T011 remains deferred rather than passed.
+
 ### No-designated-guidance and knowledge boundaries
 
 No designated vault-local guidance is a valid state, not a missing-source

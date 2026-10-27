@@ -159,9 +159,14 @@ skill may report the issue and request the information needed to continue.
 Once the missing input or decision is resolved, it must re-establish the
 applicable context before proceeding.
 
-The dependency inventory is explicit but non-exhaustive. Each future required
-dependency must document its purpose and scope, compatible version/interface,
-user-owned setup, readiness check, and unavailable behavior. The official
+The dependency inventory is explicit but non-exhaustive. Add every future
+required dependency to the **Expected Runtime Dependencies** table in
+`specs/001-shared-vault-guidance/spec.md`, documenting its purpose and scope,
+compatible version/interface, user-owned setup, readiness check, authorization
+check when applicable, and unavailable behavior. Vault-facing skill
+instructions, `skills/README.md`, and the static source audit must refer to
+that authoritative table; do not maintain a divergent or duplicated
+dependency inventory. The official
 Obsidian documentation for [Aliases](https://obsidian.md/help/aliases),
 [Tags](https://obsidian.md/help/tags), [Internal
 links](https://obsidian.md/help/links), and
