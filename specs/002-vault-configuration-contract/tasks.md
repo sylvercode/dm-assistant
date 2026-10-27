@@ -23,7 +23,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 **Purpose**: Confirm the design-artifact scope and repository paths before story work.
 
-- [ ] T001 Record the design-only deliverables, current repository paths, and explicit Issue #4 runtime boundary in `specs/002-vault-configuration-contract/plan.md`.
+- [ ] T001 Record the design-only deliverables, current repository paths, explicit Issue #4 runtime boundary, and Spec 001 preflight/authorization boundary before profile or campaign-note access in `specs/002-vault-configuration-contract/plan.md`.
 
 ---
 
@@ -41,11 +41,11 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 **Goal**: Describe read-only use of an existing vault without requiring configuration, a prescribed layout, or migration.
 
-**Independent Test**: Review contract and scenarios for absent configuration, conventional/renamed/missing sections, root-level adventure candidates, and ambiguity. They must report evidence and uncertainty without creating or changing files, and inferred locations must not authorize edits.
+**Independent Test**: Review contract and scenarios for the Spec 001 preflight, including distinct dependency-readiness and vault-authorization checks, plus absent configuration, conventional/renamed/missing sections, root-level adventure candidates, and ambiguity. Blocked work must stop before profile or campaign-note access; inferred locations must not authorize edits.
 
-- [ ] T003 [US1] Define Spec 001 preflight as a prerequisite to profile/discovery access and absent-profile read-only discovery, conventional and renamed section candidates, ambiguity reporting, deterministic candidate selection, root-level adventure handling, and no-migration/no-creation safeguards in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`.
-- [ ] T004 [US1] Add design-only discovery scenarios for successful and blocked Spec 001 preflight, conventional, renamed, missing, and ambiguous sections, and root-level adventure candidates in `specs/002-vault-configuration-contract/quickstart.md`; assert no configuration, folders, or notes are created or changed.
-- [ ] T005 [US1] Verify the User Story 1 acceptance scenarios in `specs/002-vault-configuration-contract/spec.md` are traceable to the contract and quickstart without treating inference as edit authorization.
+- [ ] T003 [US1] Define the ordered Spec 001 preflight before reading `.dmassist.yaml` or campaign notes: establish the authorized vault, separately verify `obsidian-link-resolver`/`resolve_obsidian_link` readiness and explicit authorization of the intended vault, complete remaining guidance and campaign/group checks before campaign-note access, and prohibit profile-based authorization expansion; also define absent-profile read-only discovery and its no-migration/no-creation safeguards in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`.
+- [ ] T004 [US1] Add design-only scenarios for successful and blocked Spec 001 preflight, distinct resolver-readiness and vault-authorization failures, profile-based authorization escalation attempts, and post-preflight conventional, renamed, missing, ambiguous, and root-level adventure discovery in `specs/002-vault-configuration-contract/quickstart.md`; verify blocked workflows stop before profile or campaign-note access and discovery creates or changes no files.
+- [ ] T005 [US1] Verify the User Story 1 acceptance scenarios in `specs/002-vault-configuration-contract/spec.md` trace to the contract and quickstart, including preflight-before-access, separate resolver readiness and vault authorization, profile non-escalation, and failed-preflight stopping behavior without treating inference as edit authorization.
 
 **Checkpoint**: User Story 1 is independently reviewable as a read-only existing-vault contract.
 
@@ -55,11 +55,11 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 **Goal**: Define optional profile fields and the machine-readable schema for the normalized version-1 profile.
 
-**Independent Test**: Compare the written contract, data model, schema, and normalized-profile scenarios for minimal and customized profiles. Confirm field shapes and defaults agree, `preparation` omission resolves to `session_section`/`Preparation`, a present preparation object requires `mode` and rejects `{}`, schema validation accepts/rejects documented cases, and defaults do not mutate the instance.
+**Independent Test**: Compare the written contract, data model, schema, and scenarios for minimal and customized profiles. Confirm field shapes and defaults agree, `preparation` omission resolves to `session_section`/`Preparation`, a present preparation object requires `mode` and rejects `{}`, an absent default guidance candidate is optional, unavailable designated guidance pauses dependent work, configured template failures stop authoring without fallback, and schema validation does not mutate instances.
 
-- [ ] T006 [US2] Define each version-1 field's normalized type, required/optional status, default, and invalid outcome in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`; require integer `version: 1`, custom IDs matching `^[a-z][a-z0-9_]*$` without built-in collisions, custom section entries with exactly non-empty `path` and `description`, and present `preparation` objects with required `mode`.
+- [ ] T006 [US2] Define each version-1 field's normalized type, required/optional status, default, and invalid outcome in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`; require integer `version: 1`, custom IDs matching `^[a-z][a-z0-9_]*$` without built-in collisions, custom section entries with exactly non-empty `path` and `description`, present `preparation` objects with required `mode`, and distinguish absent optional default `.dmassist-guidance.md` from present unreadable/invalid/unavailable default or explicit guidance that blocks dependent work.
 - [ ] T007 [P] [US2] Create the Draft 2020-12 normalized-profile schema at provisional path `schemas/dmassist.schema.json`, requiring integer `version: 1`, rejecting unknown properties, enforcing non-empty strings and custom identifier constraints, requiring custom section `path` and `description`, expressing preparation conditionals, and documenting defaults as annotations only.
-- [ ] T008 [P] [US2] Document normalized profile entities, field types, requiredness/defaults, relationships, preparation mode rules, and schema-versus-runtime validation boundaries in `specs/002-vault-configuration-contract/data-model.md`.
+- [ ] T008 [P] [US2] Document normalized profile entities, field types, requiredness/defaults, relationships, preparation mode rules, Spec 001 preflight and authorization boundaries, default-guidance absence/failure semantics, and schema-versus-runtime validation boundaries in `specs/002-vault-configuration-contract/data-model.md`.
 - [ ] T009 [US2] Add future schema acceptance cases for minimal/customized profiles, types and unknown properties, custom identifiers, preparation conditionals, null/empty values, and annotation-only defaults in `specs/002-vault-configuration-contract/quickstart.md`.
 - [ ] T010 [US2] Verify `schemas/dmassist.schema.json` against the Draft 2020-12 meta-schema and representative valid/invalid normalized instances from `specs/002-vault-configuration-contract/quickstart.md`; confirm validation does not apply defaults or mutate instances and add no repository/runtime dependency.
 - [ ] T011 [US2] Document `schemas/dmassist.schema.json` as the current provisional source location and defer final installed-plugin placement, packaging, discovery, and runtime use to Issue #4 in `specs/002-vault-configuration-contract/plan.md`.
@@ -77,7 +77,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 - [ ] T012 [US3] Define all-or-nothing profile validation, actionable errors, deterministic resolution, required explicit section directories, no fallback on invalid profiles, and stale-input behavior in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`.
 - [ ] T013 [P] [US3] Specify safe vault-relative path syntax, canonicalization and symlink containment, pre-access boundary checks, and the distinction between schema string constraints and filesystem validation in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`.
 - [ ] T014 [P] [US3] Document validation states and Issue #4 ownership in `specs/002-vault-configuration-contract/data-model.md`; require every explicitly configured section directory to exist and pass boundary checks, reject the whole profile on failure, and keep path existence, readability, and symlink checks outside JSON Schema.
-- [ ] T015 [US3] Add separate future schema and Issue #4 integration scenarios for malformed YAML, duplicate keys, scalar normalization, explicit missing directories, unsafe paths/symlinks, unavailable validation, stale inputs, Spec 001 preflight enforcement, and unavailable default guidance in `specs/002-vault-configuration-contract/quickstart.md`.
+- [ ] T015 [US3] Add separate future schema and Issue #4 integration scenarios for malformed YAML, duplicate keys, scalar normalization, explicit missing directories, unsafe paths/symlinks, unavailable validation, stale inputs, blocked Spec 001 preflight, absent versus unavailable default guidance, and configured-template failures without silent fallback in `specs/002-vault-configuration-contract/quickstart.md`.
 - [ ] T016 [US3] Trace User Story 3 acceptance criteria and validation/path requirements in `specs/002-vault-configuration-contract/spec.md` to the contract and quickstart, preserving the boundary between normalized JSON Schema checks and parser/filesystem runtime checks.
 
 **Checkpoint**: User Story 3 documents safe outcomes without claiming the reader, validator integration, or filesystem behavior is implemented.
@@ -89,7 +89,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 **Purpose**: Keep project status accurate and verify artifacts together.
 
 - [ ] T017 [P] Update `README.md`, `docs/architecture.md`, and `docs/vault-guidance-brainstorm.md` to link to the proposed contract/schema while stating runtime support is not implemented.
-- [ ] T018 Review `specs/002-vault-configuration-contract/spec.md`, `specs/002-vault-configuration-contract/plan.md`, `specs/002-vault-configuration-contract/research.md`, `specs/002-vault-configuration-contract/data-model.md`, `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`, `schemas/dmassist.schema.json`, `specs/002-vault-configuration-contract/quickstart.md`, `README.md`, `docs/architecture.md`, and `docs/vault-guidance-brainstorm.md` for requirement coverage, consistent defaults, schema/runtime ownership, and proposal-versus-implementation language.
+- [ ] T018 Review `specs/002-vault-configuration-contract/spec.md`, `specs/002-vault-configuration-contract/plan.md`, `specs/002-vault-configuration-contract/research.md`, `specs/002-vault-configuration-contract/data-model.md`, `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`, `schemas/dmassist.schema.json`, `specs/002-vault-configuration-contract/quickstart.md`, `README.md`, `docs/architecture.md`, and `docs/vault-guidance-brainstorm.md` for requirement coverage, Spec 001 preflight and authorization boundaries, default-guidance failure behavior, consistent defaults, schema/runtime ownership, and proposal-versus-implementation language.
 
 ## Dependencies & Execution Order
 
@@ -102,13 +102,13 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 ### User Story Dependencies
 
-- **User Story 1 (P1)**: Depends on the foundation; otherwise independent.
-- **User Story 2 (P2)**: Depends on the foundation; profile contract/schema definitions precede schema scenarios and verification.
+- **User Story 1 (P1)**: Depends on the foundation; its preflight contract precedes discovery scenarios and traceability review.
+- **User Story 2 (P2)**: Depends on the foundation; profile contract/schema definitions precede schema scenarios and verification. Guidance and template runtime outcomes remain design scenarios, not runtime implementation.
 - **User Story 3 (P1)**: Depends on the foundation and the normalized-profile rules from User Story 2; its quickstart scenarios follow the contract/data-model rules.
 
 ### Parallel Opportunities
 
-- T003 and T004 may proceed in parallel after T002 because they edit distinct files and document the same agreed discovery behavior.
+- T003 follows T002; T004 follows T003 so scenarios use the agreed preflight contract; T005 follows T003 and T004.
 - T007 and T008 may proceed in parallel after T002 because they edit distinct artifacts.
 - T013 and T014 may proceed in parallel after T012's validation contract is established, provided edits are limited to their distinct files.
 - T017 may proceed independently of the user-story artifacts; T018 waits for all desired story and status updates.
