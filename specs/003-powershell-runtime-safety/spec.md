@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Use issue 4 as input and create number 003 spec since 001 and 002 are in creation in another worktree."
+**Input**: User description: "Spec 001 and 002 are completed. Check if this influences current spec 003."
 
 ## Clarifications
 
@@ -17,23 +17,25 @@
 - Q: Which operating systems must future script-backed workflows support? → A: Windows, macOS, and Linux where the required PowerShell runtime and add-ons are available.
 - Q: May script-backed workflows send usage or diagnostic telemetry off the user's device? → A: No; do not send usage or diagnostic telemetry off-device.
 - Q: What information should every script-backed operation return so another workflow can reliably interpret its outcome? → A: Return the operation, completion status and code, changed and unchanged targets, remaining work, and any error details.
+- Q: How should workflow behavior reconcile uncertain folder mappings when no vault profile exists? → A: Continue read-only using the most likely candidate, label it as inferred, and stop if uncertainty affects conclusions or the next action.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Run a Script-Backed Workflow Safely (Priority: P1)
 
-A Dungeon Master starts a script-backed workflow and needs to know that the environment is supported before any operation touches campaign files. If the PowerShell runtime (the program that runs the workflow's scripts) or a required add-on is absent or unsupported, the workflow explains the prerequisite and stops without changing the vault.
+A Dungeon Master starts a script-backed workflow and needs to know that the environment and declared dependencies are ready before any operation reads or changes campaign files. If the PowerShell runtime (the program that runs the workflow's scripts), a required add-on, the Obsidian Link Resolver, or authorization for the exact vault is missing or unsupported, the workflow explains the prerequisite and stops before note access.
 
 **Why this priority**: A predictable runtime is the foundation for all later mechanical workflows. Failing closed protects campaign material and gives the user a clear next step.
 
-**Independent Test**: Review the published supported-environment and prerequisite guidance, install the plugin without PowerShell, then run a representative operation with each documented supported environment and with a missing or unsupported prerequisite. Confirm supported runs proceed, blocked runs explain the missing prerequisite, and no blocked run changes vault files or installs or upgrades a prerequisite.
+**Independent Test**: Review the published supported-environment and prerequisite guidance, install the plugin without PowerShell, then run a representative operation with each documented supported environment and with a missing or unsupported runtime, module, declared dependency, or exact-vault authorization. Confirm supported runs proceed, blocked runs explain the missing prerequisite and do not read or change notes, and no prerequisite is installed or upgraded automatically.
 
 **Acceptance Scenarios**:
 
 1. **Given** Windows, macOS, or Linux with all required components, including a validator compatible with the published JSON Schema dialect when configuration is used, **When** the user starts a script-backed operation, **Then** the platform is supported and the operation passes its prerequisite check. A platform where the required components cannot be supported reliably is explicitly identified as unsupported.
-2. **Given** a missing or unsupported runtime or required module, **When** the user starts a script-backed operation, **Then** the user receives a specific prerequisite message, no prerequisite is installed or upgraded automatically, and no vault content is changed.
+2. **Given** a missing or unsupported runtime, required module, declared runtime dependency, or exact-vault authorization, **When** the user starts a script-backed operation, **Then** the user receives a specific prerequisite message, no campaign notes are read or changed, and no prerequisite is installed or upgraded automatically.
 3. **Given** a blocked scripted operation, **When** the assistant can still help without the script, **Then** that independent read-only assistance remains available.
 4. **Given** a new release of the script-backed workflows, **When** the project publishes its supported-environment guidance, **Then** the guidance identifies the latest stable versions selected, the exact versions and selection date, and how to obtain the runtime and each add-on; repeatability and failure behavior are checked in every supported environment, and installing the plugin itself does not require the runtime.
+5. **Given** a vault-facing skill invokes a script-backed operation, **When** the operation would access campaign notes, **Then** the skill first completes the ordered pre-note checks from feature 001, including loading the bundled shared reference, any designated vault-local guidance, and the relevant campaign/group context.
 
 ---
 
@@ -51,6 +53,8 @@ A Dungeon Master needs a script-backed operation to act on the intended vault an
 2. **Given** a target path that escapes the authorized vault through traversal or a symbolic link, **When** the user starts an operation, **Then** the operation is refused before accessing or changing the out-of-bound target.
 3. **Given** a missing or ambiguous vault target, **When** the user starts an operation, **Then** the operation reports the issue instead of assuming the plugin directory or creating vault folders.
 4. **Given** an inspection operation, **When** it completes, **Then** campaign files remain unchanged.
+5. **Given** a vault-facing operation requires the Obsidian Link Resolver, **When** the active session lacks compatible `obsidian-link-resolver` version `2.0.0` or later, the `resolve_obsidian_link` tool, or a note-content-free signal that the exact vault is authorized, **Then** the operation stops before accessing campaign notes; tool availability alone does not establish vault authorization.
+6. **Given** an operation loads a plugin-owned shared resource or profile-validation artifact, **When** the plugin is installed and the process starts in a different working directory, **Then** the resource is located through the installed plugin resource mechanism rather than a source checkout, vault path, or current-directory assumption.
 
 ---
 
@@ -86,28 +90,32 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 **Acceptance Scenarios**:
 
 1. **Given** no `.dmassist.yaml` exists at the authorized vault root, **When** a workflow requests configuration-dependent discovery, **Then** it follows the separate configuration contract's read-only discovery behavior and creates no profile, folder, or note.
-2. **Given** a profile contains malformed or unsupported YAML, duplicate keys, an absent, invalid, or unsupported version, unknown fields, explicit nulls, or values rejected by the published profile schema, **When** a workflow loads the profile, **Then** it reports a clear validation error and does not use the profile. YAML aliases or merge keys are accepted only when supported by the selected reader and the resolved profile passes schema validation.
-3. **Given** a supported YAML string, boolean, numeric, or date/time scalar is used for a string-valued setting, **When** the profile is normalized, **Then** it becomes a non-empty string using a locale-independent representation, booleans use lowercase text, dates and timestamps use ISO 8601, collection values and nulls are rejected, and the version remains integer `1`.
-4. **Given** a syntactically valid profile normalizes successfully, **When** the workflow validates it, **Then** the version-1 JSON Schema is applied to the normalized profile, documented defaults are applied only for omitted settings, and schema default annotations do not mutate or fill the profile by themselves.
-5. **Given** an explicitly configured built-in or custom section folder is missing, **When** the profile is validated, **Then** the entire profile is rejected without creating the folder or falling back to discovery; omitted conventional folders remain optional discovery candidates.
-6. **Given** a configured profile path, party note, preparation location, or custom section path is relative to the vault, **When** its final destination is resolved, **Then** traversal and symbolic links are checked and any destination outside the authorized vault is refused before access. Shared or nested section mappings remain valid, but an unresolved classification or destination is referred to the Dungeon Master.
-7. **Given** an explicitly configured guidance file or template is needed but is missing, unreadable, or invalid, **When** the workflow requests it, **Then** the workflow reports the failure and does not silently skip it or substitute another source; an absent optional default guidance candidate does not by itself invalidate the profile.
-8. **Given** the same profile and referenced vault content are unchanged, **When** separate operations resolve the profile, **Then** they produce the same settings and vault boundaries.
-9. **Given** the profile or a referenced guidance file, template, or path changes during an operation that depends on it, **When** the change is detected, **Then** that operation stops, reports the change, and requires revalidation before retrying without mixing old and new inputs.
-10. **Given** an explicitly configured party note, preparation location, section folder, guidance file, or template is needed, **When** the workflow checks that reference, **Then** it verifies existence, readability, and the expected file or folder type and stops dependent work if the reference is invalid rather than selecting a substitute.
+2. **Given** no profile exists and more than one section location is plausible, **When** read-only discovery runs, **Then** it selects the most likely candidate, reports that choice as inferred with alternatives and reason, and continues only while the uncertainty does not affect conclusions or the next action.
+3. **Given** a profile contains malformed or unsupported YAML, duplicate keys, an absent, invalid, or unsupported version, unknown fields, explicit nulls, or values rejected by the published profile schema, **When** a workflow loads the profile, **Then** it reports a clear validation error and does not use the profile. YAML aliases or merge keys are accepted only when supported by the selected reader and the resolved profile passes schema validation.
+4. **Given** a supported YAML string, boolean, numeric, or date/time scalar is used for a string-valued setting, **When** the profile is normalized, **Then** it becomes a non-empty string using a locale-independent representation, booleans use lowercase text, dates and timestamps use ISO 8601, collection values and nulls are rejected, and the version remains integer `1`.
+5. **Given** a syntactically valid profile normalizes successfully, **When** the workflow validates it, **Then** the version-1 JSON Schema is applied to the normalized profile, documented defaults are applied only for omitted settings, and schema default annotations do not mutate or fill the profile by themselves.
+6. **Given** an explicitly configured built-in or custom section folder is missing, **When** the profile is validated, **Then** the entire profile is rejected without creating the folder or falling back to discovery; omitted conventional folders remain optional discovery candidates.
+7. **Given** a configured profile path, party note, preparation location, or custom section path is relative to the vault, **When** its final destination is resolved, **Then** traversal and symbolic links are checked and any destination outside the authorized vault is refused before access. Shared or nested section mappings remain valid, but an unresolved classification or destination is referred to the Dungeon Master.
+8. **Given** an explicitly configured guidance file or template is needed but is missing, unreadable, or invalid, **When** the workflow requests it, **Then** the workflow reports the failure and does not silently skip it or substitute another source; an absent optional default guidance candidate does not by itself invalidate the profile.
+9. **Given** the same profile and referenced vault content are unchanged, **When** separate operations resolve the profile, **Then** they produce the same settings and vault boundaries.
+10. **Given** the profile or a referenced guidance file, template, or path changes during an operation that depends on it, **When** the change is detected, **Then** that operation stops, reports the change, and requires revalidation before retrying without mixing old and new inputs.
+11. **Given** an explicitly configured party note, preparation location, section folder, guidance file, or template is needed, **When** the workflow checks that reference, **Then** it verifies existence, readability, and the expected file or folder type and stops dependent work if the reference is invalid rather than selecting a substitute.
 
 ### Edge Cases
 
 - The PowerShell runtime (the program that runs scripts) is installed but outside the supported versions, or a required add-on is absent or unsupported.
 - The target vault is unspecified, unclear, unreadable, or points to the plugin installation rather than a user-authorized vault.
-- A path uses `..` to move above the vault folder, or a link to another location (symbolic link), to resolve outside the vault.
+- A configured path is absolute, uses a backslash, drive or URI syntax, contains a wildcard or control character, or includes `.` or `..` path components.
+- A path uses a symbolic link to resolve outside the vault, or a link inside the vault is valid but must still be checked against the canonical vault boundary.
 - The starting folder changes, is unavailable, or differs from the vault and plugin locations.
 - A note changes between preview and write, or a multi-note operation fails after processing only some targets.
 - A multi-note write fails after at least one successful change; completed changes must be reported accurately and must not be silently undone.
 - Markdown notes (plain-text files used for vault content) use different text encodings (saved character representations) or line endings, or contain text that resembles shell commands.
 - An error report could expose campaign content by including full note text or supplied paths unnecessarily.
 - The configuration profile contains YAML merge/alias syntax, duplicate keys, ambiguous date-like scalars, explicit nulls, or scalar values whose parsed types differ from their declared setting types.
-- The profile is structurally valid but references a missing configured folder, unreadable guidance, or invalid template.
+- The profile is structurally valid but references a missing configured folder, unreadable designated guidance, or invalid template.
+- The Obsidian Link Resolver is available but the authorized-vault roots do not include the exact established vault, or exact-vault authorization cannot be checked without reading note content.
+- The bundled schema is missing from the installed plugin, differs from the published Draft 2020-12 artifact, or cannot be loaded from a non-default working directory.
 - A profile or referenced file changes after validation but before its dependent operation completes.
 - Multiple configured section mappings overlap and a note's classification or operation destination cannot be determined from the profile.
 
@@ -115,13 +123,13 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 
 ### Functional Requirements
 
-- **FR-001**: The project MUST support Windows, macOS, and Linux for script-backed workflows when the required runtime and add-ons are available and can be supported reliably. It MUST document the supported operating environments and prerequisites for each; any excluded environment MUST be identified as unsupported.
-- **FR-002**: For each project release, the project MUST identify the latest stable PowerShell runtime and required add-ons, including `powershell-yaml` for reading YAML (a human-readable settings format) and a validator compatible with the published JSON Schema dialect. It MUST record their exact versions and the date those versions were selected.
+- **FR-001**: The project MUST support Windows, macOS, and Linux for script-backed workflows when required prerequisites are available and can be supported reliably. It MUST document the supported operating environments and prerequisites for each; any excluded environment MUST be identified as unsupported.
+- **FR-002**: For each project release, the project MUST identify the latest stable PowerShell runtime and the prerequisite add-ons needed by script-backed workflows, and record their exact versions and selection date.
 - **FR-003**: The project MUST document how users obtain the prerequisites for supported environments without automatically installing or upgrading them during a workflow.
-- **FR-004**: Before a script-backed operation runs, the system MUST verify that the required runtime and modules are available at supported versions. If a prerequisite is missing or unsupported, it MUST explain what is needed and stop that operation before any vault edits.
+- **FR-004**: Before a script-backed operation runs, the system MUST verify that the required runtime and modules are available at supported versions. Before a vault-facing operation accesses campaign notes, the invoking skill MUST complete the ordered pre-note checks and verify every declared dependency for readiness and authorization to the exact vault, as defined by feature 001. The initial dependency includes `obsidian-link-resolver` version `2.0.0` or later with `resolve_obsidian_link`; server or tool availability alone MUST NOT be treated as proof that the exact vault is authorized. If a prerequisite or authorization check is missing, incompatible, or inconclusive, the operation MUST explain what is needed and stop before reading or changing campaign notes. Until feature 001 defines a documented note-content-free authorization signal, all vault-facing scripted operations are expected to stop at that authorization gate.
 - **FR-005**: Installing the current plugin scaffold MUST NOT require PowerShell; only future script-backed workflows require the documented runtime.
 - **FR-006**: Each operation MUST receive the vault, campaign/group, and requested operation explicitly and MUST select the same target regardless of the user's starting folder.
-- **FR-007**: The system MUST check the final destination of every supplied path, including paths that use `..` or links to another location, against the user-authorized vault folder. It MUST refuse missing or unclear targets rather than assuming the plugin directory is the vault or creating unrequested folders.
+- **FR-007**: The system MUST check every supplied or configured path against the user-authorized vault. Configured paths MUST use `/` separators and MUST be relative; the system MUST reject absolute paths, leading `/`, backslashes, drive or URI syntax, NUL/control characters, wildcards, and `.` or `..` path components. It MUST NOT expand environment variables, home directories, Obsidian links, or other path expressions. Before access, it MUST resolve each path to its final location, including symbolic links, and verify that location stays inside the authorized vault using folder-boundary-aware checks (not simple string prefix checks). Symbolic links that still resolve inside the vault are allowed. It MUST refuse missing or unclear vault targets rather than assuming the plugin directory is the vault or creating unrequested folders.
 - **FR-008**: Paths and campaign content MUST be treated only as data, not as instructions to run or text to combine with commands. The system MUST NOT change or bypass operating-system script-running policies, user permissions, or security software to enable an operation.
 - **FR-009**: Inspection operations MUST be read-only by default.
 - **FR-010**: The system MUST return results in a consistent, labeled format that other tools can read, using the same fields and order for every operation: operation, completion status, completion code (a value other tools can use to recognize success or failure), changed targets, unchanged targets, remaining work, and error details when present. Errors MUST be clear, and incomplete work MUST NOT be described as fully complete.
@@ -130,31 +138,36 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - **FR-013**: Writes MUST preserve existing Markdown text, formatting, and text encoding (the saved representation of characters) except for the requested change.
 - **FR-014**: Error reports and logs MUST avoid unnecessary campaign content and remain on the user's device. Script-backed workflows MUST NOT send usage or diagnostic telemetry off-device.
 - **FR-015**: Before script-backed operations are relied upon, the project MUST test repeatability and failure behavior in every supported environment.
-- **FR-016**: The runtime MUST load the optional `.dmassist.yaml` profile only from the root of the explicitly authorized vault. If the profile is absent, dependent discovery MUST remain read-only and MUST NOT create a profile, folder, or note.
-- **FR-017**: The runtime MUST reject malformed or unsupported YAML, duplicate mapping keys, an absent, invalid, or unsupported profile version, unknown fields, explicit nulls, and invalid values with a clear error before using the profile.
+- **FR-016**: The runtime MUST load the optional `.dmassist.yaml` profile only from the root of the explicitly authorized vault. If the profile is absent, dependent discovery MUST follow the feature 002 read-only discovery contract and MUST NOT create a profile, folder, or note. If a profile is present but invalid, the runtime MUST report the error rather than falling back to unconfigured discovery for profile-dependent work.
+- **FR-017**: The runtime MUST reject malformed or unsupported YAML, duplicate mapping keys, an absent, invalid, or unsupported profile version, unknown fields, explicit nulls, and invalid values with a clear error before using the profile. YAML aliases and merge keys MAY be used only when supported by the selected reader and the resolved profile passes schema validation.
 - **FR-018**: The runtime MUST normalize supported YAML string, boolean, numeric, and date/time scalar values for string-valued profile settings to non-empty strings using locale-independent representations; booleans MUST use lowercase text and dates or timestamps MUST use ISO 8601. It MUST reject null and collection values for string fields and preserve the profile version as integer `1`.
-- **FR-019**: The runtime MUST validate the normalized version-1 profile against the published JSON Schema. It MUST apply contract defaults only to omitted settings; JSON Schema default annotations MUST NOT be treated as applying or mutating those values.
+- **FR-019**: The runtime MUST validate the normalized version-1 profile against the published profile-validation artifact from feature 002. It MUST apply contract defaults only to omitted settings; validation metadata defaults MUST NOT be treated as applying or mutating those values.
 - **FR-020**: The runtime MUST require every explicitly configured built-in or custom section directory to exist and MUST reject the entire profile if one is missing. Omitted conventional default directories MUST remain optional discovery candidates; validation MUST NOT create directories or fall back from an invalid explicit mapping.
-- **FR-021**: Every configured path, including party note, preparation location, section, custom section, guidance, and template paths, MUST be resolved relative to the authorized vault and checked after traversal and symbolic-link resolution. Any target outside the vault MUST be refused before access or modification.
+- **FR-021**: Every configured path, including party note, preparation location, section, custom section, guidance, and template paths, MUST be resolved relative to the authorized vault and checked after canonicalization and symbolic-link resolution using a component-aware boundary check. Any target outside the vault MUST be refused before access or modification; symbolic links resolving within the vault are allowed. The boundary MUST be rechecked before every access.
 - **FR-022**: The runtime MUST permit shared or nested section mappings without treating overlap alone as invalid. When an operation cannot determine a note's classification or destination from overlapping mappings, it MUST stop and ask the Dungeon Master.
-- **FR-023**: When an explicitly configured guidance file or template is needed but is missing, unreadable, or invalid, the runtime MUST report the error and stop the dependent operation without silently skipping the source or substituting another. An absent optional default guidance candidate MUST NOT by itself invalidate the profile.
+- **FR-023**: When an explicitly configured or DM-designated guidance file is needed but is missing, unreadable, or invalid, the runtime MUST report the error and stop dependent work before campaign-note access without silently skipping or substituting the source. When no local guidance is designated, its absence MUST NOT invalidate the profile; after other pre-note checks pass, only a specific, read-only lookup that does not rely on uncertain folder or note-role mappings may proceed, as specified by feature 001. An explicitly configured template that is missing, unreadable, or invalid MUST stop article creation without substituting a plugin default; if neither an override nor a plugin default exists, the workflow MUST report that no template is available and ask the DM how to proceed.
 - **FR-024**: The runtime MUST resolve unchanged profile and referenced vault state deterministically. If the profile or a referenced guidance file, template, or path changes during a dependent operation, the runtime MUST stop that operation, report the change, and require revalidation before retrying; it MUST NOT automatically retry or combine old and new inputs.
 - **FR-025**: Before a dependent operation uses an explicitly configured party note, preparation location, section folder, guidance file, or template, the runtime MUST verify that the target exists, is readable, and has the expected file or folder type. If the target is unavailable or invalid, it MUST report the problem and stop dependent work without silently selecting a substitute.
 - **FR-026**: If a multi-note write fails after one or more notes have been changed, the operation MUST stop without attempting remaining notes or automatically undoing completed changes. It MUST report partial completion and identify exactly which notes changed and which did not.
+- **FR-027**: Every vault-facing skill that invokes a script-backed operation affecting campaign material MUST complete the ordered pre-note sequence defined by feature 001 before note access: establish the authorized vault; verify readiness and exact-vault authorization for every declared dependency; load the plugin-owned shared reference and any designated local guidance; establish campaign/group and player-facing output context; then access only relevant notes. An absent, unreadable, or inconclusive prerequisite MUST stop dependent work before note access. Script execution MUST NOT be treated as proof that the assistant loaded shared guidance.
+- **FR-028**: The runtime MUST load the published profile-validation artifact through its installed plugin resource location, independently of the current working directory. It MUST verify that the installed workflow loads the same artifact that defines the active profile contract; a source-tree, vault, or current-directory path MUST NOT be used as fallback.
 
 **Acceptance Coverage**:
 
 - FR-001–FR-005: User Story 1, scenarios 1–4.
-- FR-006–FR-009: User Story 2, scenarios 1–4.
+- FR-006–FR-007 and FR-009: User Story 2, scenarios 1–6.
+- FR-008: User Story 3, scenario 6.
 - FR-010–FR-014 and FR-026: User Story 3, scenarios 1–8.
 - FR-015: User Story 1, scenarios 1 and 4.
-- FR-016–FR-025: User Story 4, scenarios 1–10.
+- FR-016–FR-025: User Story 4, scenarios 1–11.
+- FR-027–FR-028: User Stories 1 and 2, scenario 5 and 6.
 
 **Configuration Contract Boundary**:
 
 - Feature 002 owns the profile's field definitions, defaults, optionality, read-only discovery selection policy, machine-readable schema artifact and schema/contract consistency, custom-field semantics, and other contract behavior that does not depend on runtime or filesystem access.
 - This feature owns the runtime work explicitly delegated by feature 002: YAML parsing and normalization, duplicate-key rejection, applying schema validation, verifying configured paths and referenced files, deterministic resolution, and revalidation when inputs change.
 - The delegated runtime requirements correspond to feature 002 FR-010–FR-011, FR-013, FR-015–FR-017, FR-019–FR-021, and the runtime-specific boundary in FR-024, plus the schema-validation operation from FR-022. They are covered by this feature's FR-016–FR-025. Feature 002's contract and schema artifacts remain authoritative for configuration semantics outside this runtime scope.
+- Feature 001 owns the shared reference content, skill inventory, and pre-note workflow policy. This feature owns the runtime dependency and authorization checks and requires script-backed callers to follow that pre-note sequence; scripts do not prove that the assistant loaded the reference.
 
 ### Key Entities
 
@@ -166,6 +179,7 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - **Vault Configuration Profile**: The optional `.dmassist.yaml` settings document at the authorized vault root.
 - **Normalized Profile**: The settings produced after supported YAML scalars are converted to the published version-1 schema's expected types and values.
 - **Configured Reference**: A vault-relative section, guidance, party, or template path whose final destination and required existence/readability are checked before use.
+- **Declared Runtime Dependency**: A dependency in feature 001's authoritative inventory that must be ready and authorized for the exact vault before a vault-facing workflow reads campaign notes.
 
 ## Success Criteria *(mandatory)*
 
@@ -181,12 +195,16 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - **SC-008**: Every supported environment passes repeatability checks showing the same read-only request returns the same result, and missing-prerequisite and operation-failure checks produce the expected message without unintended vault changes.
 - **SC-009**: 100% of tested malformed YAML, duplicate-key, invalid-version, unknown-field, null, and schema-invalid profiles are rejected before their settings are used.
 - **SC-010**: 100% of tested supported scalar values normalize to the specified locale-independent representation, while null and collection values for string fields and non-integer version values are rejected.
-- **SC-011**: 100% of tested normalized profiles are validated against the published version-1 schema; omitted defaults follow the written contract and schema annotations alone do not alter profile values.
+- **SC-011**: 100% of tested normalized profiles are validated against the published version-1 profile-validation artifact; omitted defaults follow the written contract and validation metadata alone does not alter profile values.
 - **SC-012**: 100% of tested explicitly configured missing section directories reject the entire profile without creating folders or falling back to discovery, while omitted conventional directories remain optional.
 - **SC-013**: 100% of tested traversal and symbolic-link escapes across section, guidance, and template paths are refused before out-of-vault access or modification; valid shared or nested mappings remain accepted, with unresolved destinations escalated to the Dungeon Master.
 - **SC-014**: 100% of tested missing, unreadable, or invalid explicitly configured guidance and templates stop the dependent operation without silent omission or substitution; an absent optional default guidance candidate does not reject the profile.
 - **SC-015**: 100% of tested changes to a profile or referenced guidance, template, or path during a dependent operation stop the operation and require revalidation; unchanged inputs resolve to equivalent settings and vault boundaries.
 - **SC-016**: 100% of tested explicitly configured party notes, preparation locations, section folders, guidance files, and templates are checked for existence, readability, and expected file or folder type before use; invalid references stop dependent work without substitution.
+- **SC-017**: In 100% of tested vault-facing skill invocations, campaign notes are not accessed unless every dependency in feature 001's authoritative inventory is ready and authorized for the exact vault and the ordered pre-note checks have succeeded; resolver presence alone never counts as proof of vault authorization.
+- **SC-018**: 100% of tested configured paths containing an absolute form, unsupported separator, drive or URI syntax, control character, wildcard, or `.`/`..` component are rejected before access; valid in-vault symbolic links are accepted only after canonical, component-aware boundary verification.
+- **SC-019**: The installed workflow loads the same published profile-validation artifact from at least two different working directories, and missing or incompatible packaged validation data stops profile-dependent work before settings are used.
+- **SC-020**: In 100% of tested multi-note failures, the operation stops at the first failed write, leaves prior successful writes intact, does not attempt later notes or rollback, and reports exact changed and unchanged note sets.
 
 ## Assumptions
 
@@ -195,3 +213,4 @@ A Dungeon Master may use an optional vault configuration profile to identify exi
 - The user designates the vault through workspace context or explicit input; the plugin installation is never a fallback vault.
 - Supported operating environments and provisioning guidance are finalized during planning before any script-backed workflow is implemented.
 - Inspection remains available as read-only assistance when a scripted operation is blocked by missing prerequisites.
+- Until feature 001 defines and delivers a note-content-free exact-vault authorization signal, vault-facing scripted operations are expected to stop before campaign-note access and report that authorization could not be proven.
