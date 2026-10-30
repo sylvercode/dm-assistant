@@ -39,10 +39,14 @@ function Get-DmRuntimeEnvironment {
     Reads no environment variables or vault content.
     #>
     $os = if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'macOS' } elseif ($IsLinux) { 'Linux' } else { 'Unknown' }
+    $rawVersion = [string]$PSVersionTable.PSVersion
+    $gitCommitId = [string]$PSVersionTable.GitCommitId
+    $isPrerelease = $rawVersion.Contains('-') -or $gitCommitId -match '(?i)-(?:preview|alpha|beta|rc)(?:[.-]|$)'
     [pscustomobject][ordered]@{
-        powerShellVersion = [version]$PSVersionTable.PSVersion.ToString().Split('-')[0]
+        powerShellVersion = [version]$rawVersion.Split('-')[0]
         edition           = [string]$PSVersionTable.PSEdition
         operatingSystem   = $os
+        isPrerelease      = $isPrerelease
     }
 }
 
@@ -55,6 +59,24 @@ function Get-DmInstalledModuleVersion {
     #>
     param([Parameter(Mandatory)][string]$Name)
     @(Get-Module -ListAvailable -Name $Name -ErrorAction SilentlyContinue | ForEach-Object { $_.Version.ToString() })
+}
+
+function Test-DmRequiredModuleImport {
+    <#
+    .SYNOPSIS
+    Imports the exact required module version to verify it is loadable.
+    .PARAMETER Name
+    Required PowerShell module name.
+    .PARAMETER Version
+    Exact required module version.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][version]$Version)
+    $loaded = @(Get-Module -Name $Name -ErrorAction SilentlyContinue | Where-Object { $_.Version -eq $Version })
+    if ($loaded.Count -gt 0) { return $true }
+    $null = Import-Module -Name $Name -RequiredVersion $Version -PassThru -ErrorAction Stop
+    $loaded = @(Get-Module -Name $Name -ErrorAction SilentlyContinue | Where-Object { $_.Version -eq $Version })
+    $loaded.Count -gt 0
 }
 
 function Test-DmRuntimePrerequisite {
@@ -99,7 +121,10 @@ function Test-DmRuntimePrerequisite {
         return (& $block "Operating system '$os' is not supported; supported: $($support.operatingSystems -join ', ')." ([ordered]@{ requirement = 'operatingSystem'; observed = $os }))
     }
 
-    $psSupported = $null -ne $version -and $version -eq $support.powerShellVersion -and $edition -ceq $support.edition
+    $isPrerelease = $false
+    $prereleaseProperty = $environment.PSObject.Properties['isPrerelease']
+    if ($null -ne $prereleaseProperty) { $isPrerelease = [bool]$prereleaseProperty.Value }
+    $psSupported = $null -ne $version -and $version -eq $support.powerShellVersion -and $edition -ceq $support.edition -and -not $isPrerelease
     $observedPs = "$edition $version"
     $evidence.Add((New-DmEvidence -Gate $gate -Subject 'powershell' -State $(if ($psSupported) { 'supported' } else { 'unsupported' }) -Detail $observedPs))
     if (-not $psSupported) {
@@ -110,10 +135,16 @@ function Test-DmRuntimePrerequisite {
     foreach ($module in $support.modules) {
         $available = @()
         try { $available = @(Get-DmInstalledModuleVersion -Name $module.name) } catch { $available = @() }
-        $present = $module.version -cin @($available | ForEach-Object { [string]$_ })
+        $versionAvailable = $module.version -cin @($available | ForEach-Object { [string]$_ })
+        $importable = $false
+        if ($versionAvailable) {
+            try { $importable = Test-DmRequiredModuleImport -Name $module.name -Version ([version]$module.version) }
+            catch { $importable = $false }
+        }
+        $present = $versionAvailable -and $importable
         $evidence.Add((New-DmEvidence -Gate $gate -Subject $module.name -State $(if ($present) { 'supported' } else { 'missing' }) -Detail ($available -join ', ')))
         if (-not $present) {
-            return (& $block "Required module $($module.name) $($module.version) is not available." `
+            return (& $block "Required module $($module.name) $($module.version) is unavailable or could not be imported." `
                     ([ordered]@{ requirement = 'module'; module = $module.name; required = $module.version }))
         }
     }
@@ -197,7 +228,8 @@ function Invoke-DmPreflight {
     param([Parameter(Mandatory)][AllowNull()][AllowEmptyString()]$Request)
 
     $operationField = Get-DmRequestField -Request $Request -Name 'operation'
-    $operation = if ($operationField -is [string]) { $operationField } else { '' }
+    $operationRegistration = if ($operationField -is [string]) { Get-DmOperation -Name $operationField } else { $null }
+    $operation = if ($null -ne $operationRegistration) { [string]$operationField } else { 'unknown' }
     $vaultRootField = Get-DmRequestField -Request $Request -Name 'vaultRoot'
     $vaultRoot = if ($vaultRootField -is [string]) { $vaultRootField } else { '' }
     $targets = Get-DmRequestTarget -Request $Request

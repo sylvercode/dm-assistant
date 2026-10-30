@@ -106,6 +106,15 @@ Describe 'RuntimePreflight production gate' {
             Should -Invoke -ModuleName DependencyPreflight -CommandName Get-DmDependencyReadiness -Times 0 -Exactly -Scope It
         }
 
+        It 'rejects a prerelease with the supported PowerShell version number' {
+            Mock -ModuleName RuntimePreflight -CommandName Get-DmRuntimeEnvironment -MockWith {
+                [pscustomobject]@{ powerShellVersion = [version]'7.6.9'; edition = 'Core'; operatingSystem = 'Windows'; isPrerelease = $true }
+            }
+            Set-TestDependencyReadiness -State ready
+            Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code 'PREREQUISITE_MISSING' -Targets $targets
+            Should -Invoke -ModuleName DependencyPreflight -CommandName Get-DmDependencyReadiness -Times 0 -Exactly -Scope It
+        }
+
         It 'returns PREREQUISITE_MISSING on unsupported operating system <Os>' -ForEach @(
             @{ Os = 'macOS' }, @{ Os = 'Linux' }, @{ Os = 'Unknown' }
         ) {
@@ -117,15 +126,27 @@ Describe 'RuntimePreflight production gate' {
         }
 
         It 'returns PREREQUISITE_MISSING when powershell-yaml is <Case>' -ForEach @(
-            @{ Case = 'missing'; Versions = @() }
-            @{ Case = 'a different version'; Versions = @('0.4.7') }
-            @{ Case = 'a newer version only'; Versions = @('0.4.13') }
+            @{ Case = 'missing'; Versions = @(); Importable = $false }
+            @{ Case = 'a different version'; Versions = @('0.4.7'); Importable = $false }
+            @{ Case = 'a newer version only'; Versions = @('0.4.13'); Importable = $false }
+            @{ Case = 'present but broken'; Versions = @('0.4.12'); Importable = $false }
         ) {
             Mock -ModuleName RuntimePreflight -CommandName Get-DmInstalledModuleVersion -MockWith { $Versions }
+            Mock -ModuleName RuntimePreflight -CommandName Test-DmRequiredModuleImport -MockWith { [bool]$Importable }
             Set-TestDependencyReadiness -State ready
             $outcome = Invoke-DmPreflight -Request $request
             Assert-BlockedResult -Outcome $outcome -Code 'PREREQUISITE_MISSING' -Targets $targets
             $outcome.result.errorDetails.details.module | Should -Be 'powershell-yaml'
+        }
+
+        It 'uses unknown and omits unregistered operation values in blocked results' {
+            Set-TestDependencyReadiness -State ready
+            $unsafeOperation = 'C:\private\synthetic note.md'
+            $req = New-TestOperationRequest -VaultRoot $fixture.Root -Targets $targets -Extra @{ operation = $unsafeOperation }
+            $outcome = Invoke-DmPreflight -Request $req
+            $outcome.operation | Should -BeExactly 'unknown'
+            $outcome.result.operation | Should -BeExactly 'unknown'
+            ($outcome | ConvertTo-Json -Depth 8) | Should -Not -Match ([regex]::Escape($unsafeOperation))
         }
 
         It 'returns PREREQUISITE_MISSING when a declared dependency is <State>' -ForEach @(

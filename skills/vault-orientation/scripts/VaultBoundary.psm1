@@ -14,6 +14,285 @@ Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultPathValidati
 $script:DmMaxLinkHops = 40
 $script:DmSeparator = [System.IO.Path]::DirectorySeparatorChar
 
+if ($null -eq ('DmAssistant.IO.DirectoryLease' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+namespace DmAssistant.IO
+{
+    public sealed class UnsafePathException : IOException
+    {
+        public UnsafePathException() : base("The opened target is a reparse point.") { }
+    }
+
+    public sealed class FileSnapshot
+    {
+        public byte[] Bytes { get; private set; }
+        public string FinalPath { get; private set; }
+
+        public FileSnapshot(byte[] bytes, string finalPath)
+        {
+            Bytes = bytes;
+            FinalPath = finalPath;
+        }
+    }
+
+    public sealed class DirectoryLease : IDisposable
+    {
+        private const uint FileReadData = 0x1;
+        private const uint FileReadAttributes = 0x80;
+        private const uint Delete = 0x00010000;
+        private const uint ShareRead = 0x1;
+        private const uint ShareWrite = 0x2;
+        private const uint OpenExisting = 3;
+        private const uint CreateNew = 1;
+        private const uint GenericWrite = 0x40000000;
+        private const uint FileAttributeTemporary = 0x00000100;
+        private const uint BackupSemantics = 0x02000000;
+        private const uint OpenReparsePoint = 0x00200000;
+        private const uint SequentialScan = 0x08000000;
+        private const uint FileAttributeReparsePoint = 0x00000400;
+        private const int FileAttributeTagInfo = 9;
+        private static readonly object LeaseSync = new object();
+        private static readonly Dictionary<string, LeaseEntry> ActiveLeases =
+            new Dictionary<string, LeaseEntry>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> leaseKeys = new List<string>();
+
+        private sealed class LeaseEntry
+        {
+            public SafeFileHandle Handle;
+            public int References;
+
+            public LeaseEntry(SafeFileHandle handle)
+            {
+                Handle = handle;
+                References = 1;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SecurityAttributes
+        {
+            public int Length;
+            public IntPtr SecurityDescriptor;
+            [MarshalAs(UnmanagedType.Bool)]
+            public bool InheritHandle;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FileAttributeTagInformation
+        {
+            public uint FileAttributes;
+            public uint ReparseTag;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path, uint access, uint share, IntPtr securityAttributes,
+            uint creationDisposition, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path, uint access, uint share, ref SecurityAttributes securityAttributes,
+            uint creationDisposition, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetFileInformationByHandleEx(
+            SafeFileHandle handle, int informationClass, out FileAttributeTagInformation information, uint size);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetFinalPathNameByHandle(
+            SafeFileHandle handle, StringBuilder path, uint length, uint flags);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+            string descriptor, uint revision, out IntPtr securityDescriptor, out uint size);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr LocalFree(IntPtr memory);
+
+        private static string ToExtendedPath(string path)
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (fullPath.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase))
+                return fullPath;
+            if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))
+                return @"\\?\UNC\" + fullPath.Substring(2);
+            return @"\\?\" + fullPath;
+        }
+
+        public static SafeFileHandle CreateProtectedStage(string path)
+        {
+            IntPtr descriptor;
+            uint size;
+            if (!ConvertStringSecurityDescriptorToSecurityDescriptor(
+                "D:P(A;;FA;;;OW)", 1, out descriptor, out size))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "A restricted staging descriptor could not be created.");
+
+            try
+            {
+                var attributes = new SecurityAttributes
+                {
+                    Length = Marshal.SizeOf(typeof(SecurityAttributes)),
+                    SecurityDescriptor = descriptor,
+                    InheritHandle = false
+                };
+                var handle = CreateFile(ToExtendedPath(path), GenericWrite, 0, ref attributes,
+                    CreateNew, FileAttributeTemporary, IntPtr.Zero);
+                if (handle.IsInvalid)
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    handle.Dispose();
+                    throw new Win32Exception(error, "A protected staging file could not be created.");
+                }
+                return handle;
+            }
+            finally
+            {
+                LocalFree(descriptor);
+            }
+        }
+
+        public static DirectoryLease Acquire(string[] paths)
+        {
+            var lease = new DirectoryLease();
+            try
+            {
+                lock (LeaseSync)
+                {
+                    foreach (var path in paths)
+                    {
+                        var key = Path.GetFullPath(path);
+                        var pathRoot = Path.GetPathRoot(key);
+                        if (key.Length > pathRoot.Length)
+                            key = key.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                        LeaseEntry existing;
+                        if (ActiveLeases.TryGetValue(key, out existing))
+                        {
+                            existing.References++;
+                            lease.leaseKeys.Add(key);
+                            continue;
+                        }
+
+                        var handle = CreateFile(ToExtendedPath(path), FileReadAttributes | Delete, ShareRead | ShareWrite,
+                            IntPtr.Zero, OpenExisting, BackupSemantics, IntPtr.Zero);
+                        if (handle.IsInvalid)
+                        {
+                            var error = Marshal.GetLastWin32Error();
+                            handle.Dispose();
+                            throw new Win32Exception(error, "A vault directory could not be leased.");
+                        }
+                        ActiveLeases.Add(key, new LeaseEntry(handle));
+                        lease.leaseKeys.Add(key);
+                    }
+                }
+                return lease;
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
+        }
+
+        private static string NormalizeHandlePath(string path)
+        {
+            var resolvedPath = path;
+            if (resolvedPath.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase))
+                resolvedPath = @"\\" + resolvedPath.Substring(8);
+            else if (resolvedPath.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase))
+                resolvedPath = resolvedPath.Substring(4);
+            return Path.GetFullPath(resolvedPath);
+        }
+
+        private static bool IsWithinRoot(string root, string path)
+        {
+            var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (String.Equals(normalizedRoot, path, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return path.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static FileSnapshot ReadFileSnapshot(string path, string canonicalRoot, string expectedPath)
+        {
+            if (!OperatingSystem.IsWindows())
+                throw new PlatformNotSupportedException("Handle-protected vault reads are supported only on Windows.");
+
+            var handle = CreateFile(ToExtendedPath(path), FileReadData | FileReadAttributes, ShareRead,
+                IntPtr.Zero, OpenExisting, OpenReparsePoint | SequentialScan, IntPtr.Zero);
+            if (handle.IsInvalid)
+            {
+                var error = Marshal.GetLastWin32Error();
+                handle.Dispose();
+                throw new Win32Exception(error, "The vault target could not be opened safely.");
+            }
+
+            using (handle)
+            {
+                FileAttributeTagInformation information;
+                if (!GetFileInformationByHandleEx(handle, FileAttributeTagInfo,
+                    out information, (uint)Marshal.SizeOf(typeof(FileAttributeTagInformation))))
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "The opened target could not be verified.");
+                if ((information.FileAttributes & FileAttributeReparsePoint) != 0)
+                    throw new UnsafePathException();
+
+                var capacity = 512;
+                var finalPath = new StringBuilder(capacity);
+                uint length;
+                while ((length = GetFinalPathNameByHandle(handle, finalPath, (uint)capacity, 0)) >= capacity)
+                {
+                    capacity = checked((int)length + 1);
+                    finalPath = new StringBuilder(capacity);
+                }
+                if (length == 0)
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "The opened target path could not be verified.");
+
+                var resolvedPath = NormalizeHandlePath(finalPath.ToString());
+                var normalizedExpectedPath = Path.GetFullPath(expectedPath);
+                if (!IsWithinRoot(canonicalRoot, resolvedPath) ||
+                    !String.Equals(resolvedPath, normalizedExpectedPath, StringComparison.OrdinalIgnoreCase))
+                    throw new UnsafePathException();
+
+                using (var stream = new FileStream(handle, FileAccess.Read, 4096, false))
+                using (var bytes = new MemoryStream())
+                {
+                    stream.CopyTo(bytes);
+                    return new FileSnapshot(bytes.ToArray(), resolvedPath);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (LeaseSync)
+            {
+                for (var index = leaseKeys.Count - 1; index >= 0; index--)
+                {
+                    LeaseEntry entry;
+                    if (!ActiveLeases.TryGetValue(leaseKeys[index], out entry))
+                        continue;
+                    entry.References--;
+                    if (entry.References == 0)
+                    {
+                        entry.Handle.Dispose();
+                        ActiveLeases.Remove(leaseKeys[index]);
+                    }
+                }
+                leaseKeys.Clear();
+            }
+        }
+    }
+}
+'@ -ErrorAction Stop
+}
+
 function Get-DmPathComparison {
     <#
     .SYNOPSIS
@@ -141,6 +420,67 @@ function Test-DmPathWithinRoot {
     if ([string]::Equals($r, $p, $Comparison)) { return $true }
     $prefix = if ($r.EndsWith($script:DmSeparator)) { $r } else { $r + $script:DmSeparator }
     $p.StartsWith($prefix, $Comparison)
+}
+
+function Open-DmVaultDirectoryLease {
+    <#
+    .SYNOPSIS
+    Holds the verified vault directory chain against rename or replacement.
+    .DESCRIPTION
+    Opens the canonical vault root and each target-parent directory with
+    delete access and without delete sharing, preventing replacement while
+    the verified target is read or written. Nested operations share each
+    existing directory handle rather than weakening its lease.
+    .PARAMETER Boundary
+    Authorized canonical vault boundary containing the target.
+    .PARAMETER Resolution
+    Previously resolved target whose parent directory chain is held.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Boundary,
+        [Parameter(Mandatory)]$Resolution
+    )
+    if (-not $IsWindows) { throw [System.PlatformNotSupportedException]::new('Safe directory leases are supported only on Windows.') }
+    $root = [System.IO.Path]::GetFullPath([string]$Boundary.canonicalRoot)
+    $parent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetDirectoryName([string]$Resolution.resolvedPath))
+    if (-not (Test-DmPathWithinRoot -Root $root -Path $parent -Comparison $Boundary.comparison)) {
+        throw [System.UnauthorizedAccessException]::new('The target directory is outside the authorized vault.')
+    }
+    $paths = [System.Collections.Generic.List[string]]::new()
+    $paths.Add($root)
+    $relative = [System.IO.Path]::GetRelativePath($root, $parent)
+    if ($relative -cne '.') {
+        $current = $root
+        foreach ($component in ($relative -split '[\\/]')) {
+            if ([string]::IsNullOrEmpty($component) -or $component -ceq '.' -or $component -ceq '..') {
+                throw [System.UnauthorizedAccessException]::new('The target directory chain is not contained by the vault.')
+            }
+            $current = [System.IO.Path]::Combine($current, $component)
+            $paths.Add($current)
+        }
+    }
+    [DmAssistant.IO.DirectoryLease]::Acquire($paths.ToArray())
+}
+
+function Read-DmVaultFileHandleSnapshot {
+    <#
+    .SYNOPSIS
+    Reads a file through a handle opened without following a leaf reparse point.
+    .PARAMETER Path
+    Previously resolved absolute target path.
+    .PARAMETER Root
+    Canonical absolute vault root used to verify the opened handle before reading.
+    .PARAMETER ExpectedPath
+    Previously resolved absolute target path that the opened handle must match.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$ExpectedPath
+    )
+    [DmAssistant.IO.DirectoryLease]::ReadFileSnapshot($Path, $Root, $ExpectedPath)
 }
 
 function Resolve-DmCanonicalDirectory {
@@ -438,10 +778,11 @@ function Read-DmVaultTargetBytes {
     .SYNOPSIS
     Rechecks containment and reads a resolved file's exact bytes.
     .DESCRIPTION
-    Confirms the boundary (Confirm-DmVaultTarget) and then reads a resolved
-    file's bytes. Returns [pscustomobject]@{ ok; code; reason; bytes;
-    version } where version is 'sha256:<hex>' of the bytes read. code is the
-    recheck code or READ_FAILED for an operational read failure.
+    Confirms the boundary, leases the directory chain, rechecks it, and reads
+    from a handle that does not follow a leaf reparse point. The opened
+    handle's final path must match the resolved in-vault target. Returns
+    [pscustomobject]@{ ok; code; reason; bytes; version } where version is
+    'sha256:<hex>' of the bytes read.
     .PARAMETER Boundary
     Canonical vault boundary used for the immediate recheck.
     .PARAMETER Resolution
@@ -453,13 +794,38 @@ function Read-DmVaultTargetBytes {
         [Parameter(Mandatory)]$Resolution
     )
     $fail = { param([string]$Code, [string]$Reason) [pscustomobject][ordered]@{ ok = $false; code = $Code; reason = $Reason; bytes = $null; version = $null } }
-    $check = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $Resolution
-    if (-not $check.confirmed) { return (& $fail $check.code $check.reason) }
-    if ($check.resolution.itemType -cne 'file') { return (& $fail 'READ_FAILED' 'The target is not a file.') }
-    try { $bytes = [System.IO.File]::ReadAllBytes($check.resolution.resolvedPath) }
-    catch { return (& $fail 'READ_FAILED' 'The target could not be read.') }
-    $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
-    [pscustomobject][ordered]@{ ok = $true; code = $null; reason = ''; bytes = $bytes; version = ('sha256:' + [System.Convert]::ToHexString($hash).ToLowerInvariant()) }
+    $directoryLease = $null
+    try {
+        $check = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $Resolution
+        if (-not $check.confirmed) { return (& $fail $check.code $check.reason) }
+        if ($check.resolution.itemType -cne 'file') { return (& $fail 'READ_FAILED' 'The target is not a file.') }
+        $directoryLease = Open-DmVaultDirectoryLease -Boundary $Boundary -Resolution $check.resolution
+        $lockedCheck = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $check.resolution
+        if (-not $lockedCheck.confirmed) { return (& $fail $lockedCheck.code $lockedCheck.reason) }
+
+        $snapshot = Read-DmVaultFileHandleSnapshot `
+            -Path ([string]$lockedCheck.resolution.resolvedPath) `
+            -Root ([string]$Boundary.canonicalRoot) `
+            -ExpectedPath ([string]$lockedCheck.resolution.resolvedPath)
+        $expectedPath = [System.IO.Path]::GetFullPath([string]$lockedCheck.resolution.resolvedPath)
+        $openedPath = [System.IO.Path]::GetFullPath([string]$snapshot.FinalPath)
+        if (-not (Test-DmPathWithinRoot -Root ([string]$Boundary.canonicalRoot) -Path $openedPath -Comparison $Boundary.comparison) -or
+            -not [string]::Equals($openedPath, $expectedPath, [System.StringComparison]$Boundary.comparison)) {
+            return (& $fail 'PATH_OUTSIDE_VAULT' 'The opened target does not match the verified vault path.')
+        }
+        $bytes = [byte[]]$snapshot.Bytes
+        $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
+        [pscustomobject][ordered]@{ ok = $true; code = $null; reason = ''; bytes = $bytes; version = ('sha256:' + [System.Convert]::ToHexString($hash).ToLowerInvariant()) }
+    }
+    catch [DmAssistant.IO.UnsafePathException] {
+        & $fail 'PATH_OUTSIDE_VAULT' 'The target became a reparse point before it was opened.'
+    }
+    catch {
+        & $fail 'READ_FAILED' 'The target could not be read safely.'
+    }
+    finally {
+        if ($null -ne $directoryLease) { $directoryLease.Dispose() }
+    }
 }
 
-Export-ModuleMember -Function Resolve-DmVaultRoot, Resolve-DmVaultTarget, Confirm-DmVaultTarget, Read-DmVaultTargetBytes, Test-DmPathWithinRoot
+Export-ModuleMember -Function Resolve-DmVaultRoot, Resolve-DmVaultTarget, Confirm-DmVaultTarget, Read-DmVaultTargetBytes, Test-DmPathWithinRoot, Open-DmVaultDirectoryLease

@@ -162,6 +162,7 @@ Describe 'Installed plugin schema resource' {
             @{ Case = 'an open profile object'; Alter = { param($p) Set-TestSchemaJson -Path $p -Change { param($s) $s['additionalProperties'] = $true } } }
             @{ Case = 'an unpinned profile version'; Alter = { param($p) Set-TestSchemaJson -Path $p -Change { param($s) $s['properties']['version']['const'] = 2 } } }
             @{ Case = 'an unrequired profile version'; Alter = { param($p) Set-TestSchemaJson -Path $p -Change { param($s) $s['required'] = @($s['required'] | Where-Object { $_ -cne 'version' }) } } }
+            @{ Case = 'an unsupported preparation mode'; Alter = { param($p) Set-TestSchemaJson -Path $p -Change { param($s) $s['properties']['preparation']['properties']['mode']['enum'] = @('session_section', 'unsafe_mode') } } }
         ) {
             $install = New-TestInstalledCopy -Name ('incompatible-' + ($Case -replace '[^a-zA-Z0-9]+', '-'))
             & $Alter (Get-TestInstalledSchemaPath -InstallRoot $install)

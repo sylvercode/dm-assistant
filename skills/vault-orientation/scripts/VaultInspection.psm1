@@ -45,7 +45,7 @@ function New-DmInspectionFailure {
         $outcome = if ($i -lt $FailedIndex) { 'unchanged' } elseif ($i -eq $FailedIndex) { 'failed' } else { 'not attempted' }
         New-DmTargetRecord -Path $Targets[$i] -Outcome $outcome
     }
-    $remaining = @(for ($i = $FailedIndex; $i -lt $Targets.Count; $i++) { "Inspect $($Targets[$i]) after resolving the problem." })
+    $remaining = @(for ($i = 0; $i -lt $Targets.Count; $i++) { "Inspect $($Targets[$i]) after resolving the problem." })
     New-DmEntryPointResult -Operation $Operation -State Failure -CompletionCode $Code -Targets $Targets -UnchangedTargets @($records) `
         -RemainingWork $remaining -Message $Message -Details ([ordered]@{ target = $Targets[$FailedIndex]; reason = $Reason })
 }
@@ -92,6 +92,13 @@ function Invoke-DmInspect {
     }
     if (-not $context.passed) { return (New-DmInspectionOutcome -Result $context.result) }
     $boundary = $preflight.boundary
+    $dependencyCheck = Test-DmProfileDependencyVersions -Boundary $boundary -Profile $context.profile -ReviewedVersions ([object[]]$context.dependencyVersions)
+    if (-not $dependencyCheck.passed) {
+        $result = New-DmEntryPointResult -Operation $operation -State Failure -CompletionCode 'TARGET_CONFLICT' -Targets $targets `
+            -UnchangedTargets $targets -RemainingWork @($targets | ForEach-Object { "Inspect $_ again after revalidating the profile and guidance." }) `
+            -Message 'The profile or required guidance changed after inspection context was loaded; no inspection result was returned.'
+        return (New-DmInspectionOutcome -Result $result)
+    }
 
     # Resolve every target before any access so an escape or inaccessible path stops the whole request first.
     $resolutions = foreach ($target in $targets) { Resolve-DmVaultTarget -Boundary $boundary -Path $target }
@@ -108,6 +115,14 @@ function Invoke-DmInspect {
                 -RemainingWork @('Correct or remove the affected target, then retry.') -Detail ([ordered]@{ target = $resolution.path; reason = $resolution.reason })
             return (New-DmInspectionOutcome -Result $result)
         }
+    }
+
+    $dependencyCheck = Test-DmProfileDependencyVersions -Boundary $boundary -Profile $context.profile -ReviewedVersions ([object[]]$context.dependencyVersions)
+    if (-not $dependencyCheck.passed) {
+        $result = New-DmEntryPointResult -Operation $operation -State Failure -CompletionCode 'TARGET_CONFLICT' -Targets $targets `
+            -UnchangedTargets $targets -RemainingWork @($targets | ForEach-Object { "Inspect $_ again after revalidating the profile and guidance." }) `
+            -Message 'The profile or required guidance changed before target inspection; no inspection result was returned.'
+        return (New-DmInspectionOutcome -Result $result)
     }
 
     $inspection = [System.Collections.Generic.List[object]]::new()
@@ -155,6 +170,13 @@ function Invoke-DmInspect {
                 viaLink        = $resolution.viaLink
                 resolvedTarget = $resolution.resolvedRelativePath
             })
+    }
+    $dependencyCheck = Test-DmProfileDependencyVersions -Boundary $boundary -Profile $context.profile -ReviewedVersions ([object[]]$context.dependencyVersions)
+    if (-not $dependencyCheck.passed) {
+            $result = New-DmEntryPointResult -Operation $operation -State Failure -CompletionCode 'TARGET_CONFLICT' -Targets $targets `
+                -UnchangedTargets $targets -RemainingWork @($targets | ForEach-Object { "Inspect $_ again after revalidating the profile and guidance." }) `
+                -Message 'The profile or required guidance changed during inspection; no inspection result was returned.'
+            return (New-DmInspectionOutcome -Result $result)
     }
     $result = New-DmEntryPointResult -Operation $operation -State Complete -CompletionCode 'OK' -UnchangedTargets $targets -Targets $targets
     New-DmInspectionOutcome -Result $result -Inspection $inspection.ToArray()

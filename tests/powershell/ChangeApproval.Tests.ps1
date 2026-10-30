@@ -306,6 +306,8 @@ Describe 'Synthetic preview and approval safety' {
             }
             $outcome = Invoke-DmApply -Request $apply
             Assert-Completion -Outcome $outcome -Code 'TARGET_CONFLICT' -Status 'not completed'
+            $expectedIdentity = if ($dependency -eq 'profile') { '.dmassist.yaml' } else { '.dmassist-guidance.md' }
+            $outcome.result.errorDetails.details.changedDependencies | Should -Contain $expectedIdentity
             [System.IO.File]::ReadAllBytes($fixture.NotePaths[0]) | Should -Be $beforeTarget
 
             # A fresh preview binds the next dependency mutation independently.

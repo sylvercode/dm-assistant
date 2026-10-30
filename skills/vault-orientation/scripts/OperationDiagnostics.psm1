@@ -64,13 +64,15 @@ function New-DmSafeDiagnostic {
     .DESCRIPTION
     Creates contract-shaped error details from a stable code. The optional
     caller message and detail object are treated as untrusted and never echoed;
-    only a validated vault-relative target may be retained from details.
+    only validated vault-relative targets and dependency identities may be
+    retained from details.
     .PARAMETER Code
     Known completion code used to select the fixed safe message.
     .PARAMETER Message
     Untrusted caller message; accepted for compatibility but never copied.
     .PARAMETER Details
-    Untrusted detail object; only a validated vault-relative target is retained.
+    Untrusted detail object; only validated targets and dependency identities
+    are retained.
     #>
     [CmdletBinding()]
     param(
@@ -88,11 +90,32 @@ function New-DmSafeDiagnostic {
         code    = $Code
         message = [string]$script:DmDiagnosticMessages[$Code]
     }
+    $safeDetails = [ordered]@{}
     $target = Get-DmDiagnosticField -Object $Details -Name 'target'
     if ($target -is [string] -and $target.Length -le 512 -and
         (Test-DmVaultRelativeText -Path $target)) {
-        $result['details'] = [pscustomobject][ordered]@{ target = $target }
+        $safeDetails.target = $target
     }
+    $changedDependencies = Get-DmDiagnosticField -Object $Details -Name 'changedDependencies'
+    if ($changedDependencies -is [System.Collections.IList] -and $changedDependencies -isnot [string] -and
+        $changedDependencies.Count -gt 0 -and $changedDependencies.Count -le 64) {
+        $safeIdentities = [System.Collections.Generic.List[string]]::new()
+        $unique = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        $valid = $true
+        foreach ($identity in $changedDependencies) {
+            if ($identity -isnot [string] -or $identity.Length -gt 512) { $valid = $false; break }
+            $isPluginResource = $identity.StartsWith('plugin:', [System.StringComparison]::Ordinal) -and
+                (Test-DmVaultRelativeText -Path $identity.Substring(7))
+            $isVaultPath = Test-DmVaultRelativeText -Path $identity
+            if (-not ($isPluginResource -or $isVaultPath -or $identity -ceq 'dependency-set') -or -not $unique.Add($identity)) {
+                $valid = $false
+                break
+            }
+            $safeIdentities.Add($identity)
+        }
+        if ($valid) { $safeDetails.changedDependencies = [string[]]$safeIdentities.ToArray() }
+    }
+    if ($safeDetails.Count -gt 0) { $result['details'] = [pscustomobject]$safeDetails }
     [pscustomobject]$result
 }
 

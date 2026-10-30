@@ -513,7 +513,7 @@ function Test-DmProfileDependencyVersions {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$Boundary,
-        [Parameter(Mandatory)][System.Collections.IDictionary]$Profile,
+        [AllowNull()][System.Collections.IDictionary]$Profile,
         [Parameter(Mandatory)][object[]]$ReviewedVersions
     )
     try { $current = Get-DmProfileDependencyVersions -Boundary $Boundary -Profile $Profile }

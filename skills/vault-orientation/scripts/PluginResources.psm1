@@ -14,6 +14,7 @@ $script:DmSchemaResource = [pscustomobject][ordered]@{
     dialect      = 'https://json-schema.org/draft/2020-12/schema'
     schemaId     = 'https://github.com/sylvercode/dm-assistant/skills/vault-orientation/assets/dmassist.schema.json'
     title        = 'DM Assistant Vault Configuration Profile, Version 1'
+    version1Hash = 'sha256:272d789047f00b268985f26486e30f112fbf4e6f4109a914cd5f8e3360a30863'
 }
 
 function Get-DmProfileSchemaPath {
@@ -28,7 +29,7 @@ function Get-DmProfileSchemaPath {
 function Test-DmProfileSchemaShape {
     <#
     .SYNOPSIS
-    Checks the packaged schema's identity, dialect, and version-one shape.
+    Checks the complete packaged schema against the pinned version-one artifact.
     .DESCRIPTION
     Returns a safe reason string on mismatch, or an empty string on success.
     .PARAMETER Schema
@@ -94,6 +95,11 @@ function Get-DmProfileSchemaResource {
     $path = Get-DmProfileSchemaPath
     try { $bytes = [System.IO.File]::ReadAllBytes($path) }
     catch { return (& $block 'RESOURCE_MISSING' 'missing' 'The packaged profile schema is missing or unreadable; no profile setting was used.' $reinstall) }
+    $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
+    $version = 'sha256:' + [System.Convert]::ToHexString($hash).ToLowerInvariant()
+    if ($version -cne $script:DmSchemaResource.version1Hash) {
+        return (& $block 'RESOURCE_INCOMPATIBLE' 'incompatible' 'The packaged profile schema does not match the pinned version 1 artifact; no profile setting was used.' $reinstall)
+    }
     try {
         $text = [System.Text.UTF8Encoding]::new($false, $true).GetString($bytes)
         if ($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF) { $text = $text.Substring(1) }
@@ -116,11 +122,10 @@ function Get-DmProfileSchemaResource {
         return (& $block 'RESOURCE_INCOMPATIBLE' 'incompatible' 'The packaged profile schema cannot validate profile version 1 with the Draft 2020-12 validator; no profile setting was used.' $reinstall)
     }
 
-    $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
     $resource = [pscustomobject][ordered]@{
         identity     = $identity
         resourcePath = $script:DmSchemaResource.resourcePath
-        version      = 'sha256:' + [System.Convert]::ToHexString($hash).ToLowerInvariant()
+        version      = $version
         schemaId     = $script:DmSchemaResource.schemaId
         dialect      = $script:DmSchemaResource.dialect
         title        = $script:DmSchemaResource.title

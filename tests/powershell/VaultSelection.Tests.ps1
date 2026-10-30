@@ -178,8 +178,52 @@ Describe 'Vault selection and inspection' {
                 $r.completionStatus | Should -BeExactly 'not completed'
                 $r.completionCode | Should -BeExactly 'READ_FAILED'
                 @($r.unchangedTargets.outcome) | Should -Be @('unchanged', 'failed')
+                $r.remainingWork | Should -Contain 'Inspect Lore/Invented Town.md after resolving the problem.'
                 (Test-DmResult -Result $r -RequestedTargets $t).isValid | Should -BeTrue
                 $r.errorDetails | ConvertTo-Json -Depth 5 | Should -Not -Match ([regex]::Escape(($fixture.ParentPath | ConvertTo-Json).Trim('"')))
+            }
+
+            It 'stops before target access when the dependency snapshot changes' {
+                Mock -ModuleName VaultInspection -CommandName Test-DmProfileDependencyVersions -MockWith {
+                    [pscustomobject]@{ passed = $false; code = 'TARGET_CONFLICT'; changedIdentities = @('.dmassist.yaml') }
+                }
+                Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'target read attempted' }
+                $outcome = Invoke-DmInspect -Request $request
+                Assert-NotCompleted -Outcome $outcome -Code 'TARGET_CONFLICT' -Targets $targets
+                Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+            }
+
+            It 'rechecks dependencies immediately before reading target files' {
+                $global:DmInspectionDependencyChecks = 0
+                Mock -ModuleName VaultInspection -CommandName Test-DmProfileDependencyVersions -MockWith {
+                    $global:DmInspectionDependencyChecks++
+                    [pscustomobject]@{
+                        passed = ($global:DmInspectionDependencyChecks -eq 1)
+                        code = if ($global:DmInspectionDependencyChecks -eq 1) { $null } else { 'TARGET_CONFLICT' }
+                        changedIdentities = @('.dmassist.yaml')
+                    }
+                }
+                Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'target read attempted' }
+                $outcome = Invoke-DmInspect -Request $request
+                Assert-NotCompleted -Outcome $outcome -Code 'TARGET_CONFLICT' -Targets $targets
+                Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+                Remove-Variable -Name DmInspectionDependencyChecks -Scope Global
+            }
+
+            It 'returns TARGET_CONFLICT when dependencies change before inspection success' {
+                $global:DmInspectionDependencyChecks = 0
+                Mock -ModuleName VaultInspection -CommandName Test-DmProfileDependencyVersions -MockWith {
+                    $global:DmInspectionDependencyChecks++
+                    [pscustomobject]@{
+                        passed = ($global:DmInspectionDependencyChecks -lt 3)
+                        code = if ($global:DmInspectionDependencyChecks -lt 3) { $null } else { 'TARGET_CONFLICT' }
+                        changedIdentities = @('.dmassist.yaml')
+                    }
+                }
+                $outcome = Invoke-DmInspect -Request $request
+                Assert-NotCompleted -Outcome $outcome -Code 'TARGET_CONFLICT' -Targets $targets
+                @($outcome.result.remainingWork).Count | Should -Be $targets.Count
+                Remove-Variable -Name DmInspectionDependencyChecks -Scope Global
             }
 
             It 'returns READ_FAILED before any read when a path component is inaccessible' {
@@ -554,6 +598,76 @@ Describe 'Symbolic links, junctions, and recheck' {
         $outcome = & $inspect @('Alias.md')
         $outcome.result.completionCode | Should -BeExactly 'OK'
         $outcome.inspection[0].resolvedTarget | Should -BeExactly 'Lore/Invented Town.md'
+    }
+
+    It 'rejects an outside directory swapped in after the boundary confirmation' {
+        $probe = Join-Path -Path $root -ChildPath 'DirectoryLinkProbe'
+        if ($null -eq (New-TestDirectoryLink -Path $probe -Target $fixture.OutsidePath)) {
+            Set-ItResult -Skipped -Because 'directory links cannot be created here'
+            return
+        }
+        Remove-TestLink -Path $probe
+        $raceDirectory = Join-Path -Path $root -ChildPath 'ReadRace'
+        [void][System.IO.Directory]::CreateDirectory($raceDirectory)
+        $targetPath = Join-Path -Path $raceDirectory -ChildPath 'secret.md'
+        [System.IO.File]::WriteAllText($targetPath, 'Synthetic inside content.')
+        $boundary = (Invoke-DmPreflight -Request (New-TestOperationRequest -VaultRoot $root -Targets @('ReadRace/secret.md'))).boundary
+        $resolution = Resolve-DmVaultTarget -Boundary $boundary -Path 'ReadRace/secret.md'
+        $resolution.status | Should -BeExactly 'resolved'
+        $global:DmReadRaceDirectory = $raceDirectory
+        $global:DmReadRaceOutside = $fixture.OutsidePath
+        $global:DmReadRaceCount = 0
+        Mock -ModuleName VaultBoundary -CommandName Confirm-DmVaultTarget -MockWith {
+            if ($global:DmReadRaceCount -eq 0) {
+                [System.IO.Directory]::Delete($global:DmReadRaceDirectory, $true)
+                $kind = New-TestDirectoryLink -Path $global:DmReadRaceDirectory -Target $global:DmReadRaceOutside
+                if ($null -eq $kind) { throw 'A directory link could not be created for the race test.' }
+            }
+            $global:DmReadRaceCount++
+            [pscustomobject]@{ confirmed = $true; code = $null; reason = ''; resolution = $Resolution }
+        }
+        try {
+            $read = Read-DmVaultTargetBytes -Boundary $boundary -Resolution $resolution
+            $read.ok | Should -BeFalse
+            $read.code | Should -BeExactly 'PATH_OUTSIDE_VAULT'
+            $read.bytes | Should -BeNullOrEmpty
+        }
+        finally {
+            if ([System.IO.Directory]::Exists($raceDirectory)) { Remove-TestLink -Path $raceDirectory }
+            if ([System.IO.Directory]::Exists($raceDirectory)) { [System.IO.Directory]::Delete($raceDirectory, $true) }
+            Remove-Variable -Name DmReadRaceDirectory, DmReadRaceOutside, DmReadRaceCount -Scope Global
+        }
+    }
+
+    It 'rejects an outside leaf link swapped in immediately before the handle open' {
+        $probe = Join-Path -Path $root -ChildPath 'LinkProbe.md'
+        if (-not (New-TestFileLink -Path $probe -Target (Join-Path -Path $fixture.OutsidePath -ChildPath 'secret.md'))) {
+            Set-ItResult -Skipped -Because $script:FileLinkSkipReason
+            return
+        }
+        Remove-TestLink -Path $probe
+        $path = $fixture.NotePaths[0]
+        $original = [System.IO.File]::ReadAllBytes($path)
+        $boundary = (Invoke-DmPreflight -Request (New-TestOperationRequest -VaultRoot $root -Targets @('Adventures/Synthetic Arc.md'))).boundary
+        $resolution = Resolve-DmVaultTarget -Boundary $boundary -Path 'Adventures/Synthetic Arc.md'
+        $global:DmReadRaceLeaf = $path
+        $global:DmReadRaceOutside = Join-Path -Path $fixture.OutsidePath -ChildPath 'secret.md'
+        Mock -ModuleName VaultBoundary -CommandName Read-DmVaultFileHandleSnapshot -MockWith {
+            [System.IO.File]::Delete($global:DmReadRaceLeaf)
+            [void][System.IO.File]::CreateSymbolicLink($global:DmReadRaceLeaf, $global:DmReadRaceOutside)
+            [DmAssistant.IO.DirectoryLease]::ReadFileSnapshot($Path, $Root, $ExpectedPath)
+        }
+        try {
+            $read = Read-DmVaultTargetBytes -Boundary $boundary -Resolution $resolution
+            $read.ok | Should -BeFalse
+            $read.code | Should -BeExactly 'PATH_OUTSIDE_VAULT'
+            $read.bytes | Should -BeNullOrEmpty
+        }
+        finally {
+            if ([System.IO.File]::Exists($path)) { Remove-TestLink -Path $path }
+            [System.IO.File]::WriteAllBytes($path, $original)
+            Remove-Variable -Name DmReadRaceLeaf, DmReadRaceOutside -Scope Global
+        }
     }
 
     It 'returns PATH_OUTSIDE_VAULT for an escaping leaf file symbolic link (<Case>)' -ForEach @(

@@ -22,6 +22,43 @@ BeforeAll {
         return $false
     }
 
+    function Test-DmLocalScriptBlockInvocation {
+        param(
+            [System.Management.Automation.Language.CommandAst]$Command,
+            [System.Management.Automation.Language.Ast]$Root
+        )
+        if ($Command.InvocationOperator -ne [System.Management.Automation.Language.TokenKind]::Ampersand -or
+            $Command.CommandElements.Count -eq 0) {
+            return $false
+        }
+        $target = $Command.CommandElements[0]
+        if ($target -is [System.Management.Automation.Language.MemberExpressionAst] -and
+            $target.Expression -is [System.Management.Automation.Language.VariableExpressionAst] -and
+            $target.Expression.VariablePath.UserPath -ceq 'registration' -and
+            $target.Member -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+            $target.Member.Value -ceq 'builder') {
+            return $true
+        }
+        if ($target -isnot [System.Management.Automation.Language.VariableExpressionAst]) { return $false }
+        $name = $target.VariablePath.UserPath
+        if ($name.Contains(':')) { return $false }
+        $assignments = @($Root.FindAll({
+                    param($node)
+                    $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                    $node.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+                    $node.Left.VariablePath.UserPath -ceq $name
+                }, $true))
+        if ($assignments.Count -eq 0) { return $false }
+        foreach ($assignment in $assignments) {
+            $expression = $assignment.Right
+            if ($expression -is [System.Management.Automation.Language.CommandExpressionAst]) {
+                $expression = $expression.Expression
+            }
+            if ($expression -isnot [System.Management.Automation.Language.ScriptBlockExpressionAst]) { return $false }
+        }
+        $true
+    }
+
     function Get-DmStaticAuditViolation {
         param([Parameter(Mandatory)][string]$SourceText)
 
@@ -58,7 +95,12 @@ BeforeAll {
 
         foreach ($command in $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)) {
             $commandName = $command.GetCommandName()
-            if ([string]::IsNullOrEmpty($commandName)) { continue }
+            if ([string]::IsNullOrEmpty($commandName)) {
+                if (-not (Test-DmLocalScriptBlockInvocation -Command $command -Root $ast)) {
+                    $violations.Add('dynamic-execution')
+                }
+                continue
+            }
             $normalizedName = [System.IO.Path]::GetFileName($commandName).ToLowerInvariant()
             if ($bannedCommands.ContainsKey($normalizedName)) {
                 $violations.Add($bannedCommands[$normalizedName])
@@ -175,6 +217,15 @@ semi;colon | brackets [data] and wildcard *
             $resolution.code | Should -BeExactly 'PATH_INVALID' -Because "path syntax must not be interpreted: $path"
         }
     }
+
+    It 'rejects Windows superscript reserved device names, including extensions' {
+        foreach ($path in @('COM¹', 'COM².txt', 'COM³.md', 'LPT¹', 'LPT².log', 'LPT³.note')) {
+            (Test-DmVaultRelativePath -Path $path).isValid | Should -BeFalse -Because $path
+        }
+        foreach ($path in @('COM10.txt', 'LPT0.md', 'ordinary.md')) {
+            (Test-DmVaultRelativePath -Path $path).isValid | Should -BeTrue -Because $path
+        }
+    }
 }
 
 Describe 'PowerShell production-script static audit' {
@@ -183,6 +234,8 @@ Describe 'PowerShell production-script static audit' {
             @{ Text = 'Invoke-Expression $data'; Rule = 'dynamic-execution' }
             @{ Text = 'iex $data'; Rule = 'dynamic-execution' }
             @{ Text = '$script = [scriptblock]::Create($data)'; Rule = 'dynamic-execution' }
+            @{ Text = '& $noteContent'; Rule = 'dynamic-execution' }
+            @{ Text = '& (Get-Command $noteContent)'; Rule = 'dynamic-execution' }
             @{ Text = 'pwsh -Command $data'; Rule = 'dynamic-execution' }
             @{ Text = 'pwsh -c $data'; Rule = 'dynamic-execution' }
             @{ Text = 'Start-Process pwsh -ArgumentList $arguments'; Rule = 'dynamic-execution' }
@@ -213,6 +266,8 @@ Get-Content -LiteralPath $path
 [System.IO.File]::ReadAllBytes($path)
 $helper = { param($value) $value }
 & $helper 'literal'
+$registration = [pscustomobject]@{ builder = { param($text) $text } }
+& $registration.builder 'literal'
 $process = [System.Diagnostics.ProcessStartInfo]::new('copilot')
 foreach ($argument in @('mcp', 'get', $validatedId)) { $process.ArgumentList.Add($argument) }
 '@

@@ -71,6 +71,23 @@ Describe 'OperationDiagnostics safe error details' {
         }
     }
 
+    It 'preserves only safe changed dependency identities' {
+        $safe = New-DmSafeDiagnostic -Code 'TARGET_CONFLICT' -Details ([ordered]@{
+                changedDependencies = @('.dmassist.yaml', 'plugin:skills/vault-orientation/assets/dmassist.schema.json')
+                sourcePath = $script:SyntheticNotePath
+                noteContent = $script:SyntheticNoteContent
+            })
+        @($safe.details.changedDependencies) | Should -Be @('.dmassist.yaml', 'plugin:skills/vault-orientation/assets/dmassist.schema.json')
+        $serialized = $safe | ConvertTo-Json -Depth 8 -Compress
+        $serialized | Should -Not -Match ([regex]::Escape($script:SyntheticNotePath))
+        $serialized | Should -Not -Match ([regex]::Escape($script:SyntheticNoteContent))
+
+        $unsafe = New-DmSafeDiagnostic -Code 'TARGET_CONFLICT' -Details ([ordered]@{
+                changedDependencies = @('C:\private\secret.md', 'plugin:../../outside')
+            })
+        $unsafe.PSObject.Properties.Name | Should -Not -Contain 'details'
+    }
+
     It 'accepts legal path punctuation in the complete result envelope' {
         $target = 'Scenes(/Locked.md'
         $result = New-DmEntryPointResult -Operation 'notes.inspect' -State Failure -CompletionCode 'READ_FAILED' `

@@ -7,6 +7,8 @@ Set-StrictMode -Version Latest
 $script:DmWindowsReservedNames = @('CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$',
     'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
     'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9')
+$script:DmWindowsReservedNameSet = [System.Collections.Generic.HashSet[string]]::new(
+    [string[]]$script:DmWindowsReservedNames, [System.StringComparer]::OrdinalIgnoreCase)
 
 function New-DmPathCheck {
     <#
@@ -69,7 +71,7 @@ function Test-DmVaultRelativePath {
             return (New-DmPathCheck -IsValid $false -Reason 'A path component must not end with a dot or a space.')
         }
         $stem = $component.Split('.')[0].TrimEnd(' ')
-        if ($stem -in $script:DmWindowsReservedNames) {
+        if ($script:DmWindowsReservedNameSet.Contains($stem) -or $stem -match '^(?i:COM|LPT)[¹²³]$') {
             return (New-DmPathCheck -IsValid $false -Reason 'A path component uses a reserved device name.')
         }
     }

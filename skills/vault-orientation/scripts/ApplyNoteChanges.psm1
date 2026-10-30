@@ -49,7 +49,14 @@ function New-DmApplyBlockedResult {
     $diagnostic = New-DmSafeDiagnostic -Code $Code -Message $Message -Details $Details
     $arguments.Message = [string]$diagnostic.message
     if ($diagnostic.PSObject.Properties['details']) {
-        $arguments.Details = [ordered]@{ target = [string]$diagnostic.details.target }
+        $safeDetails = [ordered]@{}
+        if ($diagnostic.details.PSObject.Properties['target']) {
+            $safeDetails.target = [string]$diagnostic.details.target
+        }
+        if ($diagnostic.details.PSObject.Properties['changedDependencies']) {
+            $safeDetails.changedDependencies = [string[]]$diagnostic.details.changedDependencies
+        }
+        $arguments.Details = $safeDetails
     }
     New-DmEntryPointResult @arguments
 }
