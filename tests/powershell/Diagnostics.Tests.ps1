@@ -60,6 +60,27 @@ Describe 'OperationDiagnostics safe error details' {
         (Test-DmResult -Result $result -RequestedTargets @($script:SyntheticRelativeTarget)).isValid |
             Should -BeTrue
     }
+
+    It 'validates diagnostic targets as paths and preserves legal punctuation' {
+        $safe = New-DmSafeDiagnostic -Code 'READ_FAILED' -Details ([ordered]@{ target = 'Lore/Thing (draft).md' })
+        $safe.details.target | Should -BeExactly 'Lore/Thing (draft).md'
+
+        foreach ($invalidPath in @('C:/private/note.md', '../outside/note.md', 'Lore/*.md', 'Lore//note.md')) {
+            $unsafe = New-DmSafeDiagnostic -Code 'READ_FAILED' -Details ([ordered]@{ target = $invalidPath })
+            $unsafe.PSObject.Properties.Name | Should -Not -Contain 'details'
+        }
+    }
+
+    It 'accepts legal path punctuation in the complete result envelope' {
+        $target = 'Scenes(/Locked.md'
+        $result = New-DmEntryPointResult -Operation 'notes.inspect' -State Failure -CompletionCode 'READ_FAILED' `
+            -Targets @($target) -UnchangedTargets @((New-DmTargetRecord -Path $target -Outcome 'failed')) `
+            -RemainingWork @("Inspect $target after restoring access.") -Message 'The target could not be read.' `
+            -Details ([ordered]@{ target = $target })
+
+        (Test-DmResult -Result $result -RequestedTargets @($target)).isValid | Should -BeTrue
+        $result.errorDetails.details.target | Should -BeExactly $target
+    }
 }
 
 Describe 'OperationDiagnostics local-only behavior' {

@@ -90,7 +90,7 @@ function New-DmSafeDiagnostic {
     }
     $target = Get-DmDiagnosticField -Object $Details -Name 'target'
     if ($target -is [string] -and $target.Length -le 512 -and
-        (Test-DmVaultRelativePath -Path $target).isValid) {
+        (Test-DmVaultRelativeText -Path $target)) {
         $result['details'] = [pscustomobject][ordered]@{ target = $target }
     }
     [pscustomobject]$result

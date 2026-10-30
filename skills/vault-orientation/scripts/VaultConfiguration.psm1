@@ -429,45 +429,66 @@ function Test-DmProfileReference {
 function Get-DmProfileDependencyVersions {
     <#
     .SYNOPSIS
-    Collects ordered profile, schema, and configured-reference versions.
+    Collects ordered versions for the validated profile and references used by
+    the current operation.
     .PARAMETER Boundary
     Canonical authorized vault boundary for profile and reference access.
     .PARAMETER Profile
     Validated profile whose referenced paths are fingerprinted.
+    .PARAMETER ExpectedProfileVersion
+    Optional byte fingerprint captured when the profile was parsed and validated.
+    .PARAMETER ReferencePaths
+    Exact profile references used by this operation; unrelated references are not read.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$Boundary,
-        [Parameter(Mandatory)][System.Collections.IDictionary]$Profile
+        [AllowNull()][System.Collections.IDictionary]$Profile,
+        [AllowNull()][string]$ExpectedProfileVersion,
+        [AllowNull()][string[]]$ReferencePaths
     )
     $versions = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
     $profileResolution = Resolve-DmVaultTarget -Boundary $Boundary -Path '.dmassist.yaml'
+    if ($profileResolution.code) { throw 'The profile could not be safely resolved while computing dependency versions.' }
+    $currentProfileVersion = 'absent'
     if ($profileResolution.exists) {
+        if ($profileResolution.itemType -cne 'file') { throw 'The profile is not a file while computing dependency versions.' }
         $profileRead = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $profileResolution
         if (-not $profileRead.ok) { throw 'The profile changed or could not be read while computing dependency versions.' }
-        $versions.Add('.dmassist.yaml', $profileRead.version)
+        $currentProfileVersion = [string]$profileRead.version
+    }
+    if ($PSBoundParameters.ContainsKey('ExpectedProfileVersion') -and
+        $null -ne $ExpectedProfileVersion -and $currentProfileVersion -cne $ExpectedProfileVersion) {
+        throw 'The profile changed after validation and before its dependency snapshot.'
+    }
+    $versions.Add('.dmassist.yaml', $currentProfileVersion)
+    if ($null -ne $Profile) {
         $schema = Get-DmProfileSchemaResource -Operation 'profile.validate'
         if (-not $schema.passed) { throw 'The installed profile schema is unavailable or incompatible.' }
         $versions.Add([string]$schema.resource.identity, [string]$schema.resource.version)
     }
-    $referencePaths = [System.Collections.Generic.List[string]]::new()
-    if ($Profile.Contains('guidance')) { $referencePaths.Add([string]$Profile.guidance.path) }
-    if ($Profile.Contains('party')) { $referencePaths.Add([string]$Profile.party.note) }
-    if ($Profile.Contains('templates')) {
-        foreach ($key in $Profile.templates.Keys) {
-            if ($key -ceq 'custom') { foreach ($value in $Profile.templates.custom.Values) { $referencePaths.Add([string]$value) } }
-            else { $referencePaths.Add([string]$Profile.templates[$key]) }
+    if (-not $PSBoundParameters.ContainsKey('ReferencePaths') -or $null -eq $ReferencePaths) {
+        $ReferencePaths = if ($null -ne $Profile -and $Profile.Contains('guidance')) {
+            @([string]$Profile.guidance.path)
+        }
+        else {
+            @('.dmassist-guidance.md')
         }
     }
-    foreach ($path in $referencePaths) {
+    $distinctPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($path in $ReferencePaths) {
+        if (-not $distinctPaths.Add([string]$path)) { continue }
+        $lexical = Test-DmVaultRelativePath -Path ([string]$path)
+        if (-not $lexical.isValid) { throw 'A profile dependency path is invalid.' }
         $resolution = Resolve-DmVaultTarget -Boundary $Boundary -Path $path
+        if ($resolution.code) { throw 'A profile dependency could not be safely resolved.' }
         if (-not $resolution.exists -or $resolution.itemType -cne 'file') { $version = 'absent' }
         else {
             $read = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $resolution
-            if (-not $read.ok) { throw "The reference '$path' changed or could not be read while computing dependency versions." }
+            if (-not $read.ok) { throw 'A profile dependency changed or could not be read while computing dependency versions.' }
             $version = $read.version
         }
-        $versions[$path] = $version
+        $versions[[string]$path] = $version
     }
     $identities = [string[]]@($versions.Keys)
     [System.Array]::Sort($identities, [System.StringComparer]::Ordinal)
@@ -565,42 +586,56 @@ function Get-DmPreNoteContext {
         return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
     }
 
-    $loaded = Read-DmVaultProfile -Boundary $Preflight.boundary
+    try { $loaded = Read-DmVaultProfile -Boundary $Preflight.boundary }
+    catch {
+        $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode 'READ_FAILED' -Targets $Preflight.targets `
+            -Message 'The root profile could not be safely read.' -RemainingWork @('Restore readable profile access, then retry.')
+        return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
+    }
     if ($loaded.state -ceq 'invalid') {
         $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $loaded.code -Targets $Preflight.targets -Message $loaded.message -RemainingWork @('Correct or restore the profile, then retry.')
         return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
     }
-    if ($loaded.state -ceq 'absent') {
-        $discovery = Get-DmVaultDiscovery -Boundary $Preflight.boundary
-        $request = $Preflight.request
-        $registration = Get-DmOperation -Name ([string]$request.operation)
-        if ($request.mode -cne 'inspect' -or ($null -ne $registration -and $registration.requiresMappings)) {
-            $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode 'AMBIGUOUS_CONTEXT' -Targets $Preflight.targets -Message 'No local guidance is designated; only a specific read-only inspect lookup may proceed.' -RemainingWork @('Designate local guidance or request a specific mapping-independent lookup.')
-            return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $discovery; dependencyVersions = @([pscustomobject][ordered]@{ identity = '.dmassist.yaml'; version = 'absent' }); context = $null }
-        }
-        return [pscustomobject][ordered]@{
-            passed = $true; result = $null; profile = $null; discovery = $discovery
-            dependencyVersions = @([pscustomobject][ordered]@{ identity = '.dmassist.yaml'; version = 'absent' })
-            sequence = @('vault-root-selected', 'dependency-readiness', 'vault-authorization', 'shared-reference', 'profile-absence', 'guidance-absence', 'campaign-group')
-            context = [pscustomobject]@{ sharedReferenceLoaded = $true; profileState = 'absent'; guidanceLoaded = $false; campaignGroup = $request.campaignGroup }
+    $profilePresent = $loaded.state -ceq 'valid'
+    if ($profilePresent) {
+        $filesystem = Test-DmProfileFilesystem -Boundary $Preflight.boundary -Profile $loaded.sourceProfile
+        if (-not $filesystem.passed) {
+            $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $filesystem.code -Targets $Preflight.targets -Message $filesystem.message -RemainingWork @('Correct the configured paths, then retry.')
+            return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
         }
     }
 
-    $filesystem = Test-DmProfileFilesystem -Boundary $Preflight.boundary -Profile $loaded.sourceProfile
-    if (-not $filesystem.passed) {
-        $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $filesystem.code -Targets $Preflight.targets -Message $filesystem.message -RemainingWork @('Correct the configured paths, then retry.') -Detail ([ordered]@{ target = $filesystem.path })
-        return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
+    $guidancePath = '.dmassist-guidance.md'
+    if ($profilePresent -and $loaded.profile.Contains('guidance')) {
+        $guidancePath = [string]$loaded.profile.guidance.path
     }
     $guidanceLoaded = $false
-    if ($loaded.profile.Contains('guidance')) {
-        $guidance = Test-DmProfileReference -Boundary $Preflight.boundary -Path ([string]$loaded.profile.guidance.path) -Kind guidance
+    $guidanceResolution = Resolve-DmVaultTarget -Boundary $Preflight.boundary -Path $guidancePath
+    if ($guidanceResolution.code) {
+        $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $guidanceResolution.code -Targets $Preflight.targets -Message 'The designated local guidance could not be safely resolved.' -RemainingWork @('Correct or restore the local guidance, then retry.')
+        return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
+    }
+    if (($profilePresent -and $loaded.profile.Contains('guidance')) -or $guidanceResolution.exists) {
+        $guidance = Test-DmProfileReference -Boundary $Preflight.boundary -Path $guidancePath -Kind guidance
         if (-not $guidance.passed) {
-            $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $guidance.code -Targets $Preflight.targets -Message $guidance.message -RemainingWork @('Restore the configured guidance, then retry.')
+            $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $guidance.code -Targets $Preflight.targets -Message $guidance.message -RemainingWork @('Restore the local guidance, then retry.')
             return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
         }
         $guidanceLoaded = $true
     }
-    $dependencies = Get-DmProfileDependencyVersions -Boundary $Preflight.boundary -Profile $loaded.profile
+
+    try {
+        $profileArgument = if ($profilePresent) { $loaded.profile } else { $null }
+        $dependencies = Get-DmProfileDependencyVersions -Boundary $Preflight.boundary -Profile $profileArgument `
+            -ExpectedProfileVersion ([string]$loaded.sourceVersion) -ReferencePaths @($guidancePath)
+    }
+    catch {
+        $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode 'TARGET_CONFLICT' -Targets $Preflight.targets `
+            -Message 'The profile or a required guidance dependency changed or could not be verified after validation.' `
+            -RemainingWork @('Revalidate the profile and guidance, then retry.')
+        return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
+    }
+
     $request = $Preflight.request
     $registration = Get-DmOperation -Name ([string]$request.operation)
     $needsMapping = $request.mode -cne 'inspect' -or ($null -ne $registration -and $registration.requiresMappings)
@@ -608,16 +643,17 @@ function Get-DmPreNoteContext {
         $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode 'AMBIGUOUS_CONTEXT' -Targets $Preflight.targets -Message 'No local guidance is designated; this request depends on unresolved note or folder mappings.' -RemainingWork @('Designate local guidance or request a specific mapping-independent lookup.')
         return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $loaded.profile; discovery = $null; dependencyVersions = $dependencies; context = $null }
     }
+    $discovery = if (-not $profilePresent) { Get-DmVaultDiscovery -Boundary $Preflight.boundary } else { $null }
     [pscustomobject][ordered]@{
         passed = $true
         result = $null
         profile = $loaded.profile
-        discovery = $null
+        discovery = $discovery
         dependencyVersions = $dependencies
-        sequence = @('vault-root-selected', 'dependency-readiness', 'vault-authorization', 'shared-reference', 'profile-validated', $(if ($guidanceLoaded) { 'guidance-loaded' } else { 'guidance-absence' }), 'campaign-group')
+        sequence = @('vault-root-selected', 'dependency-readiness', 'vault-authorization', 'shared-reference', $(if ($profilePresent) { 'profile-validated' } else { 'profile-absence' }), $(if ($guidanceLoaded) { 'guidance-loaded' } else { 'guidance-absence' }), 'campaign-group')
         context = [pscustomobject][ordered]@{
             sharedReferenceLoaded = $true
-            profileState = 'valid'
+            profileState = if ($profilePresent) { 'valid' } else { 'absent' }
             profileVersion = $loaded.sourceVersion
             guidanceLoaded = $guidanceLoaded
             campaignGroup = $request.campaignGroup

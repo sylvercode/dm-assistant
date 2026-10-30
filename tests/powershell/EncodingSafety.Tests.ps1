@@ -101,6 +101,24 @@ guidance:
             Should -BeExactly ([System.Convert]::ToHexString($undecodable))
     }
 
+    It 'rejects BOM-less NUL-containing input and UTF-32LE before any write' {
+        $ambiguousInputs = @(
+            [byte[]]@(0x42, 0x00, 0x65, 0x00, 0x66, 0x00, 0x6F, 0x00, 0x72, 0x00, 0x65, 0x00),
+            [byte[]]@(0xFF, 0xFE, 0x00, 0x00, 0x42, 0x00, 0x00, 0x00, 0x65, 0x00, 0x00, 0x00)
+        )
+        $index = 0
+        foreach ($inputBytes in $ambiguousInputs) {
+            [System.IO.File]::WriteAllBytes((Join-Path -Path $fixture.Root -ChildPath 'Notes\Target.md'), $inputBytes)
+            $request = New-TestEditRequest -Mode apply -Targets @($script:targetOne) -RequestId "ambiguous-$index"
+
+            $outcome = Invoke-DmApply -Request $request
+            $outcome.result.completionCode | Should -BeExactly 'ENCODING_UNSAFE'
+            [System.Convert]::ToHexString((Get-TestTargetBytes -RelativePath $script:targetOne)) |
+                Should -BeExactly ([System.Convert]::ToHexString($inputBytes))
+            $index++
+        }
+    }
+
     It 'rejects a multi-target preview before any write when a later target is undecodable' {
         $firstOriginal = New-TestEncodedBytes -Text "Before`r`nKeep`n" -EncodingKind utf8
         [byte[]]$secondOriginal = @(0xFF, 0xFE, 0x00, 0xD8, 0xFF)

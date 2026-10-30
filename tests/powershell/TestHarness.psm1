@@ -31,8 +31,9 @@ function Import-TestProductionModule {
 
 function New-TestVaultFixture {
     <#
-    Creates a synthetic, disposable vault under -ParentPath (defaults to a new
-    folder in the system temp directory). Returns
+    Creates a synthetic, disposable vault under -ParentPath (defaults to the
+    system temp directory). A fresh, uniquely named owned directory is created
+    beneath that parent. Returns
     [pscustomobject]@{ Root; ParentPath; OutsidePath; ProfilePath; NotePaths }.
     All content is invented. -ProfileText writes a root .dmassist.yaml.
     #>
@@ -43,11 +44,11 @@ function New-TestVaultFixture {
         [AllowNull()][string]$ProfileText,
         [System.Collections.IDictionary]$Notes
     )
-    if ([string]::IsNullOrEmpty($ParentPath)) {
-        $ParentPath = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('dmassist-test-' + [guid]::NewGuid().ToString('N'))
-    }
-    $root = Join-Path -Path $ParentPath -ChildPath $Name
-    $outside = Join-Path -Path $ParentPath -ChildPath 'outside'
+    if ([string]::IsNullOrEmpty($ParentPath)) { $ParentPath = [System.IO.Path]::GetTempPath() }
+    $ownershipParentPath = [System.IO.Path]::GetFullPath($ParentPath)
+    $ownedDirectory = Join-Path -Path $ownershipParentPath -ChildPath ('dmassist-test-' + [guid]::NewGuid().ToString('N'))
+    $root = Join-Path -Path $ownedDirectory -ChildPath $Name
+    $outside = Join-Path -Path $ownedDirectory -ChildPath 'outside'
     [void][System.IO.Directory]::CreateDirectory($root)
     [void][System.IO.Directory]::CreateDirectory($outside)
     [System.IO.File]::WriteAllText((Join-Path -Path $outside -ChildPath 'secret.md'), "# Outside`nSynthetic outside-boundary file.`n")
@@ -71,7 +72,9 @@ function New-TestVaultFixture {
     }
     [pscustomobject]@{
         Root        = $root
-        ParentPath  = $ParentPath
+        ParentPath  = $ownedDirectory
+        OwnershipParentPath = $ownershipParentPath
+        OwnedDirectory = $ownedDirectory
         OutsidePath = $outside
         ProfilePath = $profilePath
         NotePaths   = [string[]]$notePaths.ToArray()
@@ -81,9 +84,19 @@ function New-TestVaultFixture {
 function Remove-TestVaultFixture {
     [CmdletBinding()]
     param([Parameter(Mandatory)]$Fixture)
-    if ($null -ne $Fixture -and (Test-Path -LiteralPath $Fixture.ParentPath)) {
-        Remove-Item -LiteralPath $Fixture.ParentPath -Recurse -Force
+    if ($null -eq $Fixture -or $null -eq $Fixture.OwnedDirectory -or $null -eq $Fixture.OwnershipParentPath) { return }
+    $parent = [System.IO.Path]::GetFullPath([string]$Fixture.OwnershipParentPath)
+    $owned = [System.IO.Path]::GetFullPath([string]$Fixture.OwnedDirectory)
+    $actualParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetDirectoryName($owned))
+    $root = [System.IO.Path]::GetPathRoot($parent)
+    if ($parent.Length -gt $root.Length) { $parent = $parent.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) }
+    $actualRoot = [System.IO.Path]::GetPathRoot($actualParent)
+    if ($actualParent.Length -gt $actualRoot.Length) { $actualParent = $actualParent.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) }
+    $ownedName = [System.IO.Path]::GetFileName($owned)
+    if (-not [System.StringComparer]::OrdinalIgnoreCase.Equals($actualParent, $parent) -or $ownedName -notmatch '^dmassist-test-[0-9a-f]{32}$') {
+        throw [System.ArgumentException]::new('The fixture cleanup target is not a uniquely owned fixture directory.')
     }
+    if (Test-Path -LiteralPath $owned) { Remove-Item -LiteralPath $owned -Recurse -Force }
 }
 
 function Get-TestVaultSnapshot {

@@ -68,7 +68,7 @@ workflow only checks them.
    assistance that does not need scripts remains available.
 
 Contributors running the acceptance tests also need Pester 6.2.0
-(`Install-Module -Name Pester -RequiredVersion 6.2.0 -Scope CurrentUser -SkipPublisherCheck`).
+(`Install-Module -Name Pester -RequiredVersion 6.2.0 -Scope CurrentUser`).
 Run the suite with `pwsh -NoProfile -File tests/powershell/Invoke-Tests.ps1`;
 it imports Pester 6.2.0 explicitly and never uses the Windows built-in
 Pester 3.4.0.

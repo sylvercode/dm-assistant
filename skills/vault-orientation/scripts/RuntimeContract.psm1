@@ -118,16 +118,20 @@ function Test-DmSafeText {
 function Test-DmVaultRelativeText {
     <#
     .SYNOPSIS
-    Checks whether text has the basic shape of a vault-relative path.
+    Checks whether a path is safe to retain as a vault-relative diagnostic.
     .DESCRIPTION
-    This lightweight result-contract check is not full filesystem containment
-    or lexical path validation.
+    Rejects absolute, traversal, wildcard, control-character, and malformed
+    paths without interpreting punctuation that is legal in a path component.
     .PARAMETER Path
     Candidate path text; null, empty, rooted, drive, and URI forms are rejected.
     #>
     param([AllowNull()][AllowEmptyString()][string]$Path)
     if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
-    if ($Path.StartsWith('/') -or $Path.Contains('\') -or $Path -match '^[A-Za-z]:' -or $Path -match '^[A-Za-z][A-Za-z0-9+.-]*://') { return $false }
+    if ($Path.StartsWith('/') -or $Path.Contains('\') -or $Path -match '^[A-Za-z]:' -or $Path -match '^[A-Za-z][A-Za-z0-9+.-]*:' -or
+        $Path -match '[\x00-\x1f\x7f*?\[\]]') { return $false }
+    foreach ($component in $Path.Split('/')) {
+        if ([string]::IsNullOrEmpty($component) -or $component -ceq '.' -or $component -ceq '..') { return $false }
+    }
     return $true
 }
 
@@ -434,29 +438,40 @@ function New-DmEvidence {
     [pscustomobject][ordered]@{ gate = $Gate; subject = $Subject; state = $State; detail = $Detail }
 }
 
-function Get-DmStringLeaf {
+function Test-DmSafeDiagnosticValue {
     <#
     .SYNOPSIS
-    Enumerates string values nested in a diagnostic object.
+    Validates structured diagnostic data without treating paths as prose.
     .PARAMETER Value
-    String, dictionary, enumerable, or custom object to inspect.
-    .PARAMETER Depth
-    Current nesting depth; traversal stops after depth eight.
+    Optional scalar, collection, or object contained in error details.
+    .PARAMETER FieldName
+    Name of the containing structured field; target values use path validation.
     #>
-    param([AllowNull()]$Value, [int]$Depth = 0)
-    if ($null -eq $Value -or $Depth -gt 8) { return }
-    if ($Value -is [string]) { $Value; return }
-    if ($Value -is [System.Collections.IDictionary]) {
-        foreach ($k in $Value.Keys) { Get-DmStringLeaf -Value $Value[$k] -Depth ($Depth + 1) }
-        return
+    [CmdletBinding()]
+    param([AllowNull()]$Value, [string]$FieldName = '')
+    if ($FieldName -ceq 'target') {
+        return ($Value -is [string] -and (Test-DmVaultRelativeText -Path $Value))
     }
-    if ($Value -is [System.Collections.IEnumerable]) {
-        foreach ($v in $Value) { Get-DmStringLeaf -Value $v -Depth ($Depth + 1) }
-        return
+    if ($null -eq $Value) { return $true }
+    if ($Value -is [string]) { return (Test-DmSafeText -Text $Value) }
+    if ($Value -is [System.Collections.IDictionary]) {
+        foreach ($key in $Value.Keys) {
+            if (-not (Test-DmSafeDiagnosticValue -Value $Value[$key] -FieldName ([string]$key))) { return $false }
+        }
+        return $true
     }
     if ($Value -is [System.Management.Automation.PSCustomObject]) {
-        foreach ($p in $Value.PSObject.Properties) { Get-DmStringLeaf -Value $p.Value -Depth ($Depth + 1) }
+        foreach ($property in $Value.PSObject.Properties) {
+            if (-not (Test-DmSafeDiagnosticValue -Value $property.Value -FieldName $property.Name)) { return $false }
+        }
+        return $true
     }
+    if ($Value -is [System.Collections.IEnumerable]) {
+        foreach ($item in $Value) {
+            if (-not (Test-DmSafeDiagnosticValue -Value $item -FieldName $FieldName)) { return $false }
+        }
+    }
+    return $true
 }
 
 function Test-DmResult {
@@ -578,15 +593,12 @@ function Test-DmResult {
                     $errors.Add('errorDetails.message must be a non-empty string.')
                 }
             }
-            foreach ($text in @(Get-DmStringLeaf -Value $detail)) {
-                if (-not (Test-DmSafeText -Text $text)) {
-                    $errors.Add('errorDetails must not contain absolute paths.')
-                    break
-                }
+            if (-not (Test-DmSafeDiagnosticValue -Value $detail)) {
+                $errors.Add('errorDetails must not contain absolute paths or invalid target paths.')
             }
         }
     }
     & $finish
 }
 
-Export-ModuleMember -Function Get-DmContractVersion, Get-DmCompletionStatus, Get-DmCompletionCode, Get-DmTargetOutcome, Test-DmSafeText, New-DmTargetRecord, New-DmResult, New-DmEntryPointResult, New-DmBlockedResult, Test-DmResult, New-DmGateOutcome, New-DmEvidence
+Export-ModuleMember -Function Get-DmContractVersion, Get-DmCompletionStatus, Get-DmCompletionCode, Test-DmVaultRelativeText, Test-DmSafeText, New-DmTargetRecord, New-DmResult, New-DmEntryPointResult, New-DmBlockedResult, Test-DmResult, New-DmGateOutcome, New-DmEvidence

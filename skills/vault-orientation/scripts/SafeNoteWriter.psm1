@@ -6,6 +6,184 @@ Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultBoundary.psm
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultConfiguration.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PluginResources.psm1')
 
+if ($null -eq ('DmAssistant.IO.DirectoryLease' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace DmAssistant.IO
+{
+    public sealed class DirectoryLease : IDisposable
+    {
+        private const uint FileReadAttributes = 0x80;
+        private const uint Delete = 0x00010000;
+        private const uint ShareRead = 0x1;
+        private const uint ShareWrite = 0x2;
+        private const uint OpenExisting = 3;
+        private const uint CreateNew = 1;
+        private const uint GenericWrite = 0x40000000;
+        private const uint FileAttributeTemporary = 0x00000100;
+        private const uint BackupSemantics = 0x02000000;
+        private readonly List<SafeFileHandle> handles = new List<SafeFileHandle>();
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SecurityAttributes
+        {
+            public int Length;
+            public IntPtr SecurityDescriptor;
+            [MarshalAs(UnmanagedType.Bool)]
+            public bool InheritHandle;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path, uint access, uint share, IntPtr securityAttributes,
+            uint creationDisposition, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path, uint access, uint share, ref SecurityAttributes securityAttributes,
+            uint creationDisposition, uint flags, IntPtr template);
+
+        [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+            string descriptor, uint revision, out IntPtr securityDescriptor, out uint size);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr LocalFree(IntPtr memory);
+
+        public static SafeFileHandle CreateProtectedStage(string path)
+        {
+            IntPtr descriptor;
+            uint size;
+            if (!ConvertStringSecurityDescriptorToSecurityDescriptor(
+                "D:P(A;;FA;;;OW)", 1, out descriptor, out size))
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "A restricted staging descriptor could not be created.");
+
+            try
+            {
+                var attributes = new SecurityAttributes
+                {
+                    Length = Marshal.SizeOf(typeof(SecurityAttributes)),
+                    SecurityDescriptor = descriptor,
+                    InheritHandle = false
+                };
+                var handle = CreateFile(path, GenericWrite, 0, ref attributes,
+                    CreateNew, FileAttributeTemporary, IntPtr.Zero);
+                if (handle.IsInvalid)
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    handle.Dispose();
+                    throw new Win32Exception(error, "A protected staging file could not be created.");
+                }
+                return handle;
+            }
+            finally
+            {
+                LocalFree(descriptor);
+            }
+        }
+
+        public static DirectoryLease Acquire(string[] paths)
+        {
+            var lease = new DirectoryLease();
+            try
+            {
+                foreach (var path in paths)
+                {
+                    var handle = CreateFile(path, FileReadAttributes | Delete, ShareRead | ShareWrite,
+                        IntPtr.Zero, OpenExisting, BackupSemantics, IntPtr.Zero);
+                    if (handle.IsInvalid)
+                    {
+                        var error = Marshal.GetLastWin32Error();
+                        handle.Dispose();
+                        throw new Win32Exception(error, "A vault directory could not be leased.");
+                    }
+                    lease.handles.Add(handle);
+                }
+                return lease;
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
+        }
+
+        public void Dispose()
+        {
+            foreach (var handle in handles)
+                handle.Dispose();
+            handles.Clear();
+        }
+    }
+}
+'@ -ErrorAction Stop
+}
+
+function Open-DmVaultDirectoryLease {
+    <#
+    .SYNOPSIS
+    Holds the verified vault directory chain against rename or replacement.
+    .DESCRIPTION
+    Opens the canonical vault root and each target-parent directory with
+    delete access and without delete sharing, preventing their replacement
+    while a staged write runs.
+    .PARAMETER Boundary
+    Authorized canonical vault boundary containing the target.
+    .PARAMETER Resolution
+    Previously resolved target whose parent directory chain is held.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Boundary,
+        [Parameter(Mandatory)]$Resolution
+    )
+    if (-not $IsWindows) { throw [System.PlatformNotSupportedException]::new('Safe directory leases are supported only on Windows.') }
+    $root = [System.IO.Path]::GetFullPath([string]$Boundary.canonicalRoot)
+    $parent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetDirectoryName([string]$Resolution.resolvedPath))
+    if (-not (Test-DmPathWithinRoot -Root $root -Path $parent -Comparison $Boundary.comparison)) {
+        throw [System.UnauthorizedAccessException]::new('The target directory is outside the authorized vault.')
+    }
+    $paths = [System.Collections.Generic.List[string]]::new()
+    $paths.Add($root)
+    $relative = [System.IO.Path]::GetRelativePath($root, $parent)
+    if ($relative -cne '.') {
+        $current = $root
+        foreach ($component in ($relative -split '[\\/]')) {
+            if ([string]::IsNullOrEmpty($component) -or $component -ceq '.' -or $component -ceq '..') {
+                throw [System.UnauthorizedAccessException]::new('The target directory chain is not contained by the vault.')
+            }
+            $current = [System.IO.Path]::Combine($current, $component)
+            $paths.Add($current)
+        }
+    }
+    [DmAssistant.IO.DirectoryLease]::Acquire($paths.ToArray())
+}
+
+function Get-DmFileAccessFingerprint {
+    <#
+    .SYNOPSIS
+    Fingerprints a file's discretionary access control list.
+    .PARAMETER Path
+    Existing file whose access rules are read.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
+    $security = [System.IO.FileSystemAclExtensions]::GetAccessControl(
+        [System.IO.FileInfo]::new($Path),
+        [System.Security.AccessControl.AccessControlSections]::Access
+    )
+    $hash = [System.Security.Cryptography.SHA256]::HashData($security.GetSecurityDescriptorBinaryForm())
+    [pscustomobject][ordered]@{
+        security = $security
+        version  = 'sha256:' + [System.Convert]::ToHexString($hash).ToLowerInvariant()
+    }
+}
+
 function Get-DmByteFingerprint {
     <#
     .SYNOPSIS
@@ -35,22 +213,8 @@ function Get-DmCurrentChangeDependencyVersions {
     )
 
     $versions = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
-    if ($null -eq $Profile) {
-        $profileResolution = Resolve-DmVaultTarget -Boundary $Boundary -Path '.dmassist.yaml'
-        if ($profileResolution.code) { throw 'The profile dependency could not be resolved.' }
-        $profileVersion = 'absent'
-        if ($profileResolution.exists) {
-            if ($profileResolution.itemType -cne 'file') { throw 'The profile dependency is not a file.' }
-            $profileRead = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $profileResolution
-            if (-not $profileRead.ok) { throw 'The profile dependency could not be read.' }
-            $profileVersion = [string]$profileRead.version
-        }
-        $versions.Add('.dmassist.yaml', $profileVersion)
-    }
-    else {
-        foreach ($entry in (Get-DmProfileDependencyVersions -Boundary $Boundary -Profile $Profile)) {
-            $versions.Add([string]$entry.identity, [string]$entry.version)
-        }
+    foreach ($entry in (Get-DmProfileDependencyVersions -Boundary $Boundary -Profile $Profile)) {
+        $versions.Add([string]$entry.identity, [string]$entry.version)
     }
 
     $inventory = Get-DmDependencyInventoryVersion
@@ -119,6 +283,9 @@ function ConvertFrom-DmNoteBytes {
         $preamble = [byte[]]@(0xEF, 0xBB, 0xBF)
         $offset = 3
     }
+    elseif ($Bytes.Length -ge 4 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE -and $Bytes[2] -eq 0x00 -and $Bytes[3] -eq 0x00) {
+        return [pscustomobject][ordered]@{ ok = $false; code = 'ENCODING_UNSAFE'; text = $null; encodingName = $null; encoding = $null; preamble = @(); roundTrips = $false }
+    }
     elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE) {
         $encodingName = 'utf-16le'
         $encoding = [System.Text.UnicodeEncoding]::new($false, $false, $true)
@@ -130,6 +297,9 @@ function ConvertFrom-DmNoteBytes {
         $encoding = [System.Text.UnicodeEncoding]::new($true, $false, $true)
         $preamble = [byte[]]@(0xFE, 0xFF)
         $offset = 2
+    }
+    elseif ($Bytes -contains 0x00) {
+        return [pscustomobject][ordered]@{ ok = $false; code = 'ENCODING_UNSAFE'; text = $null; encodingName = $null; encoding = $null; preamble = @(); roundTrips = $false }
     }
 
     try {
@@ -236,12 +406,34 @@ function Invoke-DmAtomicReplace {
     )
 
     $stagePath = $null
+    $directoryLease = $null
     try {
-        $directory = [System.IO.Path]::GetDirectoryName([string]$Resolution.resolvedPath)
-        $leaf = [System.IO.Path]::GetFileName([string]$Resolution.resolvedPath)
-        $stagePath = [System.IO.Path]::Combine($directory, ".$leaf.dmassist-$([guid]::NewGuid().ToString('N')).tmp")
-        $stream = [System.IO.FileStream]::new($stagePath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $initialBoundary = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $Resolution
+        if (-not $initialBoundary.confirmed) {
+            return [pscustomobject][ordered]@{ ok = $false; code = [string]$initialBoundary.code; message = 'The target boundary changed before staging.' }
+        }
+        $directoryLease = Open-DmVaultDirectoryLease -Boundary $Boundary -Resolution $initialBoundary.resolution
+        $boundaryCheck = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $initialBoundary.resolution
+        if (-not $boundaryCheck.confirmed) {
+            return [pscustomobject][ordered]@{ ok = $false; code = [string]$boundaryCheck.code; message = 'The target boundary changed before staging.' }
+        }
+        $directory = [System.IO.Path]::GetDirectoryName([string]$boundaryCheck.resolution.resolvedPath)
+        $current = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $boundaryCheck.resolution
+        if (-not $current.ok) {
+            return [pscustomobject][ordered]@{ ok = $false; code = [string]$current.code; message = 'The target could not be revalidated before staging.' }
+        }
+        if ([string]$current.version -cne $ExpectedVersion) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'The target changed before staging.' }
+        }
+        $targetSecurity = Get-DmFileAccessFingerprint -Path ([string]$boundaryCheck.resolution.resolvedPath)
+        $stagePath = [System.IO.Path]::Combine($directory, ".dmassist-$([guid]::NewGuid().ToString('N')).tmp")
+        $stageHandle = [DmAssistant.IO.DirectoryLease]::CreateProtectedStage($stagePath)
+        $stream = [System.IO.FileStream]::new($stageHandle, [System.IO.FileAccess]::Write, 4096, $false)
         try {
+            [System.IO.FileSystemAclExtensions]::SetAccessControl(
+                [System.IO.FileInfo]::new($stagePath),
+                $targetSecurity.security
+            )
             $stream.Write($Bytes, 0, $Bytes.Length)
             $stream.Flush($true)
         }
@@ -267,7 +459,29 @@ function Invoke-DmAtomicReplace {
             return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A profile, reference, or installed resource changed before replacement.' }
         }
 
-        [System.IO.File]::Move($stagePath, [string]$boundaryCheck.resolution.resolvedPath, $true)
+        $finalBoundary = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $boundaryCheck.resolution
+        if (-not $finalBoundary.confirmed) {
+            return [pscustomobject][ordered]@{ ok = $false; code = [string]$finalBoundary.code; message = 'The target boundary changed immediately before replacement.' }
+        }
+        $finalCurrent = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $finalBoundary.resolution
+        if (-not $finalCurrent.ok) {
+            return [pscustomobject][ordered]@{ ok = $false; code = [string]$finalCurrent.code; message = 'The target could not be revalidated immediately before replacement.' }
+        }
+        if ([string]$finalCurrent.version -cne $ExpectedVersion) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'The target changed immediately before replacement.' }
+        }
+        $finalSecurity = Get-DmFileAccessFingerprint -Path ([string]$finalBoundary.resolution.resolvedPath)
+        if ([string]$finalSecurity.version -cne [string]$targetSecurity.version) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'The target access rules changed before replacement.' }
+        }
+
+        $replaceMethod = [System.IO.File].GetMethod('Replace', [type[]]@([string], [string], [string]))
+        $replaceArguments = [object[]]::new(3)
+        $replaceArguments[0] = $stagePath
+        $replaceArguments[1] = [string]$finalBoundary.resolution.resolvedPath
+        $replaceArguments[2] = $null
+        # Reflection preserves a real null backup path; PowerShell binds null as an empty string here.
+        $null = $replaceMethod.Invoke($null, $replaceArguments)
         $stagePath = $null
         [pscustomobject][ordered]@{ ok = $true; code = $null; message = '' }
     }
@@ -284,6 +498,7 @@ function Invoke-DmAtomicReplace {
         if ($null -ne $stagePath) {
             try { [System.IO.File]::Delete($stagePath) } catch { $null = $_ }
         }
+        if ($null -ne $directoryLease) { $directoryLease.Dispose() }
     }
 }
 
@@ -322,4 +537,4 @@ function Invoke-DmSafeNoteWrite {
     [pscustomobject][ordered]@{ ok = [bool]$outcome.ok; code = $outcome.code; reason = [string]$outcome.message }
 }
 
-Export-ModuleMember -Function Get-DmByteFingerprint, Get-DmCurrentChangeDependencyVersions, Test-DmChangeDependencyVersions, ConvertFrom-DmNoteBytes, ConvertTo-DmPreparedNote, Invoke-DmAtomicReplace, Invoke-DmSafeNoteWrite
+Export-ModuleMember -Function Get-DmByteFingerprint, Get-DmCurrentChangeDependencyVersions, Test-DmChangeDependencyVersions, ConvertFrom-DmNoteBytes, ConvertTo-DmPreparedNote, Open-DmVaultDirectoryLease, Get-DmFileAccessFingerprint, Invoke-DmAtomicReplace, Invoke-DmSafeNoteWrite

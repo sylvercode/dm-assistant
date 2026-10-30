@@ -83,7 +83,13 @@ function Invoke-DmInspect {
             -Message 'Inspection requires mode inspect.' -RemainingWork @('Send an inspect-mode request, then retry.') -Detail ([ordered]@{ mode = [string]$request.mode })
         return (New-DmInspectionOutcome -Result $result)
     }
-    $context = Get-DmPreNoteContext -Preflight $preflight
+    try { $context = Get-DmPreNoteContext -Preflight $preflight }
+    catch {
+        $result = New-DmBlockedResult -Operation $operation -CompletionCode 'TARGET_CONFLICT' -Targets $targets `
+            -Message 'A required profile or guidance dependency could not be verified; nothing was read.' `
+            -RemainingWork @('Revalidate the profile and local guidance, then retry.')
+        return (New-DmInspectionOutcome -Result $result)
+    }
     if (-not $context.passed) { return (New-DmInspectionOutcome -Result $context.result) }
     $boundary = $preflight.boundary
 
@@ -109,18 +115,34 @@ function Invoke-DmInspect {
         $resolution = $resolutions[$i]
         $version = $null
         if ($resolution.itemType -ceq 'file') {
-            $read = Read-DmVaultTargetBytes -Boundary $boundary -Resolution $resolution
+            try { $read = Read-DmVaultTargetBytes -Boundary $boundary -Resolution $resolution }
+            catch {
+                $result = New-DmInspectionFailure -Operation $operation -Code 'READ_FAILED' `
+                    -Message 'Inspection stopped because the requested target could not be read.' `
+                    -Targets $targets -FailedIndex $i -Reason 'The target read failed.'
+                return (New-DmInspectionOutcome -Result $result)
+            }
             if (-not $read.ok) {
-                $result = New-DmInspectionFailure -Operation $operation -Code $read.code -Message "Inspection stopped: $($read.reason)" -Targets $targets -FailedIndex $i -Reason $read.reason
+                $result = New-DmInspectionFailure -Operation $operation -Code $read.code `
+                    -Message 'Inspection stopped because the requested target could not be read.' `
+                    -Targets $targets -FailedIndex $i -Reason 'The target read failed.'
                 return (New-DmInspectionOutcome -Result $result)
             }
             $version = $read.version
             $read.bytes = $null
         }
         else {
-            $check = Confirm-DmVaultTarget -Boundary $boundary -Resolution $resolution
+            try { $check = Confirm-DmVaultTarget -Boundary $boundary -Resolution $resolution }
+            catch {
+                $result = New-DmInspectionFailure -Operation $operation -Code 'READ_FAILED' `
+                    -Message 'Inspection stopped because the requested target could not be confirmed.' `
+                    -Targets $targets -FailedIndex $i -Reason 'The target confirmation failed.'
+                return (New-DmInspectionOutcome -Result $result)
+            }
             if (-not $check.confirmed) {
-                $result = New-DmInspectionFailure -Operation $operation -Code $check.code -Message "Inspection stopped: $($check.reason)" -Targets $targets -FailedIndex $i -Reason $check.reason
+                $result = New-DmInspectionFailure -Operation $operation -Code $check.code `
+                    -Message 'Inspection stopped because the requested target could not be confirmed.' `
+                    -Targets $targets -FailedIndex $i -Reason 'The target confirmation failed.'
                 return (New-DmInspectionOutcome -Result $result)
             }
             if (-not $resolution.exists) { $version = 'absent' }

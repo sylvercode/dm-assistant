@@ -289,12 +289,12 @@ Describe 'Synthetic preview and approval safety' {
         [System.IO.File]::ReadAllBytes($fixture.NotePaths[0]) | Should -Be $current
     }
 
-    It 'returns TARGET_CONFLICT when the profile, guidance, or configured template changes' {
+    It 'returns TARGET_CONFLICT when the profile or guidance changes' {
         $request = New-TextEditRequest -VaultRoot $fixture.Root
         $preview = (Invoke-DmPreview -Request $request).preview
         $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $preview
 
-        foreach ($dependency in @('profile', 'guidance', 'template')) {
+        foreach ($dependency in @('profile', 'guidance')) {
             $beforeTarget = [System.IO.File]::ReadAllBytes($fixture.NotePaths[0])
             switch ($dependency) {
                 'profile' {
@@ -309,12 +309,21 @@ Describe 'Synthetic preview and approval safety' {
             [System.IO.File]::ReadAllBytes($fixture.NotePaths[0]) | Should -Be $beforeTarget
 
             # A fresh preview binds the next dependency mutation independently.
-            if ($dependency -ne 'template') {
-                $request = New-TextEditRequest -VaultRoot $fixture.Root
-                $preview = (Invoke-DmPreview -Request $request).preview
-                $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $preview
-            }
+            $request = New-TextEditRequest -VaultRoot $fixture.Root
+            $preview = (Invoke-DmPreview -Request $request).preview
+            $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $preview
         }
+    }
+
+    It 'does not invalidate a text replacement for an unrelated configured template change' {
+        $request = New-TextEditRequest -VaultRoot $fixture.Root
+        $preview = (Invoke-DmPreview -Request $request).preview
+        $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $preview
+        [System.IO.File]::AppendAllText($fixture.TemplatePath, "Unrelated synthetic template update.`n")
+
+        $outcome = Invoke-DmApply -Request $apply
+
+        Assert-Completion -Outcome $outcome -Code 'OK' -Status 'complete'
     }
 
     It 'invalidates approval when runtimeVersion changes after preview' {
@@ -360,7 +369,7 @@ Describe 'Synthetic preview and approval safety' {
         }
 
         Assert-Completion -Outcome (Invoke-DmApply -Request $apply) -Code 'TARGET_CONFLICT' -Status 'not completed'
-        Should -Invoke -ModuleName SafeNoteWriter -CommandName Read-DmVaultTargetBytes -Times 1 -Exactly -Scope It
+        Should -Invoke -ModuleName SafeNoteWriter -CommandName Read-DmVaultTargetBytes -Times 2 -Exactly -Scope It
         Get-TestVaultSnapshot -Path $fixture.ParentPath | Should -Be $before
     }
 

@@ -126,6 +126,71 @@ Describe 'Atomic note writes and boundary rechecks' {
         $outcome.code | Should -BeExactly 'WRITE_FAILED'
         [System.IO.File]::ReadAllBytes($target.resolution.resolvedPath) | Should -Be $original
     }
+
+    It 'holds the verified directory chain against rename while staging is active' {
+        $target = New-TestApplyTarget -Fixture $script:AtomicFixture -Path 'Atomic/First.md' -ReplacementText "# First`nReplacement.`n"
+        $directory = Join-Path $script:AtomicFixture.Root 'Atomic'
+        $renamed = Join-Path $script:AtomicFixture.Root 'Atomic-renamed'
+        $lease = Open-DmVaultDirectoryLease -Boundary $script:AtomicFixture.Boundary -Resolution $target.resolution
+        try {
+            { [System.IO.Directory]::Move($directory, $renamed) } | Should -Throw
+            Test-Path -LiteralPath $directory | Should -BeTrue
+        }
+        finally { $lease.Dispose() }
+    }
+
+    It 'preserves the target access rules through atomic replacement' {
+        $target = New-TestApplyTarget -Fixture $script:AtomicFixture -Path 'Atomic/First.md' -ReplacementText "# First`nACL-preserving replacement.`n"
+        $before = Get-DmFileAccessFingerprint -Path $target.resolution.resolvedPath
+        $rights = [System.Security.Principal.NTAccount]
+        $beforeRules = @($before.security.GetAccessRules($true, $true, $rights) | ForEach-Object {
+            "$($_.IdentityReference.Value)|$($_.AccessControlType)|$($_.FileSystemRights)|$($_.InheritanceFlags)|$($_.PropagationFlags)|$($_.IsInherited)"
+        } | Sort-Object)
+
+        $outcome = Invoke-DmSafeNoteWrite -Boundary $script:AtomicFixture.Boundary -Target $target
+
+        $outcome.ok | Should -BeTrue
+        $after = Get-DmFileAccessFingerprint -Path $target.resolution.resolvedPath
+        $afterRules = @($after.security.GetAccessRules($true, $true, $rights) | ForEach-Object {
+            "$($_.IdentityReference.Value)|$($_.AccessControlType)|$($_.FileSystemRights)|$($_.InheritanceFlags)|$($_.PropagationFlags)|$($_.IsInherited)"
+        } | Sort-Object)
+        $afterRules | Should -Be $beforeRules
+    }
+
+    It 'uses a short staging filename for long target leaves' {
+        $leaf = ('n' * 230) + '.md'
+        $fullPath = Join-Path $script:AtomicFixture.Root $leaf
+        [System.IO.File]::WriteAllText($fullPath, "Original long target.`n", [System.Text.UTF8Encoding]::new($false))
+        $resolution = Resolve-DmVaultTarget -Boundary $script:AtomicFixture.Boundary -Path $leaf
+        $original = [System.IO.File]::ReadAllBytes($fullPath)
+        $replacement = [System.Text.UTF8Encoding]::new($false).GetBytes("Replacement long target.`n")
+        $target = [pscustomobject][ordered]@{
+            path = $leaf
+            resolution = $resolution
+            observedVersion = Get-TestBytesVersion -Bytes $original
+            replacementBytes = $replacement
+        }
+
+        $outcome = Invoke-DmSafeNoteWrite -Boundary $script:AtomicFixture.Boundary -Target $target
+
+        $outcome.ok | Should -BeTrue
+        [System.IO.File]::ReadAllText($fullPath) | Should -BeExactly "Replacement long target.`n"
+    }
+
+    It 'rechecks the target after dependency reads and immediately before replacement' {
+        $target = New-TestApplyTarget -Fixture $script:AtomicFixture -Path 'Atomic/First.md' -ReplacementText "# First`nApproved replacement.`n"
+        $expectedDependencies = Get-DmCurrentChangeDependencyVersions -Boundary $script:AtomicFixture.Boundary -Profile $null
+        Mock -ModuleName SafeNoteWriter -CommandName Get-DmCurrentChangeDependencyVersions -MockWith {
+            $changed = [System.Text.UTF8Encoding]::new($false).GetBytes("# First`nChanged during dependency read.`n")
+            [System.IO.File]::WriteAllBytes($target.resolution.resolvedPath, $changed)
+            $expectedDependencies
+        }
+
+        $outcome = Invoke-DmSafeNoteWrite -Boundary $script:AtomicFixture.Boundary -Target $target -ExpectedDependencies $expectedDependencies
+
+        $outcome.code | Should -BeExactly 'TARGET_CONFLICT'
+        [System.IO.File]::ReadAllText($target.resolution.resolvedPath) | Should -BeExactly "# First`nChanged during dependency read.`n"
+    }
 }
 
 Describe 'Deterministic multi-target apply results' {

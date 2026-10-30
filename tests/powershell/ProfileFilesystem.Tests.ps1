@@ -70,6 +70,35 @@ Describe 'Vault profile filesystem and reference validation' {
         $check.changedIdentities | Should -Contain '.dmassist.yaml'
     }
 
+    It 'snapshots only guidance used by the current operation, not party notes or templates' {
+        $profile = [ordered]@{
+            version = 1
+            guidance = [ordered]@{ path = '.dmassist-guidance.md' }
+            party = [ordered]@{ note = 'Lore/Invented Town.md' }
+            templates = [ordered]@{ adventure = 'Lore/Template.md' }
+        }
+        [System.IO.File]::WriteAllText((Join-Path $fixture.Root '.dmassist-guidance.md'), 'Synthetic guidance.')
+        $reads = [System.Collections.Generic.List[string]]::new()
+        Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultTargetBytes -MockWith {
+            $reads.Add([string]$Resolution.path)
+            $bytes = [System.IO.File]::ReadAllBytes([string]$Resolution.resolvedPath)
+            [pscustomobject][ordered]@{
+                ok = $true
+                code = $null
+                bytes = $bytes
+                version = 'sha256:' + [System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+            }
+        }
+
+        $versions = Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $profile
+
+        $versions.identity | Should -Contain '.dmassist-guidance.md'
+        $reads | Should -Contain '.dmassist.yaml'
+        $reads | Should -Contain '.dmassist-guidance.md'
+        $reads | Should -Not -Contain 'Lore/Invented Town.md'
+        $reads | Should -Not -Contain 'Lore/Template.md'
+    }
+
     It 'does not substitute a plugin template when the profile has no matching template' {
         $profile = [ordered]@{ version = 1; templates = [ordered]@{ adventure = 'custom/adventure.md' } }
         (Resolve-DmProfileTemplate -Profile $profile -ArticleType 'monster').available | Should -BeFalse
