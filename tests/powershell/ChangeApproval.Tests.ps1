@@ -178,6 +178,29 @@ Describe 'Synthetic preview and approval safety' {
         Remove-Variable -Name DmApprovalInventoryPath -Scope Global -ErrorAction SilentlyContinue
     }
 
+    It 'blocks preview and apply before profile or note access when required campaign context is missing' {
+        Register-DmOperation -Name 'test.group-required' -Modes @('preview', 'apply') -FactChanging $false `
+            -RequiresCampaignGroup -ChangeKind edit -MinTargets 1 -MaxTargets 1 -Builder {
+                param($CurrentText, $Arguments, $TargetPath)
+                [string]$CurrentText
+            } | Out-Null
+        try {
+            $extra = @{ campaignGroup = [ordered]@{ campaign = 'Synthetic Campaign'; group = $null } }
+            $previewRequest = New-TestOperationRequest -VaultRoot $fixture.Root -Operation 'test.group-required' `
+                -Mode preview -Targets @('Adventures/Synthetic Arc.md') -Extra $extra
+            $applyRequest = New-TestOperationRequest -VaultRoot $fixture.Root -Operation 'test.group-required' `
+                -Mode apply -Targets @('Adventures/Synthetic Arc.md') -Extra $extra
+            Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultProfile -MockWith { throw 'Profile read before campaign/group gate.' }
+            Mock -ModuleName ChangePreview -CommandName Read-DmVaultTargetBytes -MockWith { throw 'Campaign note read before campaign/group gate.' }
+
+            Assert-Completion -Outcome (Invoke-DmPreview -Request $previewRequest) -Code 'INVALID_REQUEST' -Status 'not completed'
+            Assert-Completion -Outcome (Invoke-DmApply -Request $applyRequest) -Code 'INVALID_REQUEST' -Status 'not completed'
+            Should -Invoke -ModuleName VaultConfiguration -CommandName Read-DmVaultProfile -Times 0 -Exactly -Scope It
+            Should -Invoke -ModuleName ChangePreview -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+        }
+        finally { Unregister-DmOperation -Name 'test.group-required' | Out-Null }
+    }
+
     It 'keeps preview read-only and carries versioned effects without note content' {
         $request = New-TextEditRequest -VaultRoot $fixture.Root
         $before = Get-TestVaultSnapshot -Path $fixture.ParentPath
@@ -315,6 +338,28 @@ Describe 'Synthetic preview and approval safety' {
             $preview = (Invoke-DmPreview -Request $request).preview
             $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $preview
         }
+    }
+
+    It 'reports a changed punctuated guidance path as a structured apply conflict' {
+        $guidanceIdentity = 'Scenes(/guidance.md'
+        $guidanceDirectory = Join-Path -Path $fixture.Root -ChildPath 'Scenes('
+        $guidancePath = Join-Path -Path $guidanceDirectory -ChildPath 'guidance.md'
+        [void][System.IO.Directory]::CreateDirectory($guidanceDirectory)
+        [System.IO.File]::WriteAllText($guidancePath, "Synthetic guidance.`n")
+        [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nguidance:`n  path: '$guidanceIdentity'`n")
+        $request = New-TextEditRequest -VaultRoot $fixture.Root
+        $previewOutcome = Invoke-DmPreview -Request $request
+        Assert-Completion -Outcome $previewOutcome -Code 'OK' -Status 'complete'
+        $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $previewOutcome.preview
+        $targetBytes = [System.IO.File]::ReadAllBytes($fixture.NotePaths[0])
+        [System.IO.File]::AppendAllText($guidancePath, "Changed synthetic guidance.`n")
+
+        $outcome = Invoke-DmApply -Request $apply
+
+        Assert-Completion -Outcome $outcome -Code 'TARGET_CONFLICT' -Status 'not completed'
+        $outcome.result.errorDetails.details.changedDependencies | Should -Contain $guidanceIdentity
+        (Test-DmResult -Result $outcome.result -RequestedTargets $request.targets).isValid | Should -BeTrue
+        [System.IO.File]::ReadAllBytes($fixture.NotePaths[0]) | Should -Be $targetBytes
     }
 
     It 'does not invalidate a text replacement for an unrelated configured template change' {

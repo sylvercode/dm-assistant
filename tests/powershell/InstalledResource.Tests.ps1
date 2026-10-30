@@ -96,6 +96,25 @@ Describe 'Installed plugin schema resource' {
             @($runs.resource.fullPath | Select-Object -Unique).Count | Should -Be 1
         }
 
+        It 'accepts the pinned LF and CRLF schema bytes while reporting each raw-byte digest' {
+            $install = New-TestInstalledCopy -Name 'line-endings'
+            $schemaPath = Get-TestInstalledSchemaPath -InstallRoot $install
+            $schemaText = [System.IO.File]::ReadAllText($schemaPath)
+            foreach ($lineEnding in @("`n", "`r`n")) {
+                $representedText = [regex]::Replace($schemaText, '\r?\n', $lineEnding)
+                $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($representedText)
+                [System.IO.File]::WriteAllBytes($schemaPath, $bytes)
+                $null = Import-TestInstalledResourceModule -InstallRoot $install
+
+                $outcome = Get-DmProfileSchemaResource -Operation 'profile.load'
+                $expectedVersion = 'sha256:' + [System.Convert]::ToHexString(
+                    [System.Security.Cryptography.SHA256]::HashData($bytes)
+                ).ToLowerInvariant()
+                $outcome.passed | Should -BeTrue
+                $outcome.resource.version | Should -BeExactly $expectedVersion
+            }
+        }
+
         It 'validates a version 1 profile and rejects another version with the installed Draft 2020-12 artifact' {
             Push-Location -LiteralPath $script:WorkDirs[1]
             try { $resource = (Get-DmProfileSchemaResource).resource }

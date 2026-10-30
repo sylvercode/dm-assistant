@@ -97,23 +97,9 @@ function New-DmSafeDiagnostic {
         $safeDetails.target = $target
     }
     $changedDependencies = Get-DmDiagnosticField -Object $Details -Name 'changedDependencies'
-    if ($changedDependencies -is [System.Collections.IList] -and $changedDependencies -isnot [string] -and
-        $changedDependencies.Count -gt 0 -and $changedDependencies.Count -le 64) {
-        $safeIdentities = [System.Collections.Generic.List[string]]::new()
-        $unique = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-        $valid = $true
-        foreach ($identity in $changedDependencies) {
-            if ($identity -isnot [string] -or $identity.Length -gt 512) { $valid = $false; break }
-            $isPluginResource = $identity.StartsWith('plugin:', [System.StringComparison]::Ordinal) -and
-                (Test-DmVaultRelativeText -Path $identity.Substring(7))
-            $isVaultPath = Test-DmVaultRelativeText -Path $identity
-            if (-not ($isPluginResource -or $isVaultPath -or $identity -ceq 'dependency-set') -or -not $unique.Add($identity)) {
-                $valid = $false
-                break
-            }
-            $safeIdentities.Add($identity)
-        }
-        if ($valid) { $safeDetails.changedDependencies = [string[]]$safeIdentities.ToArray() }
+    if ($changedDependencies -is [System.Collections.IList] -and $changedDependencies.Count -gt 0 -and
+        (Test-DmSafeDiagnosticValue -Value $changedDependencies -FieldName 'changedDependencies')) {
+        $safeDetails.changedDependencies = [string[]]$changedDependencies
     }
     if ($safeDetails.Count -gt 0) { $result['details'] = [pscustomobject]$safeDetails }
     [pscustomobject]$result

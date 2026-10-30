@@ -46,8 +46,8 @@ namespace DmAssistant.IO
     public sealed class DirectoryLease : IDisposable
     {
         private const uint FileReadData = 0x1;
+        private const uint FileListDirectory = 0x1;
         private const uint FileReadAttributes = 0x80;
-        private const uint Delete = 0x00010000;
         private const uint ShareRead = 0x1;
         private const uint ShareWrite = 0x2;
         private const uint OpenExisting = 3;
@@ -181,7 +181,8 @@ namespace DmAssistant.IO
                             continue;
                         }
 
-                        var handle = CreateFile(ToExtendedPath(path), FileReadAttributes | Delete, ShareRead | ShareWrite,
+                        // Attribute-only access does not enforce deny-delete sharing on Windows.
+                        var handle = CreateFile(ToExtendedPath(path), FileReadAttributes | FileListDirectory, ShareRead | ShareWrite,
                             IntPtr.Zero, OpenExisting, BackupSemantics, IntPtr.Zero);
                         if (handle.IsInvalid)
                         {
@@ -785,7 +786,7 @@ function Test-DmUniqueResolvedTargets {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$Boundary,
-        [Parameter(Mandatory)][object[]]$Resolutions
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Resolutions
     )
     $comparer = if ([System.StringComparison]$Boundary.comparison -eq [System.StringComparison]::OrdinalIgnoreCase) {
         [System.StringComparer]::OrdinalIgnoreCase

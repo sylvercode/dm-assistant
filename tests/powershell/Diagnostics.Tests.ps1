@@ -98,6 +98,18 @@ Describe 'OperationDiagnostics safe error details' {
         (Test-DmResult -Result $result -RequestedTargets @($target)).isValid | Should -BeTrue
         $result.errorDetails.details.target | Should -BeExactly $target
     }
+
+    It 'validates changed dependency identities as structured paths' {
+        $identity = 'Scenes(/guidance.md'
+        $result = New-DmEntryPointResult -Operation 'notes.inspect' -State Failure -CompletionCode 'TARGET_CONFLICT' `
+            -Targets @('Lore/Invented Note.md') `
+            -UnchangedTargets @((New-DmTargetRecord -Path 'Lore/Invented Note.md' -Outcome 'not attempted')) `
+            -RemainingWork @('Revalidate dependencies, then retry.') `
+            -Details ([ordered]@{ changedDependencies = @($identity) })
+
+        (Test-DmResult -Result $result -RequestedTargets @('Lore/Invented Note.md')).isValid | Should -BeTrue
+        $result.errorDetails.details.changedDependencies | Should -Be @($identity)
+    }
 }
 
 Describe 'OperationDiagnostics local-only behavior' {

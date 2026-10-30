@@ -46,13 +46,19 @@ Describe 'Vault profile state and pre-note sequence' {
         finally { Unregister-DmOperation -Name 'notes.mapping-check' | Out-Null }
     }
 
-    It 'requires campaign and group context before profile or note access when the operation declares it' {
+    It 'requires campaign and group context before profile or note access (<Missing>)' -ForEach @(
+        @{ Missing = 'both values'; Campaign = $null; Group = $null }
+        @{ Missing = 'campaign'; Campaign = $null; Group = 'Synthetic Group' }
+        @{ Missing = 'group'; Campaign = 'Synthetic Campaign'; Group = $null }
+        @{ Missing = 'blank campaign'; Campaign = '  '; Group = 'Synthetic Group' }
+        @{ Missing = 'blank group'; Campaign = 'Synthetic Campaign'; Group = '  ' }
+    ) {
         Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
         Register-DmOperation -Name 'notes.group-check' -Modes @('inspect') -FactChanging $false `
             -RequiresCampaignGroup -MinTargets 1 -MaxTargets 1 | Out-Null
         try {
             $missingContext = New-TestOperationRequest -VaultRoot $fixture.Root -Operation 'notes.group-check' `
-                -Targets @('Lore/Invented Town.md') -Extra @{ campaignGroup = [ordered]@{ campaign = $null; group = $null } }
+                -Targets @('Lore/Invented Town.md') -Extra @{ campaignGroup = [ordered]@{ campaign = $Campaign; group = $Group } }
             Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultProfile -MockWith { throw 'Profile read before campaign/group gate.' }
             Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'Campaign note read before campaign/group gate.' }
 
@@ -77,8 +83,12 @@ Describe 'Vault profile state and pre-note sequence' {
         $outcome.result.completionCode | Should -Be 'OK'
     }
 
-    It 'loads the default local guidance when present and permits it to be absent' {
+    It 'loads default local guidance when <ProfileState> and permits it to be absent' -ForEach @(
+        @{ ProfileState = 'the profile is absent'; ProfileContent = $null }
+        @{ ProfileState = 'the profile omits guidance'; ProfileContent = "version: 1`n" }
+    ) {
         Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+        if ($null -ne $ProfileContent) { [System.IO.File]::WriteAllText($fixture.ProfilePath, $ProfileContent) }
         [System.IO.File]::WriteAllText((Join-Path -Path $fixture.Root -ChildPath '.dmassist-guidance.md'), 'Synthetic local guidance.')
 
         $preflight = Invoke-DmPreflight -Request $request
@@ -91,6 +101,25 @@ Describe 'Vault profile state and pre-note sequence' {
         $absent = Get-DmPreNoteContext -Preflight $preflight
         $absent.passed | Should -BeTrue
         $absent.context.guidanceLoaded | Should -BeFalse
+    }
+
+    It 'does not read unrelated configured party or template notes during inspection' {
+        Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+        $profile = "version: 1`nparty:`n  note: Lore/Invented Town.md`ntemplates:`n  adventure: Lore/Template.md`n"
+        [System.IO.File]::WriteAllText($fixture.ProfilePath, $profile)
+        $templatePath = Join-Path -Path (Join-Path -Path $fixture.Root -ChildPath 'Lore') -ChildPath 'Template.md'
+        [System.IO.File]::WriteAllText($templatePath, 'Synthetic template.')
+        Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultTargetBytes -ParameterFilter {
+            $Resolution.path -cin @('Lore/Invented Town.md', 'Lore/Template.md')
+        } -MockWith { throw 'Unrelated configured note was read.' }
+
+        $inspectRequest = New-TestOperationRequest -VaultRoot $fixture.Root -Targets @('Adventures/Synthetic Arc.md')
+        $outcome = Invoke-DmInspect -Request $inspectRequest
+
+        $outcome.result.completionCode | Should -BeExactly 'OK'
+        Should -Invoke -ModuleName VaultConfiguration -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It -ParameterFilter {
+            $Resolution.path -cin @('Lore/Invented Town.md', 'Lore/Template.md')
+        }
     }
 
     It 'blocks inspection when default guidance exists but is not a file' {
@@ -122,16 +151,21 @@ Describe 'Vault profile state and pre-note sequence' {
         @($context.result.unchangedTargets | ForEach-Object { $_.outcome }) | Should -Be @('not attempted')
     }
 
-    It 'blocks when designated guidance changes between validation and its dependency snapshot' {
+    It 'blocks when designated guidance is deleted between validation and its dependency snapshot' {
         Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
         $guidancePath = Join-Path -Path $fixture.Root -ChildPath '.dmassist-guidance.md'
         [System.IO.File]::WriteAllText($guidancePath, 'Synthetic local guidance.')
+        $guidanceBytes = [System.IO.File]::ReadAllBytes($guidancePath)
+        $validatedVersion = 'sha256:' + [System.Convert]::ToHexString(
+            [System.Security.Cryptography.SHA256]::HashData($guidanceBytes)
+        ).ToLowerInvariant()
         Mock -ModuleName VaultConfiguration -CommandName Test-DmProfileReference -MockWith {
+            [System.IO.File]::Delete($guidancePath)
             [pscustomobject][ordered]@{
                 passed = $true
                 code = $null
                 message = ''
-                version = 'sha256:' + ('a' * 64)
+                version = $validatedVersion
                 path = $Path
             }
         }

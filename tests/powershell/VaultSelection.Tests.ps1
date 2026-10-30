@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'TestHarness.psm1') -Force
-    Import-TestProductionModule -Name RuntimeContract, DependencyPreflight, VaultPathValidation, OperationRequest, VaultBoundary, RuntimePreflight, VaultInspection, ChangePreview
+    Import-TestProductionModule -Name RuntimeContract, DependencyPreflight, VaultPathValidation, OperationRequest, VaultBoundary, RuntimePreflight, VaultConfiguration, VaultInspection, ChangePreview
 
     function Get-TestSha256 {
         param([string]$Path)
@@ -161,6 +161,21 @@ Describe 'Vault selection and inspection' {
                 $outcome.inspection[0].version | Should -BeNullOrEmpty
             }
 
+            It 'completes a registered zero-target inspect request with an empty inspection' {
+                Register-DmOperation -Name 'notes.empty-inspect' -Modes @('inspect') -FactChanging $false `
+                    -MinTargets 0 -MaxTargets 0 | Out-Null
+                try {
+                    $emptyRequest = New-TestOperationRequest -VaultRoot $fixture.Root -Operation 'notes.empty-inspect' -Targets @()
+                    $outcome = Invoke-DmInspect -Request $emptyRequest
+
+                    $outcome.result.completionCode | Should -BeExactly 'OK'
+                    $outcome.result.unchangedTargets | Should -BeNullOrEmpty
+                    $outcome.inspection | Should -BeNullOrEmpty
+                    (Test-DmResult -Result $outcome.result -RequestedTargets @()).isValid | Should -BeTrue
+                }
+                finally { Unregister-DmOperation -Name 'notes.empty-inspect' | Out-Null }
+            }
+
             It 'rejects targets that resolve to the same file before reading or planning changes' {
                 [System.IO.File]::WriteAllText(
                     (Join-Path -Path $fixture.Root -ChildPath '.dmassist-guidance.md'),
@@ -189,6 +204,33 @@ Describe 'Vault selection and inspection' {
                     Should -Invoke -ModuleName ChangePreview -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
                 }
                 finally { Remove-TestLink -Path $aliasDirectory }
+            }
+
+            It 'rejects case-variant target aliases before inspection or change planning on Windows' {
+                if (-not $IsWindows) {
+                    Set-ItResult -Skipped -Because 'Windows path comparison is required for this regression'
+                    return
+                }
+                [System.IO.File]::WriteAllText(
+                    (Join-Path -Path $fixture.Root -ChildPath '.dmassist-guidance.md'),
+                    'Synthetic local guidance.'
+                )
+                $before = Get-TestVaultSnapshot -Path $fixture.ParentPath
+                $duplicateTargets = [string[]]@('Adventures/Synthetic Arc.md', 'adventures/synthetic arc.md')
+
+                Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'duplicate target was read' }
+                $inspectOutcome = Invoke-DmInspect -Request (New-TestOperationRequest -VaultRoot $fixture.Root -Targets $duplicateTargets)
+                Assert-NotCompleted -Outcome $inspectOutcome -Code 'INVALID_REQUEST' -Targets $duplicateTargets
+                Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+
+                $previewRequest = New-TestOperationRequest -VaultRoot $fixture.Root -Operation 'note.replace-text' -Mode preview `
+                    -Targets $duplicateTargets -Arguments ([ordered]@{ oldText = 'Invented'; newText = 'Revised' })
+                $previewPreflight = Invoke-DmPreflight -Request $previewRequest
+                $previewContext = Get-DmPreNoteContext -Preflight $previewPreflight
+                Mock -ModuleName ChangePreview -CommandName Read-DmVaultTargetBytes -MockWith { throw 'duplicate target was planned' }
+                $previewPlan = Get-DmChangePlan -Preflight $previewPreflight -Context $previewContext
+                $previewPlan.code | Should -BeExactly 'INVALID_REQUEST'
+                Should -Invoke -ModuleName ChangePreview -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
             }
 
             It 'treats variable and home-directory markers as literal names' {
@@ -220,6 +262,8 @@ Describe 'Vault selection and inspection' {
                 Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'target read attempted' }
                 $outcome = Invoke-DmInspect -Request $request
                 Assert-NotCompleted -Outcome $outcome -Code 'TARGET_CONFLICT' -Targets $targets
+                @($outcome.result.unchangedTargets.outcome | Select-Object -Unique) | Should -Be @('not attempted')
+                $outcome.result.errorDetails.details.changedDependencies | Should -Contain '.dmassist.yaml'
                 Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
             }
 
@@ -236,6 +280,8 @@ Describe 'Vault selection and inspection' {
                 Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'target read attempted' }
                 $outcome = Invoke-DmInspect -Request $request
                 Assert-NotCompleted -Outcome $outcome -Code 'TARGET_CONFLICT' -Targets $targets
+                @($outcome.result.unchangedTargets.outcome | Select-Object -Unique) | Should -Be @('not attempted')
+                $outcome.result.errorDetails.details.changedDependencies | Should -Contain '.dmassist.yaml'
                 Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
                 Remove-Variable -Name DmInspectionDependencyChecks -Scope Global
             }
@@ -253,7 +299,39 @@ Describe 'Vault selection and inspection' {
                 $outcome = Invoke-DmInspect -Request $request
                 Assert-NotCompleted -Outcome $outcome -Code 'TARGET_CONFLICT' -Targets $targets
                 @($outcome.result.remainingWork).Count | Should -Be $targets.Count
+                $outcome.result.errorDetails.details.changedDependencies | Should -Contain '.dmassist.yaml'
                 Remove-Variable -Name DmInspectionDependencyChecks -Scope Global
+            }
+
+            It 'reads notes when the vault directory is readable but denies delete access' {
+                if (-not $IsWindows) {
+                    Set-ItResult -Skipped -Because 'Windows ACLs are required for this permission regression'
+                    return
+                }
+                $directoryPath = Join-Path -Path $fixture.Root -ChildPath 'Lore'
+                $originalAcl = Get-Acl -LiteralPath $directoryPath
+                try {
+                    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+                    $denyDelete = [System.Security.AccessControl.FileSystemAccessRule]::new(
+                        $identity.User,
+                        [System.Security.AccessControl.FileSystemRights]::Delete,
+                        [System.Security.AccessControl.AccessControlType]::Deny
+                    )
+                    $restrictedAcl = Get-Acl -LiteralPath $directoryPath
+                    [void]$restrictedAcl.AddAccessRule($denyDelete)
+                    Set-Acl -LiteralPath $directoryPath -AclObject $restrictedAcl
+                }
+                catch {
+                    Set-ItResult -Skipped -Because 'The test environment does not permit setting a directory ACL'
+                    return
+                }
+
+                try {
+                    $outcome = Invoke-DmInspect -Request (New-TestOperationRequest -VaultRoot $fixture.Root -Targets @('Lore/Invented Town.md'))
+                    $outcome.result.completionCode | Should -BeExactly 'OK'
+                    $outcome.inspection[0].version | Should -BeExactly (Get-TestSha256 -Path $fixture.NotePaths[1])
+                }
+                finally { Set-Acl -LiteralPath $directoryPath -AclObject $originalAcl }
             }
 
             It 'returns READ_FAILED before any read when a path component is inaccessible' {
@@ -264,6 +342,21 @@ Describe 'Vault selection and inspection' {
                 }
                 Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'read attempted' }
                 Assert-NotCompleted -Outcome (Invoke-DmInspect -Request $request) -Code 'READ_FAILED' -Targets $targets
+                Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+            }
+
+            It 'preserves a legal punctuated target in a blocked inspection result' {
+                $t = [string[]]@('Scenes(/Locked.md')
+                Mock -ModuleName VaultInspection -CommandName Resolve-DmVaultTarget -MockWith {
+                    [pscustomobject]@{ code = 'READ_FAILED'; path = $Path; reason = 'The target component is unavailable.' }
+                }
+                Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'target read attempted' }
+
+                $outcome = Invoke-DmInspect -Request (New-TestOperationRequest -VaultRoot $fixture.Root -Targets $t)
+
+                Assert-NotCompleted -Outcome $outcome -Code 'READ_FAILED' -Targets $t
+                $outcome.result.errorDetails.details.target | Should -BeExactly $t[0]
+                $outcome.result.unchangedTargets[0].outcome | Should -BeExactly 'not attempted'
                 Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
             }
 

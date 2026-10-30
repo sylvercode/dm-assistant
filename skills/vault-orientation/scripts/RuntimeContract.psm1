@@ -445,12 +445,25 @@ function Test-DmSafeDiagnosticValue {
     .PARAMETER Value
     Optional scalar, collection, or object contained in error details.
     .PARAMETER FieldName
-    Name of the containing structured field; target values use path validation.
+    Name of the containing structured field; targets and changed dependency
+    identities use path validation.
     #>
     [CmdletBinding()]
     param([AllowNull()]$Value, [string]$FieldName = '')
     if ($FieldName -ceq 'target') {
         return ($Value -is [string] -and (Test-DmVaultRelativeText -Path $Value))
+    }
+    if ($FieldName -ceq 'changedDependencies') {
+        if ($Value -isnot [System.Collections.IList] -or $Value -is [string] -or $Value.Count -gt 64) { return $false }
+        $identities = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        foreach ($identity in $Value) {
+            if ($identity -isnot [string] -or $identity.Length -gt 512) { return $false }
+            $isPluginResource = $identity.StartsWith('plugin:', [System.StringComparison]::Ordinal) -and
+                (Test-DmVaultRelativeText -Path $identity.Substring(7))
+            if (-not ($isPluginResource -or (Test-DmVaultRelativeText -Path $identity) -or $identity -ceq 'dependency-set') -or
+                -not $identities.Add($identity)) { return $false }
+        }
+        return $true
     }
     if ($null -eq $Value) { return $true }
     if ($Value -is [string]) { return (Test-DmSafeText -Text $Value) }
@@ -601,4 +614,4 @@ function Test-DmResult {
     & $finish
 }
 
-Export-ModuleMember -Function Get-DmContractVersion, Get-DmCompletionStatus, Get-DmCompletionCode, Test-DmVaultRelativeText, Test-DmSafeText, New-DmTargetRecord, New-DmResult, New-DmEntryPointResult, New-DmBlockedResult, Test-DmResult, New-DmGateOutcome, New-DmEvidence
+Export-ModuleMember -Function Get-DmContractVersion, Get-DmCompletionStatus, Get-DmCompletionCode, Test-DmVaultRelativeText, Test-DmSafeText, Test-DmSafeDiagnosticValue, New-DmTargetRecord, New-DmResult, New-DmEntryPointResult, New-DmBlockedResult, Test-DmResult, New-DmGateOutcome, New-DmEvidence

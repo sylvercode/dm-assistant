@@ -14,7 +14,10 @@ $script:DmSchemaResource = [pscustomobject][ordered]@{
     dialect      = 'https://json-schema.org/draft/2020-12/schema'
     schemaId     = 'https://github.com/sylvercode/dm-assistant/skills/vault-orientation/assets/dmassist.schema.json'
     title        = 'DM Assistant Vault Configuration Profile, Version 1'
-    version1Hash = 'sha256:272d789047f00b268985f26486e30f112fbf4e6f4109a914cd5f8e3360a30863'
+    version1Hashes = @(
+        'sha256:272d789047f00b268985f26486e30f112fbf4e6f4109a914cd5f8e3360a30863'
+        'sha256:f71e0155e11d11569cbd74c5ed4dd5380c269944b0a639d82315e6732e5c9aae'
+    )
 }
 
 function Get-DmProfileSchemaPath {
@@ -97,7 +100,7 @@ function Get-DmProfileSchemaResource {
     catch { return (& $block 'RESOURCE_MISSING' 'missing' 'The packaged profile schema is missing or unreadable; no profile setting was used.' $reinstall) }
     $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
     $version = 'sha256:' + [System.Convert]::ToHexString($hash).ToLowerInvariant()
-    if ($version -cne $script:DmSchemaResource.version1Hash) {
+    if ($version -cnotin $script:DmSchemaResource.version1Hashes) {
         return (& $block 'RESOURCE_INCOMPATIBLE' 'incompatible' 'The packaged profile schema does not match the pinned version 1 artifact; no profile setting was used.' $reinstall)
     }
     try {
