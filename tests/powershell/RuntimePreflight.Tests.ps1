@@ -91,6 +91,21 @@ Describe 'RuntimePreflight production gate' {
             $gate.result | Should -BeNullOrEmpty
         }
 
+        It 'returns a deep copy of runtime support metadata that cannot alter the gate' {
+            $matrix = Get-DmRuntimeSupportMatrix
+            $matrix.operatingSystems[0] = 'Linux'
+            $matrix.modules[0].name = 'missing-module'
+            $matrix.modules[0].version = '0.0'
+            $matrix.modules = @()
+
+            $fresh = Get-DmRuntimeSupportMatrix
+            $fresh.operatingSystems | Should -Be @('Windows')
+            $fresh.modules.Count | Should -Be 1
+            $fresh.modules[0].name | Should -BeExactly 'powershell-yaml'
+            $fresh.modules[0].version | Should -BeExactly '0.4.12'
+            (Test-DmRuntimePrerequisite -Operation 'notes.inspect').passed | Should -BeTrue
+        }
+
         It 'returns PREREQUISITE_MISSING for PowerShell <Version> (<Edition>)' -ForEach @(
             @{ Version = '7.3.12'; Edition = 'Core' }
             @{ Version = '7.4.0'; Edition = 'Core' }

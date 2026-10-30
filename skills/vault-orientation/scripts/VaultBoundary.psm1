@@ -773,6 +773,40 @@ function Confirm-DmVaultTarget {
     [pscustomobject][ordered]@{ confirmed = $true; code = $null; reason = ''; resolution = $fresh }
 }
 
+function Test-DmUniqueResolvedTargets {
+    <#
+    .SYNOPSIS
+    Detects target aliases that resolve to the same vault path.
+    .PARAMETER Boundary
+    Canonical vault boundary supplying the platform path comparer.
+    .PARAMETER Resolutions
+    Resolved target records to compare before target access.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Boundary,
+        [Parameter(Mandatory)][object[]]$Resolutions
+    )
+    $comparer = if ([System.StringComparison]$Boundary.comparison -eq [System.StringComparison]::OrdinalIgnoreCase) {
+        [System.StringComparer]::OrdinalIgnoreCase
+    }
+    else {
+        [System.StringComparer]::Ordinal
+    }
+    $seen = [System.Collections.Generic.HashSet[string]]::new($comparer)
+    foreach ($resolution in $Resolutions) {
+        $resolvedPath = [string]$resolution.resolvedPath
+        if ([string]::IsNullOrEmpty($resolvedPath)) { continue }
+        if (-not $seen.Add($resolvedPath)) {
+            return [pscustomobject][ordered]@{
+                isUnique      = $false
+                duplicatePath = [string]$resolution.path
+            }
+        }
+    }
+    [pscustomobject][ordered]@{ isUnique = $true; duplicatePath = $null }
+}
+
 function Read-DmVaultTargetBytes {
     <#
     .SYNOPSIS
@@ -828,4 +862,4 @@ function Read-DmVaultTargetBytes {
     }
 }
 
-Export-ModuleMember -Function Resolve-DmVaultRoot, Resolve-DmVaultTarget, Confirm-DmVaultTarget, Read-DmVaultTargetBytes, Test-DmPathWithinRoot, Open-DmVaultDirectoryLease
+Export-ModuleMember -Function Resolve-DmVaultRoot, Resolve-DmVaultTarget, Confirm-DmVaultTarget, Read-DmVaultTargetBytes, Test-DmPathWithinRoot, Open-DmVaultDirectoryLease, Test-DmUniqueResolvedTargets

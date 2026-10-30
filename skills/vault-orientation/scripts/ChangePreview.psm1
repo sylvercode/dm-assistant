@@ -380,6 +380,15 @@ function Get-DmChangePlan {
         }
         $resolutions.Add($resolution)
     }
+    $uniqueTargets = Test-DmUniqueResolvedTargets -Boundary $Preflight.boundary -Resolutions ([object[]]$resolutions.ToArray())
+    if (-not $uniqueTargets.isUnique) {
+        $result = New-DmChangeEntryResult -Operation $operation -State Blocked -Code 'INVALID_REQUEST' -Targets $targets `
+            -UnchangedTargets $targets `
+            -RemainingWork @('Send each resolved vault target only once, then retry.') `
+            -Message 'Two or more requested targets resolve to the same vault path.' `
+            -Details ([ordered]@{ target = $uniqueTargets.duplicatePath })
+        return [pscustomobject][ordered]@{ ok = $false; code = 'INVALID_REQUEST'; result = $result; plan = @() }
+    }
 
     $plan = [System.Collections.Generic.List[object]]::new()
     $encodingFailureIndex = -1

@@ -1,6 +1,6 @@
 BeforeAll {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'TestHarness.psm1') -Force
-    Import-TestProductionModule -Name RuntimeContract, DependencyPreflight, VaultPathValidation, OperationRequest, VaultBoundary, RuntimePreflight, VaultInspection
+    Import-TestProductionModule -Name RuntimeContract, DependencyPreflight, VaultPathValidation, OperationRequest, VaultBoundary, RuntimePreflight, VaultInspection, ChangePreview
 
     function Get-TestSha256 {
         param([string]$Path)
@@ -159,6 +159,36 @@ Describe 'Vault selection and inspection' {
                 $outcome = Invoke-DmInspect -Request (New-TestOperationRequest -VaultRoot $fixture.Root -Targets @('Lore'))
                 $outcome.inspection[0].itemType | Should -BeExactly 'directory'
                 $outcome.inspection[0].version | Should -BeNullOrEmpty
+            }
+
+            It 'rejects targets that resolve to the same file before reading or planning changes' {
+                [System.IO.File]::WriteAllText(
+                    (Join-Path -Path $fixture.Root -ChildPath '.dmassist-guidance.md'),
+                    'Synthetic local guidance.'
+                )
+                $before = Get-TestVaultSnapshot -Path $fixture.ParentPath
+                $aliasDirectory = Join-Path -Path $fixture.Root -ChildPath 'AdventureAlias'
+                if ($null -eq (New-TestDirectoryLink -Path $aliasDirectory -Target (Join-Path -Path $fixture.Root -ChildPath 'Adventures'))) {
+                    Set-ItResult -Skipped -Because 'directory links cannot be created here'
+                    return
+                }
+                $duplicateTargets = [string[]]@('Adventures/Synthetic Arc.md', 'AdventureAlias/Synthetic Arc.md')
+                try {
+                    Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'duplicate target was read' }
+                    $inspectOutcome = Invoke-DmInspect -Request (New-TestOperationRequest -VaultRoot $fixture.Root -Targets $duplicateTargets)
+                    $inspectOutcome.result.completionCode | Should -BeExactly 'INVALID_REQUEST'
+                    Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+
+                    $previewRequest = New-TestOperationRequest -VaultRoot $fixture.Root -Operation 'note.replace-text' -Mode preview `
+                        -Targets $duplicateTargets -Arguments ([ordered]@{ oldText = 'Invented'; newText = 'Revised' })
+                    $previewPreflight = Invoke-DmPreflight -Request $previewRequest
+                    $previewContext = Get-DmPreNoteContext -Preflight $previewPreflight
+                    Mock -ModuleName ChangePreview -CommandName Read-DmVaultTargetBytes -MockWith { throw 'duplicate target was planned' }
+                    $previewPlan = Get-DmChangePlan -Preflight $previewPreflight -Context $previewContext
+                    $previewPlan.code | Should -BeExactly 'INVALID_REQUEST'
+                    Should -Invoke -ModuleName ChangePreview -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+                }
+                finally { Remove-TestLink -Path $aliasDirectory }
             }
 
             It 'treats variable and home-directory markers as literal names' {

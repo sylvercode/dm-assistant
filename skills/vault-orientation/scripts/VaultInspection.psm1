@@ -116,6 +116,14 @@ function Invoke-DmInspect {
             return (New-DmInspectionOutcome -Result $result)
         }
     }
+    $uniqueTargets = Test-DmUniqueResolvedTargets -Boundary $boundary -Resolutions ([object[]]$resolutions)
+    if (-not $uniqueTargets.isUnique) {
+        $result = New-DmBlockedResult -Operation $operation -CompletionCode 'INVALID_REQUEST' -Targets $targets `
+            -RemainingWork @('Send each resolved vault target only once, then retry.') `
+            -Message 'Two or more requested targets resolve to the same vault path.' `
+            -Detail ([ordered]@{ target = $uniqueTargets.duplicatePath })
+        return (New-DmInspectionOutcome -Result $result)
+    }
 
     $dependencyCheck = Test-DmProfileDependencyVersions -Boundary $boundary -Profile $context.profile -ReviewedVersions ([object[]]$context.dependencyVersions)
     if (-not $dependencyCheck.passed) {

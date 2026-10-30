@@ -24,11 +24,22 @@ $script:DmSupportedRuntime = [pscustomobject][ordered]@{
 function Get-DmRuntimeSupportMatrix {
     <#
     .SYNOPSIS
-    Returns the release's accepted runtime, operating system, and module versions.
+    Returns a deep copy of the release's accepted runtime, operating system, and module versions.
     #>
     [CmdletBinding()]
     param()
-    $script:DmSupportedRuntime
+    [pscustomobject][ordered]@{
+        operatingSystems  = [string[]]$script:DmSupportedRuntime.operatingSystems.Clone()
+        powerShellVersion = [version]$script:DmSupportedRuntime.powerShellVersion.ToString()
+        edition           = [string]$script:DmSupportedRuntime.edition
+        modules           = [object[]]@($script:DmSupportedRuntime.modules | ForEach-Object {
+                [pscustomobject][ordered]@{
+                    name    = [string]$_.name
+                    version = [string]$_.version
+                }
+            })
+        documentation     = [string]$script:DmSupportedRuntime.documentation
+    }
 }
 
 function Get-DmRuntimeEnvironment {

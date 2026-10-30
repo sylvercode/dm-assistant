@@ -29,6 +29,21 @@ function Import-TestProductionModule {
     }
 }
 
+function Test-TestPathWithinDirectory {
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$Path
+    )
+    $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $prefix = $fullRoot + [System.IO.Path]::DirectorySeparatorChar
+    $comparison = if ($IsWindows) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+    $fullPath.StartsWith($prefix, $comparison)
+}
+
 function New-TestVaultFixture {
     <#
     Creates a synthetic, disposable vault under -ParentPath (defaults to the
@@ -45,25 +60,51 @@ function New-TestVaultFixture {
         [System.Collections.IDictionary]$Notes
     )
     if ([string]::IsNullOrEmpty($ParentPath)) { $ParentPath = [System.IO.Path]::GetTempPath() }
+    if ([string]::IsNullOrWhiteSpace($Name) -or $Name -in @('.', '..') -or
+        $Name -match '[/\\:]' -or @($Name.ToCharArray() | Where-Object { [System.IO.Path]::GetInvalidFileNameChars() -contains $_ }).Count -gt 0) {
+        throw [System.ArgumentException]::new('Fixture Name must be one directory name.')
+    }
     $ownershipParentPath = [System.IO.Path]::GetFullPath($ParentPath)
     $ownedDirectory = Join-Path -Path $ownershipParentPath -ChildPath ('dmassist-test-' + [guid]::NewGuid().ToString('N'))
-    $root = Join-Path -Path $ownedDirectory -ChildPath $Name
+    $root = [System.IO.Path]::GetFullPath((Join-Path -Path $ownedDirectory -ChildPath $Name))
+    if (-not (Test-TestPathWithinDirectory -Root $ownedDirectory -Path $root)) {
+        throw [System.ArgumentException]::new('Fixture root must remain inside its uniquely owned directory.')
+    }
     $outside = Join-Path -Path $ownedDirectory -ChildPath 'outside'
-    [void][System.IO.Directory]::CreateDirectory($root)
-    [void][System.IO.Directory]::CreateDirectory($outside)
-    [System.IO.File]::WriteAllText((Join-Path -Path $outside -ChildPath 'secret.md'), "# Outside`nSynthetic outside-boundary file.`n")
-
     if ($null -eq $Notes) {
         $Notes = [ordered]@{
             'Adventures/Synthetic Arc.md' = "# Synthetic Arc`nInvented adventure text.`n"
             'Lore/Invented Town.md'       = "# Invented Town`nSee [[Synthetic Arc]].`n"
         }
     }
-    $notePaths = [System.Collections.Generic.List[string]]::new()
+    $validatedNotes = [System.Collections.Generic.List[object]]::new()
     foreach ($relative in $Notes.Keys) {
-        $full = Join-Path -Path $root -ChildPath ($relative -replace '/', [System.IO.Path]::DirectorySeparatorChar)
+        if ($relative -isnot [string] -or [string]::IsNullOrEmpty($relative) -or
+            $relative.StartsWith('/') -or $relative.Contains('\') -or $relative.Contains(':') -or
+            @($relative.Split('/') | Where-Object { [string]::IsNullOrEmpty($_) -or $_ -in @('.', '..') }).Count -gt 0) {
+            throw [System.ArgumentException]::new('Fixture note keys must be safe vault-relative paths.')
+        }
+        foreach ($component in $relative.Split('/')) {
+            if (@($component.ToCharArray() | Where-Object { [System.IO.Path]::GetInvalidFileNameChars() -contains $_ }).Count -gt 0) {
+                throw [System.ArgumentException]::new('Fixture note keys must be safe vault-relative paths.')
+            }
+        }
+        $full = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($root, ($relative -replace '/', [System.IO.Path]::DirectorySeparatorChar)))
+        if (-not (Test-TestPathWithinDirectory -Root $root -Path $full)) {
+            throw [System.ArgumentException]::new('Fixture note paths must remain inside the fixture vault.')
+        }
+        $validatedNotes.Add([pscustomobject]@{ relative = $relative; full = $full; content = [string]$Notes[$relative] })
+    }
+
+    [void][System.IO.Directory]::CreateDirectory($root)
+    [void][System.IO.Directory]::CreateDirectory($outside)
+    [System.IO.File]::WriteAllText((Join-Path -Path $outside -ChildPath 'secret.md'), "# Outside`nSynthetic outside-boundary file.`n")
+
+    $notePaths = [System.Collections.Generic.List[string]]::new()
+    foreach ($note in $validatedNotes) {
+        $full = [string]$note.full
         [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($full))
-        [System.IO.File]::WriteAllBytes($full, [System.Text.UTF8Encoding]::new($false).GetBytes([string]$Notes[$relative]))
+        [System.IO.File]::WriteAllBytes($full, [System.Text.UTF8Encoding]::new($false).GetBytes([string]$note.content))
         $notePaths.Add($full)
     }
     $profilePath = Join-Path -Path $root -ChildPath '.dmassist.yaml'

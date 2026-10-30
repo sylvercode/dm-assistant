@@ -574,6 +574,18 @@ function Get-DmPreNoteContext {
         return [pscustomobject][ordered]@{ passed = $false; result = $Preflight.result; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
     }
 
+    $request = $Preflight.request
+    $registration = Get-DmOperation -Name ([string]$request.operation)
+    if ($null -ne $registration -and $registration.requiresCampaignGroup -and
+        ($null -eq $request.campaignGroup -or
+            [string]::IsNullOrWhiteSpace([string]$request.campaignGroup.campaign) -or
+            [string]::IsNullOrWhiteSpace([string]$request.campaignGroup.group))) {
+        $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode 'INVALID_REQUEST' -Targets $Preflight.targets `
+            -Message 'This operation requires explicit campaign and group context before accessing campaign notes.' `
+            -RemainingWork @('Provide the campaign and group context, then retry.')
+        return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
+    }
+
     $ownerRoot = Split-Path -Parent $PSScriptRoot
     $sharedReferencePath = Join-Path -Path $ownerRoot -ChildPath 'VAULT-REFERENCE.md'
     try { $sharedText = [System.IO.File]::ReadAllText($sharedReferencePath, [System.Text.Encoding]::UTF8) }
@@ -610,6 +622,7 @@ function Get-DmPreNoteContext {
         $guidancePath = [string]$loaded.profile.guidance.path
     }
     $guidanceLoaded = $false
+    $guidanceVersion = 'absent'
     $guidanceResolution = Resolve-DmVaultTarget -Boundary $Preflight.boundary -Path $guidancePath
     if ($guidanceResolution.code) {
         $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $guidanceResolution.code -Targets $Preflight.targets -Message 'The designated local guidance could not be safely resolved.' -RemainingWork @('Correct or restore the local guidance, then retry.')
@@ -622,12 +635,17 @@ function Get-DmPreNoteContext {
             return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
         }
         $guidanceLoaded = $true
+        $guidanceVersion = [string]$guidance.version
     }
 
     try {
         $profileArgument = if ($profilePresent) { $loaded.profile } else { $null }
         $dependencies = Get-DmProfileDependencyVersions -Boundary $Preflight.boundary -Profile $profileArgument `
             -ExpectedProfileVersion ([string]$loaded.sourceVersion) -ReferencePaths @($guidancePath)
+        $guidanceSnapshot = @($dependencies | Where-Object { [string]$_.identity -ceq $guidancePath })
+        if ($guidanceSnapshot.Count -ne 1 -or [string]$guidanceSnapshot[0].version -cne $guidanceVersion) {
+            throw 'The guidance changed after validation and before its dependency snapshot.'
+        }
     }
     catch {
         $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode 'TARGET_CONFLICT' -Targets $Preflight.targets `
@@ -636,8 +654,6 @@ function Get-DmPreNoteContext {
         return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
     }
 
-    $request = $Preflight.request
-    $registration = Get-DmOperation -Name ([string]$request.operation)
     $needsMapping = $request.mode -cne 'inspect' -or ($null -ne $registration -and $registration.requiresMappings)
     if (-not $guidanceLoaded -and $needsMapping) {
         $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode 'AMBIGUOUS_CONTEXT' -Targets $Preflight.targets -Message 'No local guidance is designated; this request depends on unresolved note or folder mappings.' -RemainingWork @('Designate local guidance or request a specific mapping-independent lookup.')

@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 
 $pesterVersion = [version]'6.2.0'
 if (-not (Get-Module -ListAvailable -Name Pester | Where-Object { $_.Version -eq $pesterVersion })) {
-    Write-Error "Pester $pesterVersion is required for the acceptance tests. See docs/powershell-runtime-support.md."
+    Write-Error "Pester $pesterVersion is required for the acceptance tests. See docs/powershell-runtime-support.md." -ErrorAction Continue
     exit 2
 }
 Import-Module -Name Pester -RequiredVersion $pesterVersion -Force

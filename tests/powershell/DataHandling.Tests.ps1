@@ -102,6 +102,12 @@ BeforeAll {
                 continue
             }
             $normalizedName = [System.IO.Path]::GetFileName($commandName).ToLowerInvariant()
+            $visitedAliases = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            while ($visitedAliases.Add($normalizedName)) {
+                $alias = Get-Alias -Name $normalizedName -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($null -eq $alias) { break }
+                $normalizedName = [System.IO.Path]::GetFileName([string]$alias.Definition).ToLowerInvariant()
+            }
             if ($bannedCommands.ContainsKey($normalizedName)) {
                 $violations.Add($bannedCommands[$normalizedName])
             }
@@ -111,8 +117,14 @@ BeforeAll {
                 $element = $elements[$index]
                 if ($element -is [System.Management.Automation.Language.CommandParameterAst]) {
                     $hostCommand = $normalizedName -in @('pwsh', 'pwsh.exe', 'powershell', 'powershell.exe')
-                    if ($hostCommand -and $element.ParameterName -match '^(?i:c(ommand)?|e(n(c(oded)?)?)?)$') {
-                        $violations.Add('dynamic-execution')
+                    if ($hostCommand) {
+                        $executionParameters = @('Command', 'CommandWithArgs', 'EncodedCommand', 'EncodedArguments')
+                        foreach ($parameter in $executionParameters) {
+                            if ($parameter.StartsWith($element.ParameterName, [System.StringComparison]::OrdinalIgnoreCase)) {
+                                $violations.Add('dynamic-execution')
+                                break
+                            }
+                        }
                     }
                     if ($hostCommand -and $element.ParameterName -match '^(?i:e(x(ec(ution)?)?)?p(olicy)?)$' -and $index + 1 -lt $elements.Count) {
                         if ($elements[$index + 1].Extent.Text -match '(?i)^["'']?bypass["'']?$') {
@@ -245,6 +257,11 @@ Describe 'PowerShell production-script static audit' {
             @{ Text = 'Unblock-File -LiteralPath $path'; Rule = 'execution-policy' }
             @{ Text = 'Get-Item -Path $path'; Rule = 'non-literal-filesystem-path' }
             @{ Text = 'Get-Item $path'; Rule = 'non-literal-filesystem-path' }
+            @{ Text = 'gc $path'; Rule = 'non-literal-filesystem-path' }
+            @{ Text = 'cat -Path $path'; Rule = 'non-literal-filesystem-path' }
+            @{ Text = 'gci $path'; Rule = 'non-literal-filesystem-path' }
+            @{ Text = 'pwsh -EncodedCommand $data'; Rule = 'dynamic-execution' }
+            @{ Text = 'pwsh -EncodedArguments $data'; Rule = 'dynamic-execution' }
             @{ Text = 'Invoke-WebRequest -Uri $uri'; Rule = 'network-api' }
             @{ Text = 'iwr -Uri $uri'; Rule = 'network-api' }
             @{ Text = 'Invoke-RestMethod -Uri $uri'; Rule = 'network-api' }

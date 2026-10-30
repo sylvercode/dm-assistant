@@ -46,6 +46,25 @@ Describe 'Vault profile state and pre-note sequence' {
         finally { Unregister-DmOperation -Name 'notes.mapping-check' | Out-Null }
     }
 
+    It 'requires campaign and group context before profile or note access when the operation declares it' {
+        Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+        Register-DmOperation -Name 'notes.group-check' -Modes @('inspect') -FactChanging $false `
+            -RequiresCampaignGroup -MinTargets 1 -MaxTargets 1 | Out-Null
+        try {
+            $missingContext = New-TestOperationRequest -VaultRoot $fixture.Root -Operation 'notes.group-check' `
+                -Targets @('Lore/Invented Town.md') -Extra @{ campaignGroup = [ordered]@{ campaign = $null; group = $null } }
+            Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultProfile -MockWith { throw 'Profile read before campaign/group gate.' }
+            Mock -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -MockWith { throw 'Campaign note read before campaign/group gate.' }
+
+            $outcome = Invoke-DmInspect -Request $missingContext
+
+            $outcome.result.completionCode | Should -BeExactly 'INVALID_REQUEST'
+            Should -Invoke -ModuleName VaultConfiguration -CommandName Read-DmVaultProfile -Times 0 -Exactly -Scope It
+            Should -Invoke -ModuleName VaultInspection -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+        }
+        finally { Unregister-DmOperation -Name 'notes.group-check' | Out-Null }
+    }
+
     It 'records the ordered pre-note gates before campaign-note inspection' {
         Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
         [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nguidance:`n  path: .dmassist-guidance.md`n")
@@ -101,6 +120,28 @@ Describe 'Vault profile state and pre-note sequence' {
         $context.passed | Should -BeFalse
         $context.result.completionCode | Should -BeExactly 'READ_FAILED'
         @($context.result.unchangedTargets | ForEach-Object { $_.outcome }) | Should -Be @('not attempted')
+    }
+
+    It 'blocks when designated guidance changes between validation and its dependency snapshot' {
+        Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+        $guidancePath = Join-Path -Path $fixture.Root -ChildPath '.dmassist-guidance.md'
+        [System.IO.File]::WriteAllText($guidancePath, 'Synthetic local guidance.')
+        Mock -ModuleName VaultConfiguration -CommandName Test-DmProfileReference -MockWith {
+            [pscustomobject][ordered]@{
+                passed = $true
+                code = $null
+                message = ''
+                version = 'sha256:' + ('a' * 64)
+                path = $Path
+            }
+        }
+        $preflight = Invoke-DmPreflight -Request $request
+
+        $context = Get-DmPreNoteContext -Preflight $preflight
+
+        $context.passed | Should -BeFalse
+        $context.result.completionCode | Should -BeExactly 'TARGET_CONFLICT'
+        Should -Invoke -ModuleName VaultConfiguration -CommandName Test-DmProfileReference -Times 1 -Exactly -Scope It
     }
 
     It 'blocks on a profile snapshot changed after validation with requested targets retained' {
