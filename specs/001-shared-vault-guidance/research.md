@@ -33,9 +33,10 @@ setup, readiness check, and unavailable behavior.
 **Verified resolver contract**:
 
 - Repository: [sylvercode/obsidian-link-resolver](https://github.com/sylvercode/obsidian-link-resolver).
-- Minimum compatible release: `2.0.0`, which publishes the MCP server.
-- Server name: `obsidian-link-resolver`; required tool:
-  `resolve_obsidian_link`.
+- Minimum compatible release: `2.1.0`, which adds `get_server_info` to the
+  MCP server first published in `2.0.0`.
+- Server name: `obsidian-link-resolver`; required tools:
+  `resolve_obsidian_link` and `get_server_info`.
 - Server startup requires one or more accessible, explicitly authorized
   `--vault` roots. Keep those user-specific paths out of the plugin and
   repository.
@@ -129,9 +130,10 @@ The Resolver's source/contract documentation describes its allowed vault roots
 as a server-startup allow-list that requests cannot widen. Copilot CLI
 documents `copilot mcp get` as reporting server status and available tools.
 These support checking tool readiness separately from vault authorization.
-Exact CLI JSON output and a safe, generally available authorization
-introspection mechanism remain unverified. Do not claim an untested command
-schema or resolve a campaign link merely to establish authorization.
+Exact CLI JSON output was not relied on. As of Resolver 2.1.0, the
+`get_server_info` tool reports the running server's configured roots; see the
+2026-10-29 T002 result below. Do not resolve a campaign link merely to
+establish authorization.
 
 ### Foundational verification procedures
 
@@ -148,10 +150,8 @@ T002 must use an isolated Copilot CLI configuration and a disposable vault.
 The documented MCP status/tool checks can establish Resolver readiness, but
 are not authorization evidence. Test only a documented, note-content-free
 signal that confirms the exact disposable vault root is authorized; do not
-resolve a link or inspect/change live user MCP configuration. The
-authorization-introspection method remains unverified. If no safe supported
-signal can be demonstrated, record authorization as blocked and do not permit
-campaign-note access.
+resolve a link or inspect/change live user MCP configuration. The 2026-10-29
+run below verified `get_server_info` as that signal.
 
 ### Earlier prerequisite check (superseded by the test run below)
 
@@ -253,16 +253,9 @@ and `.temp\t011-package-check\missing-reference.md`; the disposable plugin
 was uninstalled using its isolated home. The repository reference and live
 plugin settings were unchanged.
 
-T002 readiness has passed; authorization verification is deferred pending a
-documented note-content-free interface. A proposed Resolver tool could accept
-an exact vault path and report whether it is allowed by the running server's
-active startup allow-list. It must not read campaign notes, resolve links,
-modify the allow-list, or grant access. It must return explicit
-authorized/not-authorized results and surface errors so verification fails
-closed. No such tool was exposed in the tested server. If implemented and
-documented, test the configured disposable root and an unconfigured directory,
-then update the skill to use that verified interface. Do not invent its name,
-arguments, or response schema in runtime guidance before it exists.
+On 2026-10-26, T002 readiness passed but authorization verification was
+deferred pending a documented note-content-free interface. That gap is
+resolved by `get_server_info`; see the 2026-10-29 test run.
 
 At the user's subsequent explicit request, a separate functional link test
 resolved `[[Svalich Woods]]` with context `7. Argynvostholt.md` to
@@ -278,8 +271,50 @@ disposable vault, inspecting responses and note changes. Technical scenarios
 can be agent-driven; they do not all require a human DM or a real campaign.
 SC-004 is a separate human requirement: five DMs must take the informal
 walkthrough, with at least four distinguishing plugin-wide from vault-specific
-guidance. No such walkthrough or remaining end-to-end scenario evidence is
-available, so T011 remains deferred rather than passed.
+guidance.
+
+### Test run: T002 authorization and T011 scenarios (2026-10-29)
+
+**T002 — pass.** Resolver GitHub release v2.1.0 adds "mcp server info". The
+local executable reports server version `2.1.0` (an earlier executable
+reported `3.5.1`; the current version matches the GitHub release) and lists
+`generate_obsidian_link`, `get_server_info`, and `resolve_obsidian_link`.
+Direct stdio probes of `get_server_info` with no arguments returned
+`structuredContent` `{vaults: [{path}], version}` with `isError: false`.
+Paths are canonical and `\\?\`-prefixed on Windows. When started with only an
+unconfigured empty directory, the server listed only that directory; with
+several roots, it listed all of them; with a nonexistent root, startup failed
+with `an allowed vault root could not be accessed`. No notes were read and no
+links resolved. The vault-orientation skill now requires Resolver ≥2.1.0,
+calls `get_server_info`, normalizes paths (stripping `\\?\` or converting
+`\\?\UNC\` to `\\`, removing trailing separators, case-insensitive on
+Windows), and requires an exact match. A parent or child root does not match.
+It fails closed on errors or no match.
+
+**T011 — agent-run scenarios pass; SC-004 blocked.** Copilot CLI 1.0.103 ran
+in prompt mode with `--no-ask-user`, an isolated `COPILOT_HOME` holding a
+disposable install of the plugin, and a Resolver configured only for a
+disposable vault copy containing fictional fixture notes. These notes were an
+NPC with a DM-only callout, a tentative prep note, an actual-play log with a
+contradiction, and an optional guidance note. File-hash inventories before and
+after each run detected changes, and the vault was restored between runs.
+Results and fixes are in `quickstart.md`. Three first-run failures led to
+skill changes:
+
+- Uncertain mapping: the agent bulk-read folders before asking. The
+  no-guidance section now treats folder-as-role and bulk reads as uncertain
+  mappings.
+- Broad edit: the agent rewrote an actual-play log and deleted a note without
+  a preview. The skill and reference now classify these edits and state that
+  a request is not approval of the preview.
+- Permission-denied reference: the agent offered to proceed without it. The
+  skill now makes the reference mandatory.
+
+Each re-run passed, and the approved E04 preview was applied exactly. The
+results show that the skill guided one run per scenario. Agent behavior is
+probabilistic, and one run does not guarantee the same result every time.
+The live `.mcp.json` in the user-supplied test vault was not used because it
+authorizes a live vault. SC-004 needs human DMs, so T011 remains open.
 
 ### No-designated-guidance and knowledge boundaries
 

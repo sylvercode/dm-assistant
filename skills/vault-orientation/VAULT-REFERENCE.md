@@ -82,9 +82,12 @@ authorize publishing or sharing vault content.
 - A clearly requested page-local edit may proceed without redundant approval
   when its scope and effect are clear.
 - Before a broad, destructive, restructuring, or continuity-changing edit,
-  present a scoped preview and wait for the DM's explicit approval. Apply only
-  the approved preview within the authorized vault. If its scope or context
-  changes, pause and obtain direction again.
+  present a scoped preview and wait for the DM's explicit approval. Edits that
+  span several notes, delete, move, or merge notes, or alter actual-play
+  records or established continuity belong in this category. The original
+  request does not approve the preview. Apply only the approved preview
+  within the authorized vault. If its scope or context changes, pause and
+  obtain direction again.
 - Preserve user edits and unrelated content. Git history does not authorize
   overwriting or discarding current content.
 - Approval does not waive the vault, guidance, knowledge, continuity, or
