@@ -139,6 +139,12 @@ Describe 'RuntimePreflight production gate' {
             Assert-BlockedResult -Outcome $outcome -Code 'PREREQUISITE_MISSING' -Targets $targets
             $outcome.result.errorDetails.details.dependencyId | Should -Be 'obsidian-link-resolver'
             $outcome.result.errorDetails.details.readinessState | Should -Be $State
+            $outcome.result.errorDetails.details.minimumVersion | Should -BeExactly '2.1.0'
+            @($outcome.result.errorDetails.details.requiredTools) | Should -Be @('resolve_obsidian_link', 'get_server_info')
+            $outcome.result.errorDetails.message | Should -Match 'resolve_obsidian_link'
+            $outcome.result.errorDetails.message | Should -Match 'get_server_info'
+            $outcome.result.remainingWork[0] | Should -Match 'handoff'
+            if ($State -eq 'unknown') { $outcome.result.remainingWork[0] | Should -Not -Match '^Install' }
             Should -Invoke -ModuleName DependencyPreflight -CommandName Get-DmVaultAuthorization -Times 0 -Exactly -Scope It
         }
 
@@ -154,6 +160,62 @@ Describe 'RuntimePreflight production gate' {
         It 'returns RESOURCE_MISSING when the dependency inventory asset is unavailable' {
             Mock -ModuleName DependencyPreflight -CommandName Get-DmDependencyInventoryPath -MockWith { Join-Path -Path $TestDrive -ChildPath 'absent.json' }
             Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code 'RESOURCE_MISSING' -Targets $targets
+        }
+
+        It 'rejects an incompatible dependency inventory: <Case>' -ForEach @(
+            @{ Case = 'empty'; Duplicate = $false }
+            @{ Case = 'duplicate dependency'; Duplicate = $true }
+        ) {
+            $dependencies = @()
+            if ($Duplicate) {
+                $entry = [ordered]@{
+                    dependencyId = 'obsidian-link-resolver'
+                    type = 'mcp-server'
+                    minimumVersion = '2.1.0'
+                    requiredTools = @('resolve_obsidian_link', 'get_server_info')
+                }
+                $dependencies = @($entry, $entry)
+            }
+            $inventory = [ordered]@{ inventoryVersion = 2; dependencies = $dependencies }
+            $global:DmTestInventoryPath = Join-Path -Path $TestDrive -ChildPath ('inventory-' + [guid]::NewGuid().ToString('N') + '.json')
+            [System.IO.File]::WriteAllText($global:DmTestInventoryPath, ($inventory | ConvertTo-Json -Depth 8))
+            Mock -ModuleName DependencyPreflight -CommandName Get-DmDependencyInventoryPath -MockWith { $global:DmTestInventoryPath }
+            Set-TestDependencyReadiness -State ready
+            try {
+                Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code 'RESOURCE_INCOMPATIBLE' -Targets $targets
+                Should -Invoke -ModuleName DependencyPreflight -CommandName Get-DmDependencyReadiness -Times 0 -Exactly -Scope It
+            }
+            finally {
+                Remove-Variable -Name DmTestInventoryPath -Scope Global
+            }
+        }
+
+        It 'rejects an incompatible required-tools list: <Case>' -ForEach @(
+            @{ Case = 'missing'; Tools = $null; Omit = $true }
+            @{ Case = 'null'; Tools = $null; Omit = $false }
+            @{ Case = 'scalar'; Tools = 'get_server_info'; Omit = $false }
+            @{ Case = 'empty'; Tools = @(); Omit = $false }
+            @{ Case = 'duplicate'; Tools = @('get_server_info', 'get_server_info'); Omit = $false }
+            @{ Case = 'invalid name'; Tools = @('get_server_info', 'bad/name'); Omit = $false }
+            @{ Case = 'non-string'; Tools = @('get_server_info', 42); Omit = $false }
+        ) {
+            $entry = [ordered]@{
+                dependencyId = 'obsidian-link-resolver'
+                type = 'mcp-server'
+                minimumVersion = '2.1.0'
+                requiredTools = $Tools
+            }
+            if ($Omit) { $entry.Remove('requiredTools') }
+            $inventory = [ordered]@{ inventoryVersion = 2; dependencies = @($entry) }
+            $global:DmTestInventoryPath = Join-Path -Path $TestDrive -ChildPath ('inventory-' + [guid]::NewGuid().ToString('N') + '.json')
+            [System.IO.File]::WriteAllText($global:DmTestInventoryPath, ($inventory | ConvertTo-Json -Depth 8))
+            Mock -ModuleName DependencyPreflight -CommandName Get-DmDependencyInventoryPath -MockWith { $global:DmTestInventoryPath }
+            try {
+                Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code 'RESOURCE_INCOMPATIBLE' -Targets $targets
+            }
+            finally {
+                Remove-Variable -Name DmTestInventoryPath -Scope Global
+            }
         }
     }
 
@@ -171,6 +233,8 @@ Describe 'RuntimePreflight production gate' {
             $outcome = Invoke-WithLockedVault -Fixture $fixture -Action { Invoke-DmPreflight -Request $request }
             Assert-BlockedResult -Outcome $outcome -Code 'VAULT_AUTHORIZATION_UNPROVEN' -Targets $targets
             $outcome.result.errorDetails.message | Should -Not -Match ([regex]::Escape($fixture.Root))
+            $outcome.result.errorDetails.message | Should -Match 'PowerShell runtime'
+            $outcome.result.remainingWork[0] | Should -Match 'active session Resolver'
         }
 
         It 'is repeatable across runs and working directories' {
@@ -328,14 +392,17 @@ Describe 'RuntimePreflight production gate' {
             $inventory = @(Get-DmDependencyInventory)
             $inventory.Count | Should -Be $rows.Count
             foreach ($row in $rows) {
-                $id = [regex]::Match($row, 'configures `([^`]+)`').Groups[1].Value
                 $minimum = [regex]::Match($row, 'minimum compatible release is `([^`]+)`').Groups[1].Value
-                $tool = [regex]::Match($row, 'Exposes `([^`]+)`').Groups[1].Value
                 $link = [regex]::Match($row, '^\|\s*\[([^\]]+)\]\(([^)]+)\)')
+                $link.Success | Should -BeTrue
+                $id = ([uri]$link.Groups[2].Value).Segments[-1].TrimEnd('/')
+                $purpose = $row.Split('|')[3]
+                $tools = @([regex]::Matches($purpose, '`([^`]+)`') | ForEach-Object { $_.Groups[1].Value })
+                $tools.Count | Should -BeGreaterThan 0
                 $entry = $inventory | Where-Object { $_.dependencyId -ceq $id }
                 $entry | Should -Not -BeNullOrEmpty -Because "inventory must declare '$id'"
                 $entry.minimumVersion | Should -BeExactly $minimum
-                $entry.requiredTool | Should -BeExactly $tool
+                @($entry.requiredTools) | Should -Be $tools
                 $entry.displayName | Should -BeExactly $link.Groups[1].Value
                 $entry.project | Should -BeExactly $link.Groups[2].Value
             }

@@ -24,9 +24,9 @@ The selected PowerShell 7 runtime and dependency versions, supported
 OS/runtime matrix, and provisioning guidance must be recorded for each release.
 No operation installs or upgrades PowerShell or add-ons. A vault-facing
 operation's declared dependencies include the authoritative Feature 001
-inventory, initially `obsidian-link-resolver` 2.0.0 or later with
-`resolve_obsidian_link`, plus the profile reader when profile validation is
-needed. Profile validation uses the built-in `Test-Json -Schema` cmdlet, so
+inventory, initially Obsidian Link Resolver 2.1.0 or later with
+`resolve_obsidian_link` and `get_server_info`, plus the profile reader when
+profile validation is needed. Profile validation uses the built-in `Test-Json -Schema` cmdlet, so
 the supported PowerShell release must be 7.4 or later for JSON Schema Draft
 2020-12 support; no separate validator module is required. Readiness
 and authorization to the exact vault are separate checks.
@@ -78,20 +78,21 @@ these gates in order:
 5. Only after all preceding gates succeed, access campaign notes as permitted
    by the relevant Feature 001/002 contract.
 
-The current Feature 001 contract requires a note-content-free exact-vault
-authorization signal, but no such signal is established in the Feature 003
-specification. **Until that signal is documented and successfully verified,
-exact-vault authorization is blocked: the operation must return
-`VAULT_AUTHORIZATION_UNPROVEN` and must not read the profile, guidance, or any
-campaign note, and must not write or create any vault content.** Resolver
-availability, a caller-supplied path, or successful link resolution is not
-proof of authorization. Production preflight also accepts no authorization
-assertion from request fields, paths, environment variables, configuration, or
-the profile; a synthetic provider used only by the acceptance harness is
-outside this contract and the installed skill and never proves that Feature
-001's signal exists. A failed, missing, incompatible, or inconclusive gate
-fails closed before profile or note access. Non-vault read-only assistance that is
-independent of the blocked operation may remain available.
+Feature 001 defines a note-content-free exact-vault check using the active
+Resolver's `get_server_info` response. The PowerShell runtime cannot yet
+verify that active-session response or its readiness through a trusted
+handoff. **Until that handoff is implemented and verified, script-backed
+vault access remains blocked before profile, guidance, or campaign-note
+access and before any write.** An unconfirmed dependency returns
+`PREREQUISITE_MISSING`; if readiness is established but authorization is not,
+the operation returns `VAULT_AUTHORIZATION_UNPROVEN`. Resolver availability,
+a caller-supplied path, or successful link resolution is not proof of
+authorization. Production preflight accepts no authorization assertion from
+request fields, paths, environment variables, configuration, or the profile;
+a synthetic provider used only by the acceptance harness never proves the
+production handoff works. A failed, missing, incompatible, or inconclusive
+gate fails closed. Non-vault read-only assistance independent of the blocked
+operation may remain available.
 
 Installing or discovering the static plugin and its skills does not invoke
 PowerShell or install prerequisites. A script invocation must not alter
@@ -106,14 +107,12 @@ The single canonical packaged schema location for profile-consuming work is:
 
 `skills/vault-orientation/assets/dmassist.schema.json`
 
-The schema belongs inside the installed consuming plugin component. A future
-installed loader must locate that resource through the installed plugin/owner
-skill resource mechanism, independently of the current working directory, and
-validate against that loaded artifact. This path is a proposal for the future
-packaged resource; Feature 002 documentation and packaging must be updated
-separately. Do not copy a second schema or fall back to a repository checkout,
-vault path, or current-directory path. The current source-tree schema location
-does not prove that the proposed installed resource exists.
+The schema is packaged with the consuming skill. The loader locates it relative
+to that installed skill, independently of the current working directory, and
+validates against that artifact. Feature 002 documentation points to the same
+canonical resource. Do not copy a second schema or fall back to a repository
+checkout, vault path, or current-directory path. Disposable copied-package
+tests do not establish installed-client behavior.
 
 If the resource is missing, unreadable, malformed, incompatible with the
 profile contract, or the required Draft 2020-12 validator is unavailable, the
@@ -287,8 +286,10 @@ encoding for every target and stops with `ENCODING_UNSAFE` if any target
 cannot be safely preserved. When FR-011 requires approval, `apply` must refer
 to that exact preview via `approvedPreviewId`; changed inputs,
 targets, proposed changes, or scope invalidate the approval. Approval does not
-cover later or additional changes. Clearly requested text edits confined to
-one named note do not require redundant broad-change approval.
+cover later or additional changes. A clearly requested local text edit
+confined to one named note does not require redundant approval unless it
+changes an actual-play record or established continuity. Approval-required
+work must be confirmed in a later message after the preview is presented.
 
 The runtime keeps no preview state between invocations. A target's
 `replacementVersion` is a fingerprint of the complete bytes that would be
@@ -298,9 +299,11 @@ profile, guidance file, template, configured reference, and packaged plugin
 resource the runtime reads to construct the proposed change, ordered by
 ordinal comparison of their vault-relative path or plugin-resource identity.
 Guidance loaded only by the assistant is not fingerprinted; FR-027
-re-establishment governs it. `runtimeVersion` is the installed plugin
-version combined with a fingerprint of the installed runtime module files, so
-a runtime change between preview and apply invalidates the approval.
+re-establishment governs it. The dependency inventory is included in the
+dependency snapshot and rechecked immediately before writes.
+`runtimeVersion` is the installed plugin version combined with a fingerprint
+of the installed runtime module files and dependency inventory, so a change
+to either between preview and apply invalidates the approval.
 `previewId` is a deterministic digest (for example SHA-256) of the canonical
 serialization of `contractVersion`, `runtimeVersion`, `operation`, the
 canonical `vaultRoot`, `campaignGroup`, the ordered `targets`, `arguments`,
@@ -381,7 +384,7 @@ written.
 | Path rules and boundary checks | FR-007, FR-021 | Reject every forbidden lexical form before access; reject traversal and symlink escapes before target access; accept only in-vault links after canonical, component-aware checks; recheck before every access. |
 | Profile parse/normalize/schema/filesystem separation | FR-016–FR-025 | Independently exercise malformed YAML/duplicate keys, normalized scalar edge cases, schema-invalid profiles, absent-profile discovery, explicit missing directories, reference type/readability, shared or nested section mappings and undetermined destinations (`AMBIGUOUS_CONTEXT`), deterministic defaults, and stale dependencies. Schema defaults alone never mutate input. |
 | Result structure and code taxonomy | FR-010 | Verify every result has the fields in the prescribed order, exact status vocabulary, one stable code, safe diagnostics, correct target partition, and no incomplete result marked complete. Exercise each listed code and each allowed status. |
-| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad changes require approval of the exact current preview, while a single named-note text edit does not; a target, template, guidance, or profile change after preview makes the old approval fail with `TARGET_CONFLICT`, and a changed request, runtime version, or rebuilt replacement makes it fail with `CONFIRMATION_REQUIRED`; the same preview yields the same `previewId` across separate processes; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
+| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad, actual-play, and continuity-changing edits require approval of the exact current preview in a later message, while a clearly requested non-continuity-changing local edit does not; a target, template, guidance, or profile change after preview makes the old approval fail with `TARGET_CONFLICT`, and a changed request, runtime version, or rebuilt replacement makes it fail with `CONFIRMATION_REQUIRED`; the same preview yields the same `previewId` across separate processes; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
 | Conflict detection, preservation, and encoding | FR-012–FR-013 | Modify a target after preview and before final write check; verify refusal and no overwrite. Verify supported UTF-8/UTF-16 bytes, line endings, and unrelated text remain intact; unsupported or undecodable text returns `ENCODING_UNSAFE` and remains unchanged. |
 | Atomicity and multi-target failure | FR-026 | Inject failure/interruption during a target write and after an earlier target succeeds; verify no partial current file, no later attempts, no rollback, correct `partially completed` status, and exact changed/unchanged/remaining target lists. |
 

@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'RuntimeContract.psm1')
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'DependencyPreflight.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultBoundary.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultConfiguration.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PluginResources.psm1')
@@ -21,7 +22,7 @@ function Get-DmByteFingerprint {
 function Get-DmCurrentChangeDependencyVersions {
     <#
     .SYNOPSIS
-    Collects ordered versions of profile, reference, and shared-resource inputs.
+    Collects ordered versions of profile, reference, and plugin-resource inputs.
     .PARAMETER Boundary
     Canonical authorized vault boundary for profile and reference access.
     .PARAMETER Profile
@@ -51,6 +52,9 @@ function Get-DmCurrentChangeDependencyVersions {
             $versions.Add([string]$entry.identity, [string]$entry.version)
         }
     }
+
+    $inventory = Get-DmDependencyInventoryVersion
+    $versions[[string]$inventory.identity] = [string]$inventory.version
 
     $shared = Get-DmSharedReferenceResource -Operation 'note.change'
     if (-not $shared.passed) { throw 'The packaged shared reference is unavailable.' }

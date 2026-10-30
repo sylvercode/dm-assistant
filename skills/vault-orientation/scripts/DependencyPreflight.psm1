@@ -18,6 +18,29 @@ function Get-DmDependencyInventoryPath {
     Join-Path -Path $assets -ChildPath 'runtime-dependencies.json'
 }
 
+function Get-DmDependencyInventoryVersion {
+    <#
+    .SYNOPSIS
+    Fingerprints the installed dependency inventory for change detection.
+    .DESCRIPTION
+    Returns the plugin resource identity and SHA-256 version. Throws when the
+    inventory is missing or unreadable.
+    #>
+    [CmdletBinding()]
+    param()
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes((Get-DmDependencyInventoryPath))
+    }
+    catch {
+        throw [System.IO.FileNotFoundException]::new('The runtime dependency inventory resource is missing or unreadable.')
+    }
+    $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
+    [pscustomobject][ordered]@{
+        identity = 'plugin:skills/vault-orientation/assets/runtime-dependencies.json'
+        version  = 'sha256:' + [System.Convert]::ToHexString($hash).ToLowerInvariant()
+    }
+}
+
 function Get-DmDependencyInventory {
     <#
     .SYNOPSIS
@@ -42,16 +65,27 @@ function Get-DmDependencyInventory {
     catch {
         throw [System.IO.InvalidDataException]::new('The runtime dependency inventory resource is malformed.')
     }
-    if ($null -eq $data -or -not $data.PSObject.Properties['inventoryVersion'] -or $data.inventoryVersion -ne 1 -or
-        -not $data.PSObject.Properties['dependencies'] -or $data.dependencies -isnot [array]) {
+    if ($null -eq $data -or -not $data.PSObject.Properties['inventoryVersion'] -or $data.inventoryVersion -ne 2 -or
+        -not $data.PSObject.Properties['dependencies'] -or $data.dependencies -isnot [array] -or $data.dependencies.Count -eq 0) {
         throw [System.IO.InvalidDataException]::new('The runtime dependency inventory resource is incompatible.')
     }
+    $ids = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($entry in $data.dependencies) {
         $valid = $entry -is [System.Management.Automation.PSCustomObject] -and
             $entry.PSObject.Properties['dependencyId'] -and [string]$entry.dependencyId -cmatch '^[a-z0-9][a-z0-9-]{0,63}$' -and
             $entry.PSObject.Properties['type'] -and $entry.type -ceq 'mcp-server' -and
             $entry.PSObject.Properties['minimumVersion'] -and $null -ne ([string]$entry.minimumVersion -as [version]) -and
-            $entry.PSObject.Properties['requiredTool'] -and [string]$entry.requiredTool -cmatch '^[A-Za-z0-9_.-]+$'
+            $entry.PSObject.Properties['requiredTools'] -and $entry.requiredTools -is [array] -and $entry.requiredTools.Count -gt 0 -and
+            $ids.Add([string]$entry.dependencyId)
+        if ($valid) {
+            $tools = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            foreach ($tool in $entry.requiredTools) {
+                if ($tool -isnot [string] -or $tool -cnotmatch '^[A-Za-z0-9_.-]+$' -or -not $tools.Add($tool)) {
+                    $valid = $false
+                    break
+                }
+            }
+        }
         if (-not $valid) {
             throw [System.IO.InvalidDataException]::new('The runtime dependency inventory resource contains an incompatible entry.')
         }
@@ -108,7 +142,7 @@ function Get-DmDependencyReadiness {
         $process.WaitForExit()
         $null = $stdout.Result, $stderr.Result
         if ($process.ExitCode -ne 0) {
-            return (& $new 'missing' 'The MCP server is not configured in Copilot CLI.')
+            return (& $new 'unknown' 'The MCP configuration could not be confirmed under the dependency name; the configured server may use a different name.')
         }
         return (& $new 'unknown' 'The MCP server is configured, but its version and tool exposure must be confirmed in the active Copilot CLI session.')
     }
@@ -125,10 +159,11 @@ function Get-DmVaultAuthorization {
     .SYNOPSIS
     Reports the production exact-vault authorization handoff state.
     .DESCRIPTION
-    Internal exact-vault authorization handoff. Feature 001 has not defined a
-    note-content-free authorization signal, so production always reports
-    'unknown'. It accepts no assertion from request fields, paths, environment
-    variables, configuration, or the profile, and reads nothing from the vault.
+    Internal exact-vault authorization handoff. Feature 001 defines the
+    note-content-free get_server_info signal, but this runtime cannot verify
+    the active session's response. Production therefore reports 'unknown'.
+    It accepts no assertion from request fields, paths, environment variables,
+    configuration, or the profile, and reads nothing from the vault.
     .PARAMETER Dependency
     Declared dependency for which authorization is required.
     .PARAMETER VaultRoot
@@ -143,7 +178,7 @@ function Get-DmVaultAuthorization {
     [pscustomobject][ordered]@{
         dependencyId            = [string]$Dependency.dependencyId
         vaultAuthorizationState = 'unknown'
-        evidence                = 'Feature 001 has not defined a note-content-free exact-vault authorization signal.'
+        evidence                = 'The runtime cannot verify the active session Resolver authorization response.'
     }
 }
 
@@ -200,15 +235,21 @@ function Test-DmDependencyReadiness {
         }
         $evidence.Add((New-DmEvidence -Gate $gate -Subject $id -State $state -Detail $detail))
         if ($state -cne 'ready') {
-            $requirement = "$id $($dependency.minimumVersion) or later exposing $($dependency.requiredTool)"
+            $requirement = "$id $($dependency.minimumVersion) or later exposing $($dependency.requiredTools -join ' and ')"
             $message = switch ($state) {
                 'missing' { "Required dependency $requirement is not available. $detail" }
                 'incompatible' { "Required dependency $id is incompatible; $requirement is required." }
                 default { "Readiness of required dependency $requirement could not be confirmed. $detail Unknown readiness is not success." }
             }
+            $remaining = if ($state -ceq 'unknown') {
+                "Check $requirement in the active Copilot CLI session. Script-backed work remains blocked until a trusted runtime readiness and authorization handoff is available."
+            }
+            else {
+                "Install and configure $requirement in Copilot CLI yourself. Script-backed work remains blocked until a trusted runtime readiness and authorization handoff is available."
+            }
             $result = New-DmBlockedResult -Operation $Operation -CompletionCode 'PREREQUISITE_MISSING' -Targets $Targets -Message $message `
-                -RemainingWork @("Install and configure $requirement in Copilot CLI yourself, confirm it in a new session, then retry.") `
-                -Detail ([ordered]@{ dependencyId = $id; readinessState = $state; minimumVersion = [string]$dependency.minimumVersion; requiredTool = [string]$dependency.requiredTool })
+                -RemainingWork @($remaining) `
+                -Detail ([ordered]@{ dependencyId = $id; readinessState = $state; minimumVersion = [string]$dependency.minimumVersion; requiredTools = [string[]]$dependency.requiredTools })
             return (New-DmGateOutcome -Gate $gate -Passed $false -Result $result -Evidence $evidence.ToArray())
         }
     }
@@ -267,12 +308,12 @@ function Test-DmVaultAuthorization {
     if ($blocked) {
         $detail = [ordered]@{ dependencyId = $blockedId; vaultAuthorizationState = $blockedState }
         $result = New-DmBlockedResult -Operation $Operation -CompletionCode 'VAULT_AUTHORIZATION_UNPROVEN' -Targets $Targets `
-            -Message 'Exact-vault authorization is unproven: no note-content-free authorization signal is available for this vault, so no profile, guidance, or campaign note was read and nothing was written.' `
-            -RemainingWork @('Exact-vault authorization requires the Feature 001 note-content-free signal, which is not yet available. Read-only assistance that does not need the vault remains available.') `
+            -Message 'Exact-vault authorization could not be verified by the PowerShell runtime, so no profile, guidance, or campaign note was read and nothing was written.' `
+            -RemainingWork @('A verified handoff from the active session Resolver is required before script-backed vault access. Read-only assistance that does not need the vault remains available.') `
             -Detail $detail
         return (New-DmGateOutcome -Gate $gate -Passed $false -Result $result -Evidence $evidence.ToArray())
     }
     New-DmGateOutcome -Gate $gate -Passed $true -Result $null -Evidence $evidence.ToArray()
 }
 
-Export-ModuleMember -Function Get-DmDependencyInventory, Test-DmDependencyReadiness, Test-DmVaultAuthorization
+Export-ModuleMember -Function Get-DmDependencyInventory, Get-DmDependencyInventoryVersion, Test-DmDependencyReadiness, Test-DmVaultAuthorization

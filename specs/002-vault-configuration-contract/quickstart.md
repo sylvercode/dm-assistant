@@ -1,4 +1,4 @@
-# Vault Configuration Contract: Future Validation Guide
+# Vault Configuration Contract: Validation Guide
 
 **Status: Feature 002 design-validation guide.** This feature defines the
 version-1 profile contract and schema, not its runtime. Feature 003 now
@@ -17,7 +17,7 @@ application-level format version, not the schema dialect. Use the written
 [configuration contract](contracts/vault-configuration-contract.md) as the
 reference for behavior not expressible in JSON Schema.
 
-When a future schema validation harness exists:
+For schema-level validation:
 
 1. Validate constructed normalized JSON instances against the shipped schema.
    Do not treat a YAML fixture as direct schema input.
@@ -25,10 +25,10 @@ When a future schema validation harness exists:
    vault. Schema scenarios must not access or modify filesystem paths.
 3. Assert both the validation result and, where relevant, that validation has
    not mutated the input instance.
-4. Do not invent a current command or runner. Issue #4 owns parser/runtime
-   selection, provisioning, and integration test commands.
+4. Use the Feature 003 validation guide for its selected runtime and test
+   command; Feature 002 does not prescribe a separate runner.
 
-## Future JSON Schema validation scenarios
+## JSON Schema validation scenarios
 
 These are schema-level cases over normalized objects. For each invalid case,
 expect rejection under the published schema; exact validator wording is
@@ -54,26 +54,28 @@ establish that a path is safe, exists, is readable, or remains within a vault.
 
 ## Separate Issue #4 integration scenarios
 
-The following are not JSON Schema test cases. Issue #4 owns the future reader,
+The following are not JSON Schema test cases. Issue #4 owns the reader,
 scalar-normalization layer, validator integration, runtime, and associated
-integration tests. These scenarios must remain separate from validation of
-normalized JSON instances:
+integration tests. Feature 003 implements these with synthetic coverage; the
+production authorization handoff and installed-client validation remain
+outstanding. Keep these scenarios separate from validation of normalized JSON
+instances:
 
-| Responsibility | Future integration scenario | Expected outcome |
+| Responsibility | Integration scenario | Expected outcome |
 | --- | --- | --- |
 | YAML parser and syntax | Exercise supported YAML syntax with the reader selected under Issue #4; separately test malformed or unsupported syntax. | Reader behavior follows its documented support; parser failures stop profile loading before dependent work. |
 | Scalar normalization | Feed YAML string, boolean, numeric, and date/time scalars in string-valued fields; test locale-independent conversion, lowercase boolean text, ISO 8601 dates/timestamps, explicit nulls, collections, and integer `version: 1`. | Normalize supported scalar values to the contract's required strings before schema validation. Reject explicit nulls and collections in scalar positions; preserve `version` as integer `1`. |
 | Duplicate YAML keys | Provide duplicate mapping keys at relevant levels, including cases a parser might otherwise overwrite during object construction. | Detect and reject duplicates during parsing; JSON Schema cannot detect keys already discarded by the parser. |
 | Filesystem, vault boundaries, and paths | In an explicitly authorized isolated fixture vault, test configured directory/file existence and readability, invalid relative/absolute/traversal paths, and symbolic links resolving inside and outside the vault. | Enforce existence and component-aware canonical vault containment before access; reject escapes. These are runtime checks, not schema assertions. |
 | Stale inputs | Change the profile, a referenced guidance/template input, or a relevant path after validation and before a dependent operation completes. | Stop affected work, identify the change, and require revalidation before retry. Do not mix old and new inputs or proceed on stale validation. |
-| Vault-facing preflight | Attempt profile-dependent work or campaign-note access before establishing the vault and separately verifying required dependency readiness and vault authorization, including readiness of `obsidian-link-resolver`/`resolve_obsidian_link` and explicit authorization of the intended vault. Also try to use profile contents to establish or expand authorization. | Block profile and campaign-note access until the Spec 001 preflight succeeds. Treat dependency readiness and vault authorization as distinct checks; never derive or expand authorization from `.dmassist.yaml`. |
+| Vault-facing preflight | Attempt profile-dependent work or campaign-note access before establishing the vault and separately verifying Resolver 2.1.0+ readiness with both `resolve_obsidian_link` and `get_server_info`, and exact-root authorization via `get_server_info`. Also try to use profile contents to establish or expand authorization. | Block profile and campaign-note access until the Spec 001 preflight succeeds. Treat dependency readiness and vault authorization as distinct checks; never derive or expand authorization from `.dmassist.yaml`. |
 | Default guidance candidate unavailable | With no explicit `guidance.path`, provide an absent `.dmassist-guidance.md`, then separately provide a present but unreadable/invalid candidate or make its availability impossible to establish. Request work that depends on vault-local guidance. | Absence alone is optional. If unreadable/invalid or availability cannot be established for dependent work, report the failure and pause dependent interpretation or note work before campaign-note access; do not silently skip the candidate. |
 
-Issue #4 also owns defining the future fixture format and executable test
-command. No parser, validator dependency, runtime version, or command is
-prescribed here. Profile and discovery workflows must enforce the Spec 001
-preflight, including the initial resolver dependency; `.dmassist.yaml` cannot
-establish or expand vault or dependency authorization.
+Issue #4 also owns the executable fixture tests and runtime selection. The
+Feature 003 guide records the synthetic test command and selected prerequisites;
+this feature does not prescribe separate versions. Profile and discovery
+workflows must enforce the Spec 001 preflight; `.dmassist.yaml` cannot establish
+or expand vault or dependency authorization.
 
 ## Design safeguards
 
@@ -87,4 +89,4 @@ access a path or perform an edit.
 See [spec](spec.md), [research](research.md), and [data model](data-model.md)
 for feature scope and ownership. The repository
 [README](../../README.md) and [architecture](../../docs/architecture.md)
-describe the current scaffold; neither provides a configuration runtime.
+describe the implemented runtime foundations and their production limitations.

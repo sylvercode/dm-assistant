@@ -1,7 +1,8 @@
 # Feature 003 Validation Guide
 
 **Status: Local synthetic runtime checks implemented; installed-client,
-real authorization, and production-platform acceptance remain unverified.**
+real runtime authorization handoff, and production-platform acceptance remain
+unverified.**
 
 Use this guide when implementing and validating Feature 003. Its scenarios
 describe expected behavior covered by the acceptance harness, plus remaining
@@ -26,16 +27,17 @@ Before testing a future script-backed operation:
   directory. Include only invented data; take before/after inventories or
   byte snapshots to verify that blocked and read-only scenarios do not write.
 - Test the exact-vault dependency gate. The initial Feature 001 dependency is
-  `obsidian-link-resolver` 2.0.0 or later with `resolve_obsidian_link`;
-  readiness and authorization for the exact vault are separate checks. The
-  note-content-free authorization signal is not yet defined. Until it is
-  documented and verifiable, tests of the production preflight must expect a
-  `VAULT_AUTHORIZATION_UNPROVEN` block before profile, guidance, or
-  campaign-note access. Scenarios below that reach profile, path, preview, or
-  write behavior run in an "authorized synthetic fixture" through the
-  test-only authorization provider that only the harness injects. That
-  provider never proves that Feature 001's signal exists and must not be
-  present in, or reachable from, the installed skill.
+  Obsidian Link Resolver 2.1.0 or later with both `resolve_obsidian_link` and
+  `get_server_info`; readiness and exact-vault authorization are separate
+  checks. Feature 001 defines and verified the note-content-free
+  `get_server_info` check, but the PowerShell runtime has no trusted
+  active-session handoff. Production preflight returns `PREREQUISITE_MISSING`
+  when readiness is unconfirmed or, when readiness is simulated as ready,
+  `VAULT_AUTHORIZATION_UNPROVEN` before profile, guidance, or campaign-note
+  access. Scenarios below that reach profile, path, preview, or write
+  behavior run in an "authorized synthetic fixture" through the test-only
+  provider. That provider never proves the production handoff works and must
+  not be present in, or reachable from, the installed skill.
 
 Run the local synthetic harness from the repository root with
 `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1` using Pester 6.2.0.
@@ -130,16 +132,17 @@ Feature 003 is not validated by these written scenarios alone. Before claiming
 an implementation is ready, run the future harness in every published
 supported environment, verify installed-client resource lookup, and retain
 sanitized results for the cases above. Also confirm that the installed plugin
-either excludes `tests/` or gains no authorization bypass from it, and that
-production preflight still returns `VAULT_AUTHORIZATION_UNPROVEN` when no
-harness provider is supplied. Do not claim stronger concurrency
+either excludes `tests/` or gains no authorization bypass from it. Until
+T047 is complete, production preflight must block without a harness provider:
+`PREREQUISITE_MISSING` for unconfirmed readiness or
+`VAULT_AUTHORIZATION_UNPROVEN` when readiness is simulated as ready. Do not claim stronger concurrency
 guarantees than the tested filesystem replacement primitives provide. Record
 sanitized evidence in the "Verification evidence" section of
 `docs/powershell-runtime-support.md`; this quickstart remains a guide only.
 
-The exact runtime/add-on versions, supported platform matrix, installed
-resource-loading implementation, runtime transport, operation catalog, and
-test-harness commands remain implementation decisions. This guide deliberately
-does not invent commands for them. Exact-vault authorization also remains a
-blocking contract dependency until Feature 001 defines a note-content-free
-signal.
+The selected runtime/add-on versions, current operation catalog, support
+matrix, and test command are documented in the runtime support guide.
+Installed-client and platform qualification remain incomplete. Feature 001
+defines the note-content-free signal; T047 tracks the runtime handoff, and
+T048 tracks the remaining classification of actual-play and
+continuity-changing edits.

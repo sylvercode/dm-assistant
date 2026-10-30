@@ -57,7 +57,7 @@ skills that depend on them.
   `specs/001-shared-vault-guidance/research.md`, then remove the temporary
   fixture. Do not use source-tree/current-directory fallbacks or treat an
   unverified sibling path as supported.
-- [ ] T002 Determine and document whether resolver readiness and authorization
+- [X] T002 Determine and document whether resolver readiness and authorization
   of the already-identified vault can be verified separately using
   note-content-free evidence, without resolving a campaign link. Use only an
   isolated Copilot CLI configuration and disposable vault; do not inspect or
@@ -272,7 +272,7 @@ integrated feature within the agreed static/runtime verification scope.
   with no such basis, the skill must leave the update unchanged and ask the DM.
   Record pass, fail, or blocked. This task is a static source audit and does
   not require runtime execution of every skill.
-- [ ] T011 Run the independent installed-client and disposable-vault scenarios
+- [X] T011 Run the independent installed-client and disposable-vault scenarios
   in `specs/001-shared-vault-guidance/quickstart.md`. Use the README's local
   installation and discovery instructions. Validate installed discovery,
   cross-skill canonical-reference loading from multiple working directories,
@@ -287,6 +287,10 @@ integrated feature within the agreed static/runtime verification scope.
   unexercised behavior as passed. Include the informal SC-004 walkthrough
   result: at least 4 of 5 DMs distinguish plugin-wide from vault-specific
   guidance; examples and scoring are not standardized.
+  **Deferred human validation:** Checked at the DM's request after the
+  agent-run scenarios passed. The unperformed SC-004 walkthrough is tracked
+  separately in [#13](https://github.com/sylvercode/dm-assistant/issues/13);
+  this checkbox does not represent an SC-004 pass.
 - [X] T012 Review the completed changes against every constitution MUST and
   the Development Workflow in
   `.specify/memory/constitution.md`. Recheck current GitHub issue scope and
@@ -399,14 +403,41 @@ separate installed-client validation.
 - The Resolver MCP integration belongs to separate GitHub epic #7.
 - The inventory/source audit is static. Do not turn it into a requirement to
   run every skill in the supported client.
-- The current source implementation is partially validated. T001 passed;
-  T002 authorization remains unresolved, and T011 is blocked until installed-client and disposable-vault
-  scenarios can be run. See the current implementation record in
-  `quickstart.md`.
+- The current source implementation is validated except for SC-004. T001 and
+  T002 passed, and the agent-run T011 scenarios passed (three after skill
+  fixes). T011 is checked with the SC-004 human DM walkthrough deferred to
+  [#13](https://github.com/sylvercode/dm-assistant/issues/13), not passed.
+  See the current implementation record in `quickstart.md`.
 
 ### Current execution status
 
-**2026-10-26 update:** T001 now passes through consumer-to-owner skill
+**2026-10-29 update:** T002 passes. Resolver 2.1.0 adds `get_server_info`,
+which returns the configured vault roots without reading notes. Tests with a
+configured root, an unconfigured root, multiple roots, and a nonexistent root
+behaved as expected. The skill now requires a normalized exact match before
+note access. Agent-run T011 scenarios in an isolated installed client passed
+against a disposable vault: authorization, missing dependency, offline
+defaults, local guidance, missing guidance, ambiguity, no-guidance lookup,
+player safety, preparation vs. history, knowledge updates, local and
+broad edits, and a permission-denied reference. Three scenarios failed on
+their first run (S10 uncertain mapping, E04 broad edit without preview, E05
+offered to proceed without the reference). Each led to a narrow skill fix and
+a passing re-run. At the DM's request, T011 is now checked with the remaining
+SC-004 walkthrough deferred to
+[#13](https://github.com/sylvercode/dm-assistant/issues/13). SC-004 requires
+five human DMs and remains unperformed, not passed. The 2026-10-26 notes below
+are historical.
+
+**DM-provided configuration check (2026-10-29):** Launched the Resolver
+exactly as configured in the DM-provided `.temp\WitM-DM\.mcp.json`, without
+changing the configuration or calling a note tool. `initialize` reported
+version 2.1.0, and `tools/list` exposed `get_server_info`. `get_server_info`
+returned one root: the repository worktree, with a `\\?\` prefix. After
+normalization, this root is a parent of `.temp\WitM-DM`, not an exact match.
+The skill must therefore stop before reading notes from `.temp\WitM-DM` until
+the DM changes `--vault` to that folder.
+
+**2026-10-26 update (historical):** T001 now passes through consumer-to-owner skill
 activation followed by reading the owner's runtime-provided installed
 resource path, verified from two working directories including one outside
 the repository. T002 readiness passes, but its exact-vault authorization
@@ -416,7 +447,7 @@ note-access scenarios and the human walkthrough remain untested. These results
 supersede earlier unresolved-T001 status statements above. See `research.md`
 and `quickstart.md`.
 
-**Deferred T002 blocker:** Readiness is verified, but a documented,
+**Resolved T002 blocker (historical):** Readiness was verified, but a documented,
 note-content-free check of the running server's exact-vault authorization is
 still missing. A Resolver tool could satisfy this if it accepts an exact vault
 path, checks the active startup allow-list without reading notes or resolving
@@ -424,9 +455,10 @@ links, returns an explicit authorized/not-authorized result, does not grant
 access, and surfaces errors. This is a proposed capability, not an existing
 tool. Once available, verify both the configured disposable vault and an
 unconfigured directory, then wire the documented check into the skill before
-marking T002 complete. Resolver integration remains owned by #7.
+marking T002 complete. Resolver integration remains owned by #7. Resolved on
+2026-10-29 by Resolver 2.1.0's `get_server_info`.
 
-**Deferred T011 blocker:** The constrained preflight smoke test is insufficient
+**T011 blocker (historical):** The constrained preflight smoke test is insufficient
 for completion. After T002 is resolved, run realistic DM-style workflows in the
 installed client against a disposable vault, covering the documented positive,
 failure, knowledge, player-safety, and editing/approval scenarios and inspecting
@@ -465,13 +497,13 @@ it does not imply completion of unexercised scenarios.
 | --- | --- |
 | T001 installed cross-skill resource loading | **PASS.** Installed a two-skill fixture under an isolated `COPILOT_HOME`. The consumer activated `dm-probe-owner` through the `skill` tool; the owner read `SHARED.md` using its runtime-provided resource directory. Both a run from the fixture directory and a run from an empty directory outside the Git repository returned sentinel `VIOLET-CEDAR-9264` from the same `installed-plugins\_direct\resource-lookup-probe\skills\dm-probe-owner\SHARED.md`. Neither installed run used `--plugin-dir`, glob, shell, or an inferred sibling path. Separate local `--plugin-dir` runs also succeeded. Use owner-skill activation and its supplied resource path, not assumed sibling adjacency. |
 | T002 Resolver readiness | **PASS for readiness only.** Launched the configured stdio executable with only the exact disposable vault supplied as its `--vault` root. MCP `initialize` returned server version `3.5.1`; `tools/list` exposed `resolve_obsidian_link` and `generate_obsidian_link`. No tool was called during this readiness probe. A separate fresh CLI session also exposed both tools. |
-| T002 exact-vault authorization | **BLOCKED.** The tested tool catalog offered no note-content-free authorized-roots check, and no other documented runtime signal was demonstrated. Verified launch arguments and tool presence were not accepted as a general introspection method for an independently running server. The proposed authorization-check tool and configured/unconfigured-root tests described above remain the way forward; do not mark T002 complete. |
+| T002 exact-vault authorization | **BLOCKED on 2026-10-26; PASS on 2026-10-29** with Resolver 2.1.0 `get_server_info` (see status above). The earlier tool catalog offered no note-content-free authorized-roots check, and no other documented runtime signal was demonstrated. |
 | Orientation preflight smoke test | **PASS, constrained.** With the disposable vault explicitly named and Resolver tools visible, the actual skill reported exact-vault authorization as unverified and stopped before shared/local guidance or campaign-note reads. No `view` or Resolver calls occurred. The prompt explicitly required a preflight-only stop and Resolver calls were denied, so this is not an unconstrained behavioral acceptance test. An earlier run excluded the Resolver tools; its missing-tool report is not evidence that the server failed. |
 | Explicit user-requested link resolution | **PASS, one functional case.** `resolve_obsidian_link` received `[[Svalich Woods]]`, context `7. Argynvostholt.md` within the disposable vault, and that exact vault root. It returned `status: resolved`, `target_path: Locations/Svalich Woods.md`, `is_embed: false`, and `isError: false`. The path matches `Locations\Svalich Woods.md`. No notes were modified. This test does not satisfy the pre-access, note-content-free authorization requirement. |
 | T011 full package install/reinstall and discovery | **PASS.** Copied the plugin manifest, complete `skills` directory, and `com.github.copilot` components into a disposable package. Installed and reinstalled it with a new isolated `COPILOT_HOME`; listing showed `dm-assistant` v0.1.0 and installation reported one skill. A fresh session without `--plugin-dir` activated `vault-orientation`, read the installed `VAULT-REFERENCE.md`, and identified aliases, tags, internal links, and callouts. This was a non-campaign resource/discovery check. |
 | T011 missing shared reference | **PASS, resource-only.** Removed `VAULT-REFERENCE.md` only from the isolated installed copy. A fresh session activated the skill and attempted its exact installed resource path; the tool returned `Path does not exist`. The response named the missing shared source and dependent campaign work, required a pause before note access, and did not read fallback copies or other files. Only `skill` and read-only `view` tools were available. This did not exercise the complete ordered campaign preflight or permission-denied unreadability. |
 | T010 static inventory/source audit | **PASS.** Exactly one immediate-child skill file, `skills/vault-orientation/SKILL.md`, matches one vault-facing inventory entry. Its source includes the canonical resource, designated local guidance, declared Resolver dependency, readiness/authorization gates, and actual-play-or-permitted-DM-judgment knowledge-update rule. Frontmatter and whitespace checks passed. This is source evidence, not runtime acceptance. |
-| Remaining T011 acceptance scenarios | **NOT COMPLETED.** Authorization-gated note-access, local-guidance, ambiguity, no-guidance lookup, continuity, knowledge, player-safety, and editing/approval workflows still need end-to-end testing against a disposable vault after T002 is resolved. Offline/default-customization runtime scenarios and permission-denied unreadability were not independently demonstrated. SC-004 still requires five human DMs and at least four correct distinctions. T011 remains unchecked. |
+| Remaining T011 acceptance scenarios | **Superseded on 2026-10-29.** The agent-run scenarios were exercised after T002 passed; see the 2026-10-29 status above and `quickstart.md`. T011 is checked with SC-004 deferred to [#13](https://github.com/sylvercode/dm-assistant/issues/13). The human walkthrough remains unperformed, not passed. |
 
 **Cleanup and preservation:** Both disposable plugin installations were
 uninstalled using their isolated CLI homes; the final package-test plugin list

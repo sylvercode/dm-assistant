@@ -6,9 +6,8 @@
 
 ## Summary
 
-Define implementable, testable contracts for future PowerShell-backed vault
-operations without adding a runtime to the current Agent Plugins 1.0 scaffold.
-The design covers supported runtime prerequisites, explicit operation inputs
+Define implementable, testable contracts for PowerShell-backed vault
+operations in the Agent Plugins 1.0 scaffold. The design covers supported runtime prerequisites, explicit operation inputs
 and structured results, the Feature 001 pre-note and exact-vault authorization
 gate, Feature 002 profile parsing/normalization/schema validation, installed
 plugin resource discovery, vault-contained paths, and preview/conflict-safe
@@ -16,17 +15,15 @@ atomic note writes. The canonical profile schema will be packaged with its
 current consuming skill at `skills/vault-orientation/assets/dmassist.schema.json`;
 Feature 002 remains authoritative for its meaning and constraints.
 
-The plan's gates are **design readiness gates**, not claims that these runtime
-capabilities exist. Until Feature 001 supplies a note-content-free signal
-proving authorization for the exact vault, every vault-facing operation stops
-before campaign-note access. Acceptance is therefore planned in two tiers:
-production-gate tests that expect that block, and downstream tests that run
-only through a harness-injected, test-only authorization provider that never
-ships as a production capability and does not prove Feature 001's signal.
-Issue [#7](https://github.com/sylvercode/dm-assistant/issues/7) (resolver
-integration) is the likely delivery path for that signal, but its scope does
-not yet name it; production vault access stays blocked until a tracked issue
-delivers and verifies the signal.
+The runtime modules now exist with local synthetic coverage. Feature 001
+defines the note-content-free `get_server_info` signal, but the PowerShell
+runtime cannot verify a trusted handoff from the active session. Script-backed
+vault access therefore remains blocked. Acceptance uses two tiers:
+production-gate tests that expect a readiness or authorization block, and
+downstream tests that use a harness-injected, test-only authorization provider.
+The test provider never establishes a production handoff. Issue
+[#7](https://github.com/sylvercode/dm-assistant/issues/7) tracks Resolver
+integration; task T047 tracks the remaining runtime handoff.
 
 ## Technical Context
 
@@ -63,20 +60,19 @@ Test fixtures are invented, disposable data under `tests/powershell/`, and
 sanitized verification evidence lives in `docs/powershell-runtime-support.md`;
 neither contains campaign content.
 
-**Testing**: No repository test/build/lint commands are defined today, and no
-check is claimed to have run. The task list proposes a PowerShell acceptance
-harness under `tests/powershell/` (T002) that uses only synthetic,
-disposable vault fixtures, in two tiers:
+**Testing**: The PowerShell acceptance harness under `tests/powershell/`
+(T002) uses only synthetic, disposable vault fixtures, in two tiers:
 
 1. **Production-gate tests** run the real preflight with no authorization
-   provider and expect `VAULT_AUTHORIZATION_UNPROVEN` before any profile,
+   provider. They expect `PREREQUISITE_MISSING` for unconfirmed readiness or,
+   with readiness simulated, `VAULT_AUTHORIZATION_UNPROVEN` before any profile,
    guidance, or note access and before any write (T008).
 2. **Downstream tests** (profile parse/normalize/schema, path containment,
    preview, safe write, conflict, interruption, partial completion) reach
    their behavior through a test-only authorization provider that only the
    harness injects through an explicit parameter. It is never discoverable by
-   production code, appears in no skill, and does not prove that Feature
-   001's signal exists.
+   production code, appears in no skill, and does not prove that the runtime
+   can verify Feature 001's signal.
 
 Schema tests cover valid and invalid normalized profiles. A static audit of
 `skills/vault-orientation/scripts/` rejects dynamic execution, non-literal
@@ -142,7 +138,7 @@ unmeasured capacity guarantees.
 | II. Keep the campaign vault separate | Obtain the vault from explicit/workspace context; store only user configuration and campaign data in the vault; keep schema/runtime resources in the plugin. Fixtures and evidence are invented and sanitized, never campaign content. | PASS |
 | III. Preserve continuity and user control | Preserve existing organization and edits; require scoped previews for broad changes; refuse uncertain or conflicting writes. | PASS |
 | IV. Respect character knowledge and player safety | Maintain preparation/actual-play distinction and the Feature 001 player-facing checks. | PASS |
-| V. Distinguish proposals from implemented behavior | Label all runtime, schema packaging, test-harness, and validation behavior as proposed until installed-client and runtime validation succeeds; claim no check ran until it does. | PASS |
+| V. Distinguish proposals from implemented behavior | Identify locally implemented runtime and packaging separately from unverified installed-client and production behavior; claim no check ran until it does. | PASS |
 | Plugin and Vault Constraints | Keep reusable guidance in skills, add no integration without an implementation, keep credentials and campaign content out of the distributed plugin, and do not restructure a vault without authorization. | PASS |
 | Development Workflow | Pester 6.2.0 acceptance runner documented in `AGENTS.md`; the separate constitution 1.0.1 PATCH records the matching test command. No build or lint command exists. | PASS |
 

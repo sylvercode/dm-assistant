@@ -6,8 +6,10 @@ This document describes the concepts and target contracts in the
 [feature specification](spec.md). It does not define a runtime, loader, or
 configuration format. The repository contains a text-based vault-orientation
 skill and bundled reference, but no Resolver integration or automated vault
-runtime. Installed-client behavior and the authorization check remain
-unvalidated; source instructions do not establish runtime state or behavior.
+runtime. The exact-vault authorization check uses the Resolver's
+`get_server_info` tool; remaining installed-client acceptance scenarios are
+recorded in `quickstart.md`. Source instructions do not establish runtime
+state or behavior.
 
 **All fields below are conceptual attributes inferred from current
 requirements—not a committed config schema, serialized record, or required
@@ -151,8 +153,9 @@ Conceptual attributes:
 The authoritative, extensible, non-exhaustive inventory is the **Expected
 Runtime Dependencies** table in `spec.md`. The initial dependency is the
 Obsidian Link Resolver MCP server,
-`obsidian-link-resolver` version `2.0.0` or later, exposing
-`resolve_obsidian_link`. The user configures authorized vault roots in Copilot
+version `2.1.0` or later, exposing `resolve_obsidian_link` and
+`get_server_info`; the latter reports canonical startup vault roots for the
+note-content-free exact-vault authorization check. The user configures authorized vault roots in Copilot
 CLI; private paths are not stored in the plugin. Official Obsidian help pages
 for aliases, tags, internal links, and callouts are provenance for locally
 bundled paraphrased guidance, not runtime dependencies.

@@ -158,12 +158,12 @@ lock semantics differ and cannot reliably constrain other vault tools.
 **Decision:** For each individual note, prepare replacement bytes in a
 temporary file on the same filesystem as the target, recheck the target's
 version immediately before replacement, then use a rename-class replacement
-operation. Preserve encodings and line endings when they can be reliably
-round-tripped. Otherwise, warn before converting decodable text to UTF-8
-without BOM and LF; if decoding is unreliable, do not write. For a multi-note
-operation, stop at the first failure, leave earlier completed writes intact,
-do not roll them back, do not attempt later notes, and report exact changed
-and unchanged targets.
+operation. Preserve supported encodings and line endings when they can be
+reliably round-tripped. Otherwise, return `ENCODING_UNSAFE` without writing
+or converting the note. This supersedes the earlier conversion-warning
+approach. For a multi-note operation, stop at the first failure, leave earlier
+completed writes intact, do not roll them back, do not attempt later notes,
+and report exact changed and unchanged targets.
 
 **Rationale:** A same-filesystem rename avoids exposing a partially written
 individual note after interruption. Atomicity is per note, not for the whole
@@ -222,12 +222,14 @@ and it is installed in the development environment; pin its exact version
 when the harness is created, and never fall back to the Pester 3 module that
 ships with Windows PowerShell.
 
-**Rationale:** Feature 001 has not defined a note-content-free exact-vault
-authorization signal, so the production gate must fail closed, and the
-downstream behavior (profile handling, containment, preview, atomic writes,
-conflicts) would otherwise be unverifiable. A provider confined to the
-harness lets those paths be tested without implying the production signal
-exists. Because the repository root is the installable plugin, `tests/` could
+**Rationale:** At the time of this decision, Feature 001 had not defined a
+note-content-free exact-vault authorization signal. It now defines
+`get_server_info`, but the runtime has no verified active-session handoff, so
+the production gate still fails closed. Downstream behavior (profile handling,
+containment, preview, atomic writes, conflicts) would otherwise be
+unverifiable. A provider confined to the harness lets those paths be tested
+without implying the production handoff works. Because the repository root is
+the installable plugin, `tests/` could
 ship with it; verifying that the installed plugin excludes `tests/` or gains
 no bypass from it keeps the test seam from becoming an authorization
 shortcut.

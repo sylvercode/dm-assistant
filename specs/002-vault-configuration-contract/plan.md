@@ -66,9 +66,10 @@ existence and boundary validation, and stale-input handling remain Issue #4
 runtime responsibilities. Every future profile/discovery workflow must follow
 the Spec 001 vault-facing preflight: establish the authorized vault and verify
 required dependency readiness (initially `obsidian-link-resolver`/
-`resolve_obsidian_link`) and vault authorization separately before
-profile-dependent or campaign-note access; profile contents cannot establish
-or expand authorization. A present default guidance candidate that is
+`resolve_obsidian_link` and `get_server_info` at version 2.1.0 or later) and
+vault authorization separately before profile-dependent or campaign-note
+access; profile contents cannot establish or expand authorization. A present
+default guidance candidate that is
 unreadable, invalid, or unavailable blocks dependent interpretation or note
 work rather than being silently skipped.
 Stop and revalidate when the profile, referenced guidance or template, or a

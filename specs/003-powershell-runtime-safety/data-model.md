@@ -49,7 +49,7 @@ requirements; this table describes each field's role.
 | `vaultRoot` | Explicit absolute path to the user-designated vault. It must not be inferred from the plugin location or process current directory, and exact-vault authorization is established separately. |
 | `campaignGroup` | Explicit campaign/group context, or explicit `null` for a value the operation does not use, consistent with the one-campaign/group-per-vault assumption. |
 | `targets[]` | Explicit vault-relative note or configuration references, in the operation's deterministic order. |
-| `arguments` | Operation-specific data, including the requested content effect. Clearly requested edits to one named note may proceed without redundant approval; broader, destructive, restructuring, multi-note, or continuity-changing work requires approval of its exact preview. |
+| `arguments` | Operation-specific data, including the requested content effect. Clearly requested local edits to one named note may proceed without redundant approval unless they change actual-play records or established continuity; broader, destructive, restructuring, multi-note, or continuity-changing work requires approval of its exact preview in a later message. |
 | `mode` | `inspect` (read-only), `preview` (compute proposed changes without writing), or `apply` (write only the requested targets under the safeguards). |
 | `approvedPreviewId` | Identifies the exact, still-current approved preview when the preview-and-confirm rule applies; it cannot authorize different targets or changes. |
 | `reviewedVersions` | With `approvedPreviewId`, the ordered per-target `observedVersion`, `replacementVersion`, and `conversionDecision` values from the approved preview, one entry per target. |
@@ -85,7 +85,7 @@ vault.
 | --- | --- |
 | `dependencyId` | Inventory identity; do not maintain a divergent Feature 003 inventory. |
 | `purpose`, `scope` | Dependency capability and the vault-facing skills/operations that require it, as documented in Feature 001. |
-| `requiredInterface`, `compatibleVersion` | Required capability and compatible release. Initially, `obsidian-link-resolver` version 2.0.0 or later exposing `resolve_obsidian_link`. |
+| `requiredInterface`, `compatibleVersion` | Required capabilities and compatible release. Initially, Obsidian Link Resolver version 2.1.0 or later exposing `resolve_obsidian_link` and `get_server_info`. |
 | `readinessState` | `ready`, `missing`, `incompatible`, or `unknown`, based on the documented readiness check. |
 | `vaultAuthorizationState` | `authorized`, `not authorized`, or `unknown` for this exact canonical vault, established separately from readiness. |
 | `evidence` | Non-content-bearing check result and timestamp/context sufficient to show which vault and dependency were checked; never campaign note contents. |
@@ -122,10 +122,10 @@ request, including preview or apply, stops before campaign-note access with
 that uncertainty. Changes to vault, dependency,
 guidance, campaign, or group require re-establishing the applicable checks.
 
-The current contract does not define a note-content-free signal proving that
-the exact vault is an authorized resolver root. Until Feature 001 defines and
-delivers that signal, a vault-facing scripted operation must stop at this
-preflight gate before campaign-note access.
+Feature 001 defines `get_server_info` as the note-content-free exact-vault
+check. Until the PowerShell runtime can verify a trusted handoff from the
+active session, a vault-facing scripted operation must stop at this preflight
+gate before profile, guidance, or campaign-note access.
 
 ### Vault configuration profile and validation snapshot
 
@@ -213,13 +213,18 @@ The exact proposed edit and the target versions against which it was reviewed.
 | `scopeClass` | Single named-note text edit, multi-note, deletion, reorganization, or broader established-fact change. The runtime detects multi-note, deletion, and reorganization; the registered operation declares fact-changing effects, and an unclassifiable change requires approval. |
 | `approvalState` | `not required`, `awaiting`, `approved`, `declined`, or `expired/stale`. |
 
+The current generic `note.replace-text` operation cannot reliably identify
+actual-play or continuity changes. T048 must resolve this classification gap
+before production writes; an untrusted request cannot declare itself safe.
+
 Only the exact approved preview may be applied. Approval does not authorize
 later edits or different targets. Any material change in target version,
 dependency version, content, or proposed effect invalidates the preview and
 requires a new review
-and, where required, approval. Clearly requested edits confined to one named
-note do not need redundant approval, but still require conflict checks and
-safe replacement.
+and, where required, approval in a later message. Clearly requested local
+edits confined to one named note do not need redundant approval unless they
+change actual-play records or established continuity, but still require
+conflict checks and safe replacement.
 
 ### Operation result
 
@@ -281,9 +286,10 @@ campaign content, and send no usage or diagnostic telemetry off-device.
    required add-ons before execution. Report unsupported environments; never
    install or upgrade prerequisites automatically.
 2. **Exact-vault preflight:** apply Feature 001's ordered pre-note checks.
-   The resolver tool's presence proves readiness only, not authorization for
-   the exact vault. Until the note-content-free authorization signal exists,
-   stop before campaign-note access.
+   The resolver tools' presence proves readiness only, not authorization for
+   the exact vault. Feature 001 checks `get_server_info` without reading
+   notes. Until the runtime can verify that check through a trusted
+   active-session handoff, stop before profile or campaign-note access.
 3. **Input and data safety:** treat paths, profile values, notes, guidance,
    and templates as data. Do not execute, interpolate into commands, or allow
    them to weaken operating-system policy, user permissions, approvals, or
@@ -305,19 +311,19 @@ campaign content, and send no usage or diagnostic telemetry off-device.
 7. **Staleness:** check that the profile and referenced inputs remain the
    validated versions before dependent use. On change, stop and revalidate;
    never mix old and new inputs or silently retry.
-8. **Approval and continuity:** require explicit approval for the exact
-   preview when scope is multi-note, destructive, restructuring, or
-   continuity-changing. Preserve unrelated note content; do not silently
-   resolve contradictions or rewrite run adventure plans.
+8. **Approval and continuity:** require explicit approval in a later message
+   for the exact preview when scope is multi-note, destructive,
+   restructuring, or changes actual-play records or established continuity.
+   Preserve unrelated note content; do not silently resolve contradictions
+   or rewrite run adventure plans.
 9. **Per-file atomicity:** stage replacement bytes on the target filesystem,
    recheck the target's observed version immediately before replacement, and
    replace using a rename-class atomic operation. Never truncate and rewrite
    the live target. If staging or replacement fails, do not expose partial
    contents in that target; report the failure.
 10. **Encoding and line endings:** preserve original representation when
-    safely round-trippable. Otherwise warn before writing and convert only
-    reliably decodable content to UTF-8 without BOM and LF. Undecodable
-    content is unchanged and not written.
+    safely round-trippable. Otherwise return `ENCODING_UNSAFE` without
+    writing or converting the note.
 11. **Multi-note semantics:** process targets in a deterministic order.
     Stop at first failure; preserve earlier completed writes, do not attempt
     later targets, and do not roll back. Report exact changed and unchanged
@@ -386,8 +392,8 @@ present profile. Discovery is reserved for an absent profile.
 
 ## Open issue
 
-Feature 001 has not yet defined and delivered note-content-free evidence that
-the exact established vault is among the resolver's authorized roots. Until
-that contract exists and can be verified, vault-facing scripted operations
-must stop before campaign-note access; resolver availability alone is
-insufficient.
+Feature 001 defines a note-content-free exact-vault check using Resolver
+`get_server_info`. The PowerShell runtime has no verified handoff from the
+active session to consume that evidence. Until it does, vault-facing scripted
+operations must stop before profile, guidance, or campaign-note access;
+resolver availability alone is insufficient.

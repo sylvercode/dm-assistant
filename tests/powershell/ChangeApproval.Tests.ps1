@@ -99,6 +99,13 @@ templates:
         }
     }
 
+    function Set-TestDependencyInventoryFixture {
+        $source = Join-Path -Path (Get-TestRepositoryRoot) -ChildPath 'skills\vault-orientation\assets\runtime-dependencies.json'
+        $global:DmApprovalInventoryPath = Join-Path -Path $TestDrive -ChildPath ('inventory-' + [guid]::NewGuid().ToString('N') + '.json')
+        [System.IO.File]::Copy($source, $global:DmApprovalInventoryPath)
+        Mock -ModuleName DependencyPreflight -CommandName Get-DmDependencyInventoryPath -MockWith { $global:DmApprovalInventoryPath }
+    }
+
     function Invoke-PreviewInFreshProcess {
         param(
             [Parameter(Mandatory)][string]$VaultRoot,
@@ -168,6 +175,7 @@ Describe 'Synthetic preview and approval safety' {
 
     AfterEach {
         Remove-TestVaultFixture -Fixture $fixture
+        Remove-Variable -Name DmApprovalInventoryPath -Scope Global -ErrorAction SilentlyContinue
     }
 
     It 'keeps preview read-only and carries versioned effects without note content' {
@@ -320,6 +328,39 @@ Describe 'Synthetic preview and approval safety' {
         $state.Version = 'synthetic-runtime-after'
 
         Assert-Completion -Outcome (Invoke-DmApply -Request $apply) -Code 'CONFIRMATION_REQUIRED' -Status 'not completed'
+        Get-TestVaultSnapshot -Path $fixture.ParentPath | Should -Be $before
+    }
+
+    It 'invalidates approval when the Resolver inventory changes after preview' {
+        Set-TestDependencyInventoryFixture
+        $request = New-TextEditRequest -VaultRoot $fixture.Root
+        $before = Get-TestVaultSnapshot -Path $fixture.ParentPath
+        $preview = (Invoke-DmPreview -Request $request).preview
+        $inventory = @($preview.dependencyVersions | Where-Object {
+                $_.identity -ceq 'plugin:skills/vault-orientation/assets/runtime-dependencies.json'
+            })
+        $inventory.Count | Should -Be 1
+        $inventory[0].version | Should -Match '^sha256:[0-9a-f]{64}$'
+        $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $preview
+        [System.IO.File]::AppendAllText($global:DmApprovalInventoryPath, "`n")
+
+        Assert-Completion -Outcome (Invoke-DmApply -Request $apply) -Code 'CONFIRMATION_REQUIRED' -Status 'not completed'
+        Get-TestVaultSnapshot -Path $fixture.ParentPath | Should -Be $before
+    }
+
+    It 'detects a Resolver inventory change at the immediate pre-write check' {
+        Set-TestDependencyInventoryFixture
+        $request = New-TextEditRequest -VaultRoot $fixture.Root
+        $before = Get-TestVaultSnapshot -Path $fixture.ParentPath
+        $preview = (Invoke-DmPreview -Request $request).preview
+        $apply = New-ApprovedApplyRequest -PreviewRequest $request -Preview $preview
+        Mock -ModuleName SafeNoteWriter -CommandName Read-DmVaultTargetBytes -MockWith {
+            [System.IO.File]::AppendAllText($global:DmApprovalInventoryPath, "`n")
+            VaultBoundary\Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $Resolution
+        }
+
+        Assert-Completion -Outcome (Invoke-DmApply -Request $apply) -Code 'TARGET_CONFLICT' -Status 'not completed'
+        Should -Invoke -ModuleName SafeNoteWriter -CommandName Read-DmVaultTargetBytes -Times 1 -Exactly -Scope It
         Get-TestVaultSnapshot -Path $fixture.ParentPath | Should -Be $before
     }
 

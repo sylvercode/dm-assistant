@@ -166,7 +166,7 @@ function Enable-TestAuthorizationProvider {
     Get-DmVaultAuthorization so that only the exact canonical -VaultRoot is
     reported 'authorized'; every other root stays 'unknown'. The mock is
     removed automatically when the enclosing Pester block ends. This never
-    proves that Feature 001's authorization signal exists.
+    proves that production can verify Feature 001's authorization signal.
     #>
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$VaultRoot)

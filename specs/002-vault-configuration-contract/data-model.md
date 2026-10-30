@@ -9,10 +9,10 @@ The authorized campaign vault is obtained from the user's workspace or explicit 
 Before a future workflow reads the profile or campaign notes, it must establish
 the vault and separately verify each declared required dependency's readiness
 and authorization for that vault, including readiness of the initial
-`obsidian-link-resolver`/`resolve_obsidian_link` dependency and explicit
-authorization of the intended vault. The profile cannot establish or expand
-either authorization. Before campaign-note access, complete the remaining
-ordered preflight in the
+Obsidian Link Resolver 2.1.0 or later with `resolve_obsidian_link` and
+`get_server_info`, and exact-vault authorization through the latter. The
+profile cannot establish or expand either authorization. Before campaign-note
+access, complete the remaining ordered preflight in the
 [Spec 001 Vault Guidance Loading Contract](../001-shared-vault-guidance/contracts/vault-guidance-loading.md).
 
 All paths in the profile are vault-relative. A path is usable only if its fully resolved target, including symbolic links, remains inside the authorized vault. Plugin-bundled default templates are separate plugin resources and are not profile paths.

@@ -127,10 +127,11 @@ incompatible, or not authorized for the established vault, every vault-facing
 skill must stop before reading or changing campaign notes. The skill must
 identify the dependency or authorization failure and the setup or verification
 step needed to continue, then ask the DM for direction. Initially this
-requires the `obsidian-link-resolver` MCP server (minimum compatible release
-`2.0.0`) and its `resolve_obsidian_link` tool in the active Copilot CLI
-session, as well as separate confirmation that the intended vault is an
-authorized root. Do not resolve a campaign link to prove authorization.
+requires the Obsidian Link Resolver MCP server (minimum compatible release
+`2.1.0`) and its `resolve_obsidian_link` and `get_server_info` tools in the
+active Copilot CLI session, as well as separate confirmation through
+`get_server_info` that the intended vault exactly matches a configured root.
+Do not resolve a campaign link to prove authorization.
 
 If the shared reference or a designated vault-local guidance source is missing,
 unavailable, or unreadable, the skill must:
@@ -200,14 +201,22 @@ behavior, report the conflict rather than silently applying or promising it.
 
 ## Initial dependency configuration
 
-The Obsidian Link Resolver MCP server (minimum compatible release `2.0.0`)
+The Obsidian Link Resolver MCP server (minimum compatible release `2.1.0`)
 must be installed and configured separately by the DM in Copilot CLI with one
-or more explicitly authorized absolute vault roots. Verify server/tool
-readiness with `copilot mcp list` and `copilot mcp get obsidian-link-resolver`,
-then start a new session and confirm `resolve_obsidian_link` is available.
+or more explicitly authorized absolute vault roots (`--vault <DIR>`). Verify
+server/tool readiness with `copilot mcp list` and `copilot mcp get` for the
+configured server name, then start a new session and confirm
+`resolve_obsidian_link` and `get_server_info` are available.
 Separately verify that the intended vault is authorized; the presence of the
 server/tool does not prove this, and resolving a campaign link is not a valid
-authorization check. Do not embed vault paths in the plugin or repository. If
+authorization check. Call `get_server_info` with no arguments. It returns the
+running server's version and canonical startup roots as `vaults[].path`
+without reading notes. Authorization passes only when one returned root is
+the established vault after removing a Windows `\\?\` prefix (`\\?\UNC\`
+becomes `\\`) and trailing separators, compared case-insensitively on Windows.
+A parent or child root is not an exact match. An error, `isError` result,
+missing or malformed vault list, or no match fails closed. When several roots
+are configured, pass the matched root as `vault_root` to later Resolver calls. Do not embed vault paths in the plugin or repository. If
 either readiness or authorization cannot be verified, every vault-facing skill
 must stop before campaign-note access, explain the missing setup, and ask the
 DM.

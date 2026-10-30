@@ -27,12 +27,12 @@ authorize reads or writes outside the vault.
 Before a future workflow reads `.dmassist.yaml` or campaign notes, it must
 establish the vault from the user's workspace or explicit input and verify
 each declared required runtime dependency's readiness and authorization for
-that vault as separate facts. Initially this includes verifying that
-`obsidian-link-resolver` exposes `resolve_obsidian_link` and separately
-confirming that the intended vault is an explicitly authorized root. The
-profile cannot establish or expand either authorization. Before campaign-note
-access, the workflow must then complete
-the remaining ordered preflight in the
+that vault as separate facts. Initially this includes verifying Resolver
+version `2.1.0` or later and both `resolve_obsidian_link` and `get_server_info`,
+then separately confirming via `get_server_info` that the intended vault
+exactly matches an authorized root. The profile cannot establish or expand
+either authorization. Before campaign-note access, the workflow must then
+complete the remaining ordered preflight in the
 [Spec 001 Vault Guidance Loading Contract](../../001-shared-vault-guidance/contracts/vault-guidance-loading.md):
 load the shared reference and any designated local guidance, then establish
 the relevant campaign/group and output sections. Do not access campaign notes

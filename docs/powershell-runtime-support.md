@@ -7,11 +7,19 @@ script-backed vault operations described in
 Installing the plugin and discovering its skills never requires PowerShell.
 No workflow installs or upgrades PowerShell or any module.
 
-Exact-vault authorization remains blocked: until Feature 001 defines and
-verifies a note-content-free authorization signal, every vault-facing
-operation stops with `VAULT_AUTHORIZATION_UNPROVEN` before reading a profile,
-guidance, or campaign note. A supported environment below does not imply
-that campaign-vault access works.
+Feature 001 uses Resolver 2.1.0's note-content-free `get_server_info` response
+to check exact-vault authorization in the active client session. The
+PowerShell runtime cannot yet verify a trusted handoff from that session, so
+script-backed vault access remains blocked before reading a profile, guidance,
+or campaign note. An unconfirmed dependency returns `PREREQUISITE_MISSING`;
+if readiness is established but authorization is not, the runtime returns
+`VAULT_AUTHORIZATION_UNPROVEN`. A supported environment below does not imply
+that script-backed campaign-vault access works.
+
+The packaged dependency inventory requires Resolver 2.1.0 or later with both
+`resolve_obsidian_link` and `get_server_info`. The production PowerShell probe
+cannot confirm the running server's version or active-session tools, and it
+does not treat a configured server as proof of readiness or authorization.
 
 ## Selection
 
@@ -38,7 +46,7 @@ combination is unsupported.
 
 | Operating system | PowerShell | Add-ons | Status |
 | --- | --- | --- | --- |
-| Windows | 7.6.9 | `powershell-yaml` 0.4.12 | Candidate, not supported for production vault access. Local path-boundary, atomic-replace, and encoding cases pass; four file-symlink cases, installed-client checks, and real exact-vault authorization remain unverified. |
+| Windows | 7.6.9 | `powershell-yaml` 0.4.12 | Candidate, not supported for production script-backed vault access. Local path-boundary, atomic-replace, and encoding cases pass; four file-symlink cases, installed-client checks, and the runtime authorization handoff remain unverified. |
 | Windows | Any other version | Any | Unsupported |
 | macOS | Any | Any | Unsupported (unverified) |
 | Linux | Any | Any | Unsupported (unverified) |
@@ -110,8 +118,8 @@ recorded. All tests use synthetic disposable vaults.
   - Malformed requests returned `INVALID_REQUEST` before the readiness check.
 - **Real dependency probe.** `copilot mcp get obsidian-link-resolver` reported
   the server as not configured, so readiness was `missing`. Real preflight
-  therefore stopped with `PREREQUISITE_MISSING` for `obsidian-link-resolver`
-  2.0.0 / `resolve_obsidian_link`.
+  therefore stopped with `PREREQUISITE_MISSING` for the then-declared
+  `obsidian-link-resolver` 2.0.0 / `resolve_obsidian_link` requirement.
   - Even when the server is configured, a script cannot confirm its version or
     the tools the session exposes, so readiness is reported as `unknown`.
     `unknown` is not success.
@@ -208,8 +216,8 @@ Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
   with `AMBIGUOUS_CONTEXT`.
 - **Test result.** The profile-focused suites passed 24 tests. The complete
   suite gave 231 passed, 0 failed, and 4 skipped, including those profile
-  tests. This does not verify Feature 001's real authorization signal or
-  enable production profile/note access.
+  tests. This does not verify the runtime's handoff to Feature 001's real
+  authorization signal or enable production script-backed profile/note access.
 - **Not verified.** Only Windows was tested. Windows remains a candidate
   until preview/write atomicity and encoding verification pass; macOS/Linux
   remain unsupported.
@@ -243,9 +251,29 @@ Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
   runtime functions and their 227 declared parameters; exported and private
   parameter help was also retrieved through `Get-Help`.
 - **Scope limits.** This is local Windows acceptance evidence only; it does
-  not verify an installed Copilot client, Feature 001's real exact-vault
-  authorization signal, or macOS/Linux. Windows remains a candidate and
-  production vault access remains blocked.
+  not verify the runtime in an installed Copilot client, its handoff to
+  Feature 001's exact-vault check, or macOS/Linux. Windows remains a candidate
+  and production script-backed vault access remains blocked.
+
+### Windows, 2026-10-30 (Resolver 2.1.0 merge)
+
+Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
+
+- **Complete suite.** The Pester runner passed 310 tests with 0 failures and
+  4 skipped file-symbolic-link cases requiring Windows Developer Mode or
+  elevation.
+- **Dependency reconciliation.** The inventory mirrors Feature 001's
+  Resolver 2.1.0 minimum and both required tools. Empty, duplicate, or
+  incompatible inventory entries fail closed. The production gate still
+  cannot verify readiness or exact-vault authorization from the active session.
+- **Approval safety.** Changing the inventory after preview invalidated the
+  approval; changing it immediately before replacement produced a conflict
+  without writing. Function and parameter help checks passed.
+- **Static audit.** The one immediate-child skill matched the classified skill
+  inventory and included the ordered vault-facing safeguards.
+- **Scope limits.** No new installed-client or cross-platform verification was
+  performed. The runtime handoff and single-note classification remain
+  outstanding before production script-backed writes.
 
 ### Remaining acceptance work
 
@@ -256,6 +284,11 @@ Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
   discovery without PowerShell have not been performed. The disposable copied
   package checks above are not client installation evidence. No supported
   production platform combination is claimed.
+- **T047:** The runtime has no verified way to consume the active session's
+  Resolver readiness and exact-vault authorization evidence.
+- **T048:** Before enabling production writes, reconcile single-note operation
+  classification with Feature 001's approval requirement for actual-play and
+  continuity changes.
 
 ## Implemented operation interface
 
@@ -267,7 +300,7 @@ blocked by prerequisite/authorization checks.
 | Operation | Modes | Arguments | Target outcomes and scope |
 | --- | --- | --- | --- |
 | `notes.inspect` | `inspect` | Empty object | One or more explicit targets; reports existence, type, and byte fingerprint without returning note content or changing established facts. |
-| `note.replace-text` | `preview`, `apply` | Required non-empty string `oldText`; required string `newText` (may be empty) | Replaces every ordinal occurrence in one or more explicit existing notes; unchanged targets stay unchanged. Registered as a local text edit, not a workflow for changing established campaign facts. Broad or continuity-changing work still requires the skill's preview/approval safeguards. |
+| `note.replace-text` | `preview`, `apply` | Required non-empty string `oldText`; required string `newText` (may be empty) | Replaces every ordinal occurrence in one or more explicit existing notes; unchanged targets stay unchanged. Registered as a local text edit, not a workflow for changing actual-play records or established campaign facts. The invoking skill must apply the broader preview/approval safeguards, including approval in a later message, to such work. |
 
 Unknown request fields and operation arguments are rejected. Multi-target
 changes require approval of the exact preview. Applying a change preserves
@@ -300,5 +333,6 @@ Import-Module .\skills\vault-orientation\scripts\VaultConfiguration.psm1
 
 The help documents local module interfaces; it does not bypass the production
 authorization gate or establish installed-client support. The runtime
-fingerprint includes module file bytes, so editing even help comments
-invalidates earlier preview approvals; generate and approve a fresh preview.
+fingerprint includes module file bytes and the packaged dependency inventory,
+so changing either invalidates earlier preview approvals; generate and approve
+a fresh preview.

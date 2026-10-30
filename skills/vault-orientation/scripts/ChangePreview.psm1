@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'RuntimeContract.psm1')
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'DependencyPreflight.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'RuntimePreflight.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultConfiguration.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultBoundary.psm1')
@@ -131,10 +132,10 @@ function Get-DmSha256Hex {
 function Get-DmRuntimeVersion {
     <#
     .SYNOPSIS
-    Fingerprints the installed plugin version and runtime module files.
+    Fingerprints the installed plugin version, runtime modules, and inventory.
     .DESCRIPTION
-    The returned version changes when the manifest version or any module byte
-    changes, invalidating previews bound to an earlier runtime.
+    The returned version changes when the manifest version, any module byte,
+    or the dependency inventory changes, invalidating earlier previews.
     #>
     [CmdletBinding()]
     param()
@@ -158,6 +159,7 @@ function Get-DmRuntimeVersion {
         $identity = 'skills/vault-orientation/scripts/' + $name
         $entries.Add([pscustomobject][ordered]@{ identity = $identity; version = 'sha256:' + (Get-DmSha256Hex -Bytes ([System.IO.File]::ReadAllBytes($path))) })
     }
+    $entries.Add((Get-DmDependencyInventoryVersion))
     $orderedEntries = [object[]]$entries.ToArray()
     [Array]::Sort($orderedEntries, [System.Comparison[object]]{
             param($left, $right)
@@ -329,7 +331,10 @@ function Get-DmChangePlan {
         return [pscustomobject][ordered]@{ ok = $false; code = 'INVALID_REQUEST'; result = $result; plan = @() }
     }
 
-    try { $dependencies = Get-DmCurrentChangeDependencyVersions -Boundary $Preflight.boundary -Profile $Context.profile }
+    try {
+        $dependencies = Get-DmCurrentChangeDependencyVersions -Boundary $Preflight.boundary -Profile $Context.profile
+        $inventory = Get-DmDependencyInventoryVersion
+    }
     catch {
         $result = New-DmChangeEntryResult -Operation $operation -State Blocked -Code 'TARGET_CONFLICT' -Targets $targets `
             -RemainingWork @('Revalidate the profile and installed references, then retry.') -Message 'A profile, reference, or installed resource could not be revalidated.'
@@ -340,6 +345,7 @@ function Get-DmChangePlan {
     foreach ($dependency in @($Context.dependencyVersions)) {
         $contextDependencies.Add([pscustomobject][ordered]@{ identity = [string]$dependency.identity; version = [string]$dependency.version })
     }
+    $contextDependencies.Add($inventory)
     $shared = Get-DmSharedReferenceResource -Operation $operation -Targets $targets
     if (-not $shared.passed) {
         return [pscustomobject][ordered]@{ ok = $false; code = [string]$shared.result.completionCode; result = $shared.result; plan = @() }

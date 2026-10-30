@@ -3,12 +3,13 @@
 DM Assistant uses Agent Plugins 1.0. The repository root is the installable
 plugin directory. The repository includes a portable vault-orientation skill
 and its bundled shared reference, schema, and PowerShell runtime modules.
-There is no Resolver integration or enabled production vault access. Local
-synthetic tests cover the runtime; installed-client and cross-platform runtime
-verification remain outstanding. Installed cross-skill loading passed a disposable fixture test
-using owner-skill activation and its runtime-provided resource path. The
-orientation skill must fail closed when
-exact-vault authorization cannot be established.
+The Resolver server is configured separately, and production script-backed
+vault access is not enabled. Feature 001 exercised `get_server_info` and
+cross-skill resource loading in disposable client fixtures. The PowerShell
+runtime has no verified handoff from the active Resolver session; its
+installed-client and cross-platform verification remain outstanding. The
+orientation skill must fail closed whenever exact-vault authorization cannot
+be established.
 
 ## Layout
 
@@ -143,9 +144,10 @@ production capabilities. Use the
 open questions, and acceptance scenarios.
 
 1. **Establish shared AI guidance.** The canonical reference and
-   vault-orientation skill are present. Verify installed cross-skill resource
-   lookup and a note-content-free exact-vault authorization check before
-   enabling dependent note access or claiming runtime behavior. Keep
+   vault-orientation skill are present. Installed cross-skill resource lookup
+   and exact-vault authorization through Resolver 2.1.0's `get_server_info`
+   have been verified, and agent-run acceptance scenarios pass. The informal
+   human DM walkthrough (SC-004) is still outstanding. Keep
    `skills/README.md` as the authoritative inventory and statically audit its
    exact match to skill files and each vault-facing skill's preflight.
 2. **Define the configuration contract.** The proposed `.dmassist.yaml`
@@ -158,10 +160,12 @@ open questions, and acceptance scenarios.
    [PowerShell Runtime Support](powershell-runtime-support.md). Shared inputs,
    structured results, path boundaries, previews, and atomic writes exist.
    Windows remains a candidate; macOS/Linux are unsupported and unverified.
-4. **Enable read-only vault orientation.** Inspection and configuration loading
-   are locally tested. Verify the real dependency authorization handoff and
-   installed-client execution before enabling campaign-note access. Keep
-   discovery read-only and report ambiguity rather than restructuring files.
+4. **Enable script-backed vault orientation.** Inspection and configuration
+   loading are locally tested. Verify a trusted active-session authorization
+   handoff and installed-client execution before enabling script-backed
+   campaign-note access. Before enabling writes, also resolve the single-note
+   actual-play and continuity classification gap tracked by Feature 003 T048.
+   Keep discovery read-only and report ambiguity rather than restructuring files.
 5. **Add article authoring and template selection.** Design template contents
    when authoring workflows are ready. Bundle skill defaults, read selected
    templates explicitly, and support DM overrides without overwriting them or
@@ -170,7 +174,8 @@ open questions, and acceptance scenarios.
    record lore evolution with applicable session links, and accept DM knowledge
    judgments without evidence logs. Preserve run adventure plans, report
    contradictions without resolving them, and keep handouts player-safe. Require
-   approval for major changes, not redundant approval for requested local edits.
+   a preview and later-message approval for actual-play or continuity changes
+   and other major edits, without redundant approval for safe local edits.
 7. **Validate in the installed client.** Verify resource and skill discovery
    after reinstalling the plugin, exercise representative acceptance and
    failure scenarios, and check generated notes in Obsidian. Cover dependency
