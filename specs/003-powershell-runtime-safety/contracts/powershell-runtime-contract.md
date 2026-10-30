@@ -75,7 +75,11 @@ exact-vault authorization is blocked: the operation must return
 `VAULT_AUTHORIZATION_UNPROVEN` and must not read the profile, guidance, or any
 campaign note, and must not write or create any vault content.** Resolver
 availability, a caller-supplied path, or successful link resolution is not
-proof of authorization. A failed, missing, incompatible, or inconclusive gate
+proof of authorization. Production preflight also accepts no authorization
+assertion from request fields, paths, environment variables, configuration, or
+the profile; a synthetic provider used only by the acceptance harness is
+outside this contract and the installed skill and never proves that Feature
+001's signal exists. A failed, missing, incompatible, or inconclusive gate
 fails closed before profile or note access. Non-vault read-only assistance that is
 independent of the blocked operation may remain available.
 

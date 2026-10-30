@@ -7,11 +7,13 @@ choices below do not claim that a runtime or validator has been implemented.
 ## Decision 1: Use a supported PowerShell 7 runtime, selected and recorded per release
 
 **Decision:** Future script-backed workflows target cross-platform PowerShell
-7 (`pwsh`) and only support operating-system/runtime combinations that pass
-the release's prerequisite, repeatability, and failure checks. Publish the
+7 (`pwsh`), selecting the latest stable release at selection time, and only
+support operating-system/runtime combinations that pass the release's
+prerequisite, repeatability, and failure checks and can reliably perform the
+contract's path-resolution, atomic-replace, and encoding checks. Publish the
 exact runtime and add-on versions, selection date, installation guidance, and
-any unsupported environments. Do not install or upgrade prerequisites during
-workflow execution.
+any unsupported environments in `docs/powershell-runtime-support.md`. Do not
+install or upgrade prerequisites during workflow execution.
 
 **Rationale:** PowerShell 7 is available across Windows, macOS, and Linux,
 whereas Windows PowerShell 5.1 is Windows-only. A dated, tested version matrix
@@ -191,11 +193,51 @@ unnecessarily.
 **Sources:** [Feature 003 clarification and result requirements](spec.md),
 [Feature 001 loading contract](../001-shared-vault-guidance/contracts/vault-guidance-loading.md).
 
+## Decision 8: Verify with a synthetic harness and an isolated test-only authorization provider
+
+**Decision:** Propose a PowerShell acceptance harness under
+`tests/powershell/` that runs only against invented, disposable vault
+fixtures, in two tiers. Production-gate tests run the real preflight with no
+authorization provider and expect `VAULT_AUTHORIZATION_UNPROVEN` before any
+profile, guidance, or note access. Downstream tests reach profile, path,
+preview, and write behavior through a test-only authorization provider that
+is supplied solely by an explicit harness parameter. Production code never
+discovers or accepts a provider from a path, environment variable, or
+configuration, and never references `tests/`. A static audit of the
+production script directory enforces the no-dynamic-execution,
+literal-path, no-network, and no-`tests/` rules. Pester is the candidate
+runner because the task list already follows its `*.Tests.ps1` convention;
+select and pin the exact runner and version when the harness is created.
+
+**Rationale:** Feature 001 has not defined a note-content-free exact-vault
+authorization signal, so the production gate must fail closed, and the
+downstream behavior (profile handling, containment, preview, atomic writes,
+conflicts) would otherwise be unverifiable. A provider confined to the
+harness lets those paths be tested without implying the production signal
+exists. Because the repository root is the installable plugin, `tests/` could
+ship with it; verifying that the installed plugin excludes `tests/` or gains
+no bypass from it keeps the test seam from becoming an authorization
+shortcut.
+
+**Alternatives considered:** Waiting for Feature 001 was rejected because it
+would leave Feature 003's own requirements untestable. A production
+environment-variable, flag, or configuration bypass was rejected because it
+would weaken the fail-closed gate. Manual-only verification was rejected
+because repeatable results are required in every supported environment.
+
+**Sources:** [Pester quick start](https://pester.dev/docs/quick-start),
+[Pester installation and compatibility](https://pester.dev/docs/introduction/installation),
+[Feature 003 requirements](spec.md),
+[Runtime contract](contracts/powershell-runtime-contract.md).
+
 ## Decisions deferred to implementation readiness
 
 - Select and record the exact latest stable PowerShell, YAML-reader, and
   Draft 2020-12 validator versions, plus the selection date and per-platform
   support matrix, when the runtime dependency set is tested for release.
+- Select and pin the acceptance-test runner (Pester is the candidate), and
+  confirm that it supports the selected PowerShell release before relying on
+  it.
 - Verify actual installed-client skill activation and owner-skill resource
   resolution in the disposable fixture described by
   `docs/architecture.md`; source-tree inspection is not sufficient.

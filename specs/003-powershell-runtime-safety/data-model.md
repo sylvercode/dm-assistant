@@ -37,17 +37,22 @@ the static plugin must not require PowerShell or run scripts.
 
 ### Operation request
 
-One explicitly scoped request to inspect or change campaign material.
+One explicitly scoped request to inspect or change campaign material. The
+runtime contract's section 2 is authoritative for field names, types, and
+requirements; this table describes each field's role.
 
 | Field | Meaning and constraint |
 | --- | --- |
-| `operationId` | Identity for correlating the request and its result; not a vault permission. |
-| `operation` | Requested operation name and scope. Input is data, never executable text. |
-| `vaultInput` | User workspace or explicit vault selection. It must not be inferred from the plugin location or process current directory. |
-| `campaignGroup` | Explicit or unambiguous campaign/group context, consistent with the one-campaign/group-per-vault assumption. |
-| `targets[]` | Requested note or configuration references, interpreted relative to the authorized vault where applicable. |
-| `requestedChange` | Requested content effect. Clearly requested edits to one named note may proceed without redundant approval; broader, destructive, restructuring, multi-note, or continuity-changing work requires approval of its exact preview. |
-| `mode` | Read-only inspection or requested mutation. Inspection is read-only. |
+| `contractVersion` | Interface version of the request; the current value is `1`. |
+| `requestId` | Identity for correlating the request and its result; not a vault permission or authorization token. |
+| `operation` | Requested operation name. Input is data, never executable text. |
+| `vaultRoot` | Explicit absolute path to the user-designated vault. It must not be inferred from the plugin location or process current directory, and exact-vault authorization is established separately. |
+| `campaignGroup` | Explicit campaign/group context, or explicit `null` for a value the operation does not use, consistent with the one-campaign/group-per-vault assumption. |
+| `targets[]` | Explicit vault-relative note or configuration references, in the operation's deterministic order. |
+| `arguments` | Operation-specific data, including the requested content effect. Clearly requested edits to one named note may proceed without redundant approval; broader, destructive, restructuring, multi-note, or continuity-changing work requires approval of its exact preview. |
+| `mode` | `inspect` (read-only), `preview` (compute proposed changes without writing), or `apply` (write only the requested targets under the safeguards). |
+| `approvedPreviewId` | Identifies the exact, still-current approved preview when the preview-and-confirm rule applies; it cannot authorize different targets or changes. |
+| `allowEncodingConversion` | Explicit acknowledgement, in a subsequent request, of a documented conversion warning; defaults to `false`. |
 
 The same explicit request and unchanged inputs must select the same target
 regardless of the starting working directory.

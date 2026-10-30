@@ -27,8 +27,13 @@ Before testing a future script-backed operation:
   `obsidian-link-resolver` 2.0.0 or later with `resolve_obsidian_link`;
   readiness and authorization for the exact vault are separate checks. The
   note-content-free authorization signal is not yet defined. Until it is
-  documented and verifiable, vault-facing runtime tests must expect a block
-  before profile, guidance, or campaign-note access.
+  documented and verifiable, tests of the production preflight must expect a
+  `VAULT_AUTHORIZATION_UNPROVEN` block before profile, guidance, or
+  campaign-note access. Scenarios below that reach profile, path, preview, or
+  write behavior run in an "authorized synthetic fixture" through the
+  test-only authorization provider that only the harness injects. That
+  provider never proves that Feature 001's signal exists and must not be
+  present in, or reachable from, the installed skill.
 
 The eventual transport, operation names, and test-runner commands have not
 been selected. The criteria below are executable acceptance criteria for a
@@ -116,7 +121,10 @@ documented deterministic order.
 Feature 003 is not validated by these written scenarios alone. Before claiming
 an implementation is ready, run the future harness in every published
 supported environment, verify installed-client resource lookup, and retain
-sanitized results for the cases above. Do not claim stronger concurrency
+sanitized results for the cases above. Also confirm that the installed plugin
+either excludes `tests/` or gains no authorization bypass from it, and that
+production preflight still returns `VAULT_AUTHORIZATION_UNPROVEN` when no
+harness provider is supplied. Do not claim stronger concurrency
 guarantees than the tested filesystem replacement primitives provide. Record
 sanitized evidence in the "Verification evidence" section of
 `docs/powershell-runtime-support.md`; this quickstart remains a guide only.
