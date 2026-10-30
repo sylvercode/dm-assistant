@@ -129,9 +129,10 @@ These are future milestones, not implemented capabilities. Use the
 open questions, and acceptance scenarios.
 
 1. **Establish shared AI guidance.** The canonical reference and
-   vault-orientation skill are present. Verify installed cross-skill resource
-   lookup and a note-content-free exact-vault authorization check before
-   enabling dependent note access or claiming runtime behavior. Keep
+   vault-orientation skill are present. Installed cross-skill resource lookup
+   and exact-vault authorization through Resolver 2.1.0's `get_server_info`
+   have been verified, and agent-run acceptance scenarios pass. The informal
+   human DM walkthrough (SC-004) is still outstanding. Keep
    `skills/README.md` as the authoritative inventory and statically audit its
    exact match to skill files and each vault-facing skill's preflight.
 2. **Define the configuration contract.** The proposed `.dmassist.yaml`

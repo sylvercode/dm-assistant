@@ -173,8 +173,10 @@ and check component discovery with `/agent` and `/skills list`; the
 vault-orientation skill should be listed. No Copilot-specific agents are
 currently included. See the feature
 [validation guide](specs/001-shared-vault-guidance/quickstart.md) for the
-unverified resource-loading and authorization gates; installation or skill
-discovery alone does not validate campaign-note access behavior.
+resource-loading and exact-vault authorization checks. The skill requires
+Obsidian Link Resolver 2.1.0 or later, configured with your vault as an
+allowed root. Installation or skill discovery alone does not validate
+campaign-note access behavior.
 
 Copilot caches installed plugins. Re-run `copilot plugin install .` after changing the local plugin, then start a new session to test it.
 

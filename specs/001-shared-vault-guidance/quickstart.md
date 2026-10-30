@@ -1,11 +1,16 @@
 # Shared Vault Guidance Validation Quickstart
 
-**Status: validation guide for partially implemented guidance.** The plugin
-contains a vault-orientation skill and its bundled shared reference, but the
-Resolver integration and installed cross-skill loading and authorization
-behavior remain unverified. Do not treat plugin installation, skill discovery,
-or source-tree presence as proof that campaign-note access is safe. Record
-unsupported or unexercised checks as blocked.
+**Status: validation guide for implemented guidance.** The plugin contains a
+vault-orientation skill and its bundled shared reference. Installed
+cross-skill loading (T001) and Resolver readiness and exact-vault
+authorization through `get_server_info` (T002) are verified, and the
+agent-run installed-client scenarios passed (see the implementation record
+below). The SC-004 human DM walkthrough is deferred to
+[#13](https://github.com/sylvercode/dm-assistant/issues/13). T011 is checked
+with that explicit deferral; SC-004 remains unperformed, not passed. Do not treat
+plugin installation, skill discovery, or source-tree presence as proof that
+campaign-note access is safe. Record unsupported or unexercised checks as
+blocked.
 
 See [the feature specification](spec.md), [data model](data-model.md), and
 [loading contract](contracts/vault-guidance-loading.md) for requirements and
@@ -22,13 +27,15 @@ path.
   configuration. Do not access a real campaign vault or change the user's live
   MCP configuration. Do not embed vault paths in the plugin or repository.
 - For the disposable setup, configure the Obsidian Link Resolver MCP server
-  separately (minimum compatible release `2.0.0`) with the disposable vault as
+  separately (minimum compatible release `2.1.0`) with the disposable vault as
   an explicitly authorized absolute root. Verify server/tool readiness with
   `copilot mcp list` and `copilot mcp get obsidian-link-resolver`, then confirm
-  `resolve_obsidian_link` is available in a new session. This establishes
-  readiness only; separately verify that the intended disposable vault is
-  authorized. Server or tool presence alone does not prove authorization, and
-  do not resolve a campaign link merely to test authorization.
+  `resolve_obsidian_link` and `get_server_info` are available in a new
+  session. This establishes readiness only; separately verify authorization
+  by calling `get_server_info` and confirming one returned `vaults[].path`
+  exactly matches the intended disposable vault after normalization. Server or
+  tool presence alone does not prove authorization, and do not resolve a
+  campaign link merely to test authorization.
 - The dependency inventory is non-exhaustive. Every vault-facing skill must
   verify all currently declared required dependencies before accessing
   campaign notes. Official Obsidian help pages are source references, not
@@ -136,12 +143,14 @@ unimplemented or a skill cannot be inspected.
 ### Required dependency availability and fail-closed behavior
 
 In the isolated Copilot CLI configuration, first confirm the resolver server
-and `resolve_obsidian_link` tool are exposed in a new session. Then test
-whether a documented, note-content-free method confirms that the exact
-disposable test vault is among the resolver's explicitly authorized roots,
-without resolving any campaign link. Do not treat server/tool presence as
-authorization proof. If no safe documented method is available, record
-authorization as blocked and do not access notes. Use another isolated
+and its `resolve_obsidian_link` and `get_server_info` tools are exposed in a
+new session. Then call `get_server_info` (no arguments, note-content-free) and
+confirm that one returned `vaults[].path` exactly matches the disposable test
+vault after stripping a `\\?\` prefix and trailing separators (compared
+case-insensitively on Windows), without resolving any campaign link. Repeat
+with the server configured for a different root and confirm the skill
+reports the mismatch and stops before note access. Do not treat server/tool
+presence as authorization proof. Use another isolated
 configuration with the resolver missing or disabled and invoke a
 representative implemented vault-facing skill with a campaign-note task.
 
@@ -311,6 +320,10 @@ Conduct an informal short walkthrough with 5 DMs and assess whether at least
 4 can distinguish plugin-wide guidance from vault-specific guidance. Examples
 and scoring are not standardized; no vault reorganization is required.
 
+**Deferred:** This human validation is tracked in
+[#13](https://github.com/sylvercode/dm-assistant/issues/13). Record the actual
+walkthrough result here when conducted; agent-run scenarios do not replace it.
+
 ## 6. Verify page-local edits and the approval gate
 
 ### Clearly requested page-local edit
@@ -367,14 +380,31 @@ test run in `research.md` for exact procedure, evidence, and limitations.
 | Full package install/reinstall and discovery | **Pass** | Installed a disposable copy of the complete plugin components as `dm-assistant` v0.1.0, listed it, reinstalled it, and activated `vault-orientation` in a fresh session without `--plugin-dir`. Read its installed reference and identified all four convention topics. Logs: `.temp\t011-package-check\discovery.md`. Uninstalled using the isolated home afterward. |
 | Missing shared reference | **Pass, resource-only** | Removed the reference only from the isolated installation. A fresh session activated the skill, attempted the exact installed resource path, observed `Path does not exist`, and reported dependent campaign work must pause without fallback copies or note access. Logs: `.temp\t011-package-check\missing-reference.md`. This non-campaign resource test does not bypass or validate the ordered authorization preflight. Permission-denied unreadability was not separately exercised. |
 | Cross-skill reference lookup (T001) | **Pass** | Consumer activated the resource-owning skill, then read the same installed sentinel resource from the fixture directory and a directory outside the repository. No sibling-path or current-directory fallback. |
-| Resolver readiness (T002) | **Pass** | Direct stdio initialization returned version `3.5.1` and both Resolver tools; a fresh CLI session exposed `resolve_obsidian_link`. No link-resolution call was made. |
-| Exact-vault authorization (T002) | **Deferred / blocked** | A proposed Resolver tool checking an exact path against the running server's active allow-list without note reads, link resolution, or permission changes could satisfy this. It is not currently exposed. Verify configured and unconfigured roots and wire the documented interface into the skill before closing T002. |
+| Resolver readiness (T002) | **Pass** | 2026-10-26: direct stdio initialization of an earlier executable returned version `3.5.1` and two Resolver tools. 2026-10-29: the current executable reports `2.1.0` (matching GitHub release v2.1.0) and exposes `resolve_obsidian_link`, `generate_obsidian_link`, and `get_server_info`; the isolated CLI exposed them as `obsidian-link-resolver-*`. No link-resolution call was made. |
+| Exact-vault authorization (T002) | **Pass** | `get_server_info` (no arguments) returned `vaults[].path` (canonical `\\?\`-prefixed) and `version`, without reading notes. Configured root: listed. Unconfigured directory: not listed; only the configured root appeared. Multiple roots: all listed. Nonexistent root: server startup fails (`an allowed vault root could not be accessed`). The skill now requires this check (normalized exact match) before note access; see the T011 scenarios below. |
+| T011 S1 authorized no-guidance lookup | **Pass** | Called `get_server_info`, loaded the reference, searched by the named NPC and read only matching notes; answered, withheld the DM-only callout, made no changes. Re-run after later skill edits: still targeted and read-only. |
+| T011 S2 unauthorized root | **Pass** | Server configured for a different root: the skill reported the mismatch and the configured root and stopped without note reads. |
+| T011 S3 Resolver missing | **Pass** | No Resolver configured: named the missing dependency and stopped without note reads. |
+| T011 S4 offline Obsidian defaults | **Pass** | Explained aliases, tags, both internal-link formats with wikilinks preferred, and callouts from the bundled reference without web fetching. The network was not disabled, so this shows no fetch was attempted, not an offline run. |
+| T011 S5 designated local guidance and customization | **Pass** | Loaded the shared reference, then the designated vault guidance; applied its Markdown-link preference and tag conventions, kept Obsidian semantics, withheld a `[!secret]` callout code, and noted callouts are not access control. |
+| T011 S6 designated guidance missing | **Pass** | Named the missing designated file and paused before reading note content. |
+| T011 S7 ambiguous campaign | **Pass** | Asked which campaign/group and knowledge basis before note reads. |
+| T011 S8 handout/read-aloud gate | **Pass** | Player-facing sections contained no DM-only facts or revealing links; tentative prep was labeled, and an actual-play contradiction was flagged rather than resolved. |
+| T011 S9 preparation vs. history | **Pass** | Separated actual play, party knowledge, DM-only facts, and tentative prep; preserved the recorded contradiction. |
+| T011 S10 uncertain folder/note-role mapping | **Fail, then pass** | First run bulk-read folders through the shell before pausing. The skill's no-guidance section was tightened (identify notes by names/links/terms in the request; folder-as-role or bulk reads are uncertain mappings). Re-run paused before any note reads and offered options. |
+| T011 E01–E02 knowledge updates | **Pass** | With only vault notes and tentative prep, refused to treat prep as character knowledge, asked, and changed nothing. With explicit DM judgment, added exactly one knowledge line. (An initial E01 prompt was itself a DM instruction and was discarded as an invalid test.) |
+| T011 E03 clearly requested local edit | **Pass** | Changed only the requested phrase in one note, without redundant approval. |
+| T011 E04 broad/continuity-changing edit | **Fail, then pass** | First run applied a multi-note change, rewrote an actual-play log, and deleted a note without a preview. The approval rule in the skill and reference was tightened (multi-note, delete/move/merge, actual-play, or continuity changes require a preview; the request is not approval; stop after the preview). Re-run: preview only, no changes, flagged the actual-play rewrite. Resumed with approval: applied exactly the preview (one append, one log line, one deletion) and nothing else. |
+| T011 E05 shared reference permission-denied | **Fail-safe, then pass** | Read access denied on the installed reference (ACL). First run paused before note access but offered to proceed without the reference. The skill now states the reference is mandatory. Re-run paused, refused to continue without it, and read nothing else. Access was restored. |
 | Explicit functional link-resolution test | **Pass, single case** | At the user's request, `[[Svalich Woods]]` from `7. Argynvostholt.md` resolved to `Locations/Svalich Woods.md`. No notes changed. This does not satisfy T002's note-content-free pre-access check. |
 | Orientation preflight smoke test | **Pass, constrained** | The actual skill recognized the explicit vault and exposed Resolver tools, then paused on unverified authorization without note reads or Resolver calls. The prompt required a preflight-only stop and Resolver calls were denied; this does not pass broader acceptance scenarios. |
 | Current issue scope (T012) | **Pass** | The open #2 issue covers shared vault guidance and preflight; the open #7 issue separately owns Resolver integration. No user vault path or MCP configuration is added here. |
-| Offline Obsidian defaults; missing-source, ambiguity, no-guidance, continuity, knowledge, player-safety, and approval scenarios | **Deferred / blocked** | Await T002, then exercise realistic DM-style installed-client scenarios against the disposable vault, inspecting outputs and before/after note state. Agent-driven scenarios are acceptable; a constrained smoke test alone is insufficient. |
-| SC-004 informal DM walkthrough | **Deferred / blocked** | Requires five human DMs, with at least four distinguishing plugin-wide from vault-specific guidance. No walkthrough was conducted; technical smoke tests cannot replace it. |
+| SC-004 informal DM walkthrough | **Deferred — not passed** | Tracked in [#13](https://github.com/sylvercode/dm-assistant/issues/13) at the DM's request; T011 is checked with this deferral. Requires five human DMs, with at least four distinguishing plugin-wide from vault-specific guidance. No walkthrough was conducted; agent-run scenarios cannot replace it. |
 
-The unresolved foundational gates remain blockers. The skill's fail-closed
-instructions are not evidence that installed-client runtime behavior has been
-validated.
+The 2026-10-29 T011 scenarios ran in Copilot CLI 1.0.103 with Resolver 2.1.0
+under an isolated `COPILOT_HOME`, using a disposable copy of a test vault
+with fictional fixture notes and `--no-ask-user`. Each run was compared with a
+before-test file-hash inventory, and the vault was restored between runs. No
+live vault or live MCP configuration was used or changed. Agent behavior is
+probabilistic; these results show that the skill guided one run per scenario,
+not that every future run will behave the same way.
