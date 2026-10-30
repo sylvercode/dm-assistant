@@ -1,0 +1,15 @@
+{
+  "inventoryVersion": 1,
+  "source": "Mirrors the authoritative Feature 001 inventory: specs/001-shared-vault-guidance/spec.md, section Expected Runtime Dependencies. Update both together; an acceptance test fails if they diverge.",
+  "dependencies": [
+    {
+      "dependencyId": "obsidian-link-resolver",
+      "displayName": "Obsidian Link Resolver",
+      "project": "https://github.com/sylvercode/obsidian-link-resolver",
+      "type": "mcp-server",
+      "scope": "every vault-facing skill",
+      "minimumVersion": "2.0.0",
+      "requiredTool": "resolve_obsidian_link"
+    }
+  ]
+}

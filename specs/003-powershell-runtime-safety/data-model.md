@@ -2,11 +2,11 @@
 
 ## Status and scope
 
-**Proposed future contract—not implemented behavior.** The repository is an
-Agent Plugins 1.0 scaffold; it contains no PowerShell operation runtime or
-profile loader. The entities and states below describe the intended contracts
-for future script-backed workflows. They do not prescribe a persistence
-format, script API, or installed-resource lookup implementation.
+**Implementation status:** PowerShell modules and a synthetic acceptance
+harness implement these runtime contracts. Production vault access remains
+blocked by the unresolved exact-vault authorization handoff; installed-client
+and cross-platform acceptance are not established. The entities and states
+below define operation contracts, not a persistence format or universal CLI.
 
 Feature 003 owns runtime prerequisite checks, safe operation execution,
 profile parsing and validation delegated by Feature 002, path/reference
@@ -28,7 +28,7 @@ prerequisite add-ons for a release.
 | --- | --- |
 | `operatingSystem` | Windows, macOS, or Linux, limited to combinations verified for that release. Unsupported combinations are identified as unsupported. |
 | `runtimeName`, `runtimeVersion` | PowerShell (`pwsh`) and the exact supported version. The version is selected and recorded per release, not inferred from a floating minimum. |
-| `addOns[]` | Required add-on identities and exact versions, including any YAML reader and Draft 2020-12 validator needed by the operation. |
+| `addOns[]` | Required add-on identities and exact versions, including any YAML reader needed by the operation. Draft 2020-12 validation uses the runtime's built-in `Test-Json`, so it is covered by the PowerShell version requirement rather than an add-on. |
 | `selectionDate` | Date those prerequisite versions were selected for the release. |
 | `provisioningGuidance` | User-facing acquisition/setup guidance. A workflow checks prerequisites but does not install or upgrade them. |
 
@@ -54,8 +54,7 @@ requirements; this table describes each field's role.
 | `approvedPreviewId` | Identifies the exact, still-current approved preview when the preview-and-confirm rule applies; it cannot authorize different targets or changes. |
 | `reviewedVersions` | With `approvedPreviewId`, the ordered per-target `observedVersion`, `replacementVersion`, and `conversionDecision` values from the approved preview, one entry per target. |
 | `reviewedDependencyVersions` | With `approvedPreviewId`, the ordered dependency identities and versions from the approved preview, so a stateless apply can detect a changed profile, template, guidance file, or reference. |
-| `declinedReviewId` | Identifies a preview or conversion warning the DM declined or withdrew; the result is `USER_CANCELLED` with no write. Cannot be combined with an approval or conversion acknowledgement. |
-| `allowEncodingConversion` | Explicit acknowledgement, in a subsequent `apply` request, of a documented conversion warning or of a reviewed preview stating the conversion; defaults to `false`, is invalid outside `mode: apply`, and is not a preview-digest input. |
+| `declinedReviewId` | Identifies a preview the DM declined or withdrew; the result is `USER_CANCELLED` with no write. Cannot be combined with an approval. |
 
 The same explicit request and unchanged inputs must select the same target
 regardless of the starting working directory.
@@ -190,17 +189,16 @@ proposed write. It is not a lock or permission to write.
 | `observedVersion` | Exact byte-content fingerprint and available file identity/metadata recorded when the note is read or previewed. Content fingerprints are for conflict detection only and are not diagnostic content. |
 | `encoding` | Detected source encoding and whether it can be safely round-tripped. |
 | `lineEndings` | Observed line-ending pattern and whether it can be safely preserved. |
-| `replacementVersion` | Fingerprint of the complete bytes that would be written, derived from the reviewed snapshot, dependency versions, and requested edit; for a `warn-and-convert` target, the converted UTF-8 without BOM and LF bytes. It is carried into an approved apply and recomputed before writing. |
-| `conversionDecision` | `preserve`, `warn-and-convert`, or `undecodable-no-write`. Conversion target is UTF-8 without BOM and LF. Reported by preview, carried into an approved apply, and included in the preview digest. |
+| `replacementVersion` | Fingerprint of the complete bytes that would be written while preserving a supported source encoding and its line endings. It is carried into an approved apply and recomputed before writing. |
+| `conversionDecision` | `preserve` for a supported, round-trippable target or `undecodable-no-write` for an unsafe target. Included in reviewed versions and the preview digest; unsafe targets do not produce an applicable preview. |
 | `writeState` | `not started`, `prepared`, `rechecked`, `replaced`, `conflict`, or `failed`. |
 
 Immediately before each write, re-resolve and check the boundary, then compare
 the target with the version captured when it was read/reviewed. If it changed,
 refuse replacement and report a conflict; do not overwrite or automatically
-retry. A warning and the conversion decision must precede writing whenever
-encoding or line endings cannot be safely preserved. Reliably decodable text
-may then be converted to UTF-8 without BOM and LF. If decoding is unreliable,
-do not write that file.
+retry. Only strictly decoded BOM-marked UTF-8/UTF-16 and BOM-less UTF-8 that round-trip
+byte-for-byte are supported. If decoding or exact preservation fails, return
+`ENCODING_UNSAFE`; do not convert the file.
 
 ### Change preview
 
@@ -208,10 +206,10 @@ The exact proposed edit and the target versions against which it was reviewed.
 
 | Field | Meaning and constraint |
 | --- | --- |
-| `previewId` | Deterministic digest identifying the exact preview presented for approval, covering the request (including `campaignGroup`), runtime version, target versions, replacement versions, conversion decisions, and dependency versions, serialized with RFC 8785 JCS (contract section 9); no preview state is stored between invocations. |
+| `previewId` | Deterministic digest identifying the exact preview presented for approval, covering the request (including `campaignGroup`), runtime version, target versions, replacement versions, encoding decisions, and dependency versions, serialized with RFC 8785 JCS (contract section 9); no preview state is stored between invocations. |
 | `targets[]` | Exact target paths with their reviewed `observedVersion`, `replacementVersion`, and `conversionDecision` values. |
 | `dependencyVersions[]` | Ordered identities and versions of every profile, guidance file, template, configured reference, and packaged plugin resource the runtime reads to construct the proposed change; guidance loaded only by the assistant is governed by FR-027 re-establishment. |
-| `proposedEffects[]` | Human-reviewable description or diff of intended changes, including any required encoding conversion; a preview stating a conversion serves as the conversion warning. |
+| `proposedEffects[]` | Human-reviewable description or diff of intended changes, with supported text encoding and line endings preserved. |
 | `scopeClass` | Single named-note text edit, multi-note, deletion, reorganization, or broader established-fact change. The runtime detects multi-note, deletion, and reorganization; the registered operation declares fact-changing effects, and an unclassifiable change requires approval. |
 | `approvalState` | `not required`, `awaiting`, `approved`, `declined`, or `expired/stale`. |
 
@@ -361,7 +359,7 @@ the outcome rather than silently retrying.
 | `stale` | A profile or referenced dependency changes during dependent work. | Stop affected work, report `TARGET_CONFLICT`, require revalidation before retry. |
 | `conflict` | A note differs from the version reviewed when the immediate pre-write check runs. | Refuse that replacement; do not retry automatically. Prior completed target writes remain. |
 | `failed` | An operational error or interruption prevents the next safe step. | Preserve prior completed target writes; ensure the current note is not partially replaced; stop later targets and report exact outcomes. |
-| `cancelled` | The DM declines or withdraws a preview or conversion warning before apply. | Make no proposed changes; report `not completed` with `USER_CANCELLED`. A stop signal during apply is handled as `failed` with `INTERRUPTED`. |
+| `cancelled` | The DM declines or withdraws a preview before apply. | Make no proposed changes; report `not completed` with `USER_CANCELLED`. A stop signal during apply is handled as `failed` with `INTERRUPTED`. |
 
 The terminal result status is derived from actual progress, not the state name:
 all requested work done is `complete`; no requested work done is `not

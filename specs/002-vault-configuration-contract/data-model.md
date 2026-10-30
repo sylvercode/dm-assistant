@@ -1,6 +1,6 @@
 # Data Model: Vault Configuration Contract
 
-**Status:** Proposed contract for a future plugin workflow. The repository is an Agent Plugins 1.0 scaffold; none of the entities, parsing, validation, or state transitions below are implemented.
+**Status:** Feature 002 owns this configuration design contract. Feature 003 implements parsing, validation, discovery, and dependency tracking in locally tested modules. Production authorization and installed-client/platform qualification remain blocked or unverified.
 
 ## Scope and Ownership
 
@@ -20,7 +20,7 @@ All paths in the profile are vault-relative. A path is usable only if its fully 
 ## Schema Artifact and Normalized Profile
 
 The canonical machine-readable schema deliverable is
-[`schemas/dmassist.schema.json`](../../schemas/dmassist.schema.json). It describes the normalized version-1
+[`skills/vault-orientation/assets/dmassist.schema.json`](../../skills/vault-orientation/assets/dmassist.schema.json). It describes the normalized version-1
 profile structure and uses JSON Schema Draft 2020-12, declared with
 `$schema`; this dialect is distinct from the profile's application-level
 `version: 1`.

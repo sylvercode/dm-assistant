@@ -9,6 +9,30 @@ Use this workflow for any task that reads, interprets, creates, or changes
 campaign material. A general question that requires no campaign material does
 not need vault access.
 
+## Script-backed operations (runtime-gated)
+
+Installing the plugin and discovering its skills uses only static files and
+needs no PowerShell. Script-backed operations have locally tested runtime
+foundations but remain authorization-gated and unverified in an installed
+client; see `docs/powershell-runtime-support.md` in the plugin repository
+for the supported runtime. Before any script-backed operation that affects
+campaign material:
+
+- Run the runtime prerequisite check first (`Invoke-DmPreflight` in this
+  skill's `scripts/RuntimePreflight.psm1`). It checks the supported runtime,
+  the request shape, dependency readiness, and exact-vault authorization
+  without reading the vault, installing, or updating anything. Then complete
+  the pre-note sequence below in order.
+- If the check returns `not completed`, report its completion code and
+  message, stop the script-backed work, and do not retry around it.
+  `VAULT_AUTHORIZATION_UNPROVEN` is expected until a note-content-free
+  exact-vault authorization signal exists.
+- A passing check or successful script run does not prove that shared
+  guidance was loaded. Load guidance yourself in step 3.
+- When scripts are blocked or PowerShell is unavailable, read-only assistance
+  that does not need the blocked operation remains available, subject to this
+  skill's pre-note sequence.
+
 ## Required pre-note sequence
 
 Do these steps in order. Do not inspect campaign notes, vault configuration,
@@ -64,7 +88,7 @@ information requested may read relevant notes identified without relying on
 uncertain folder or note-role mappings. It must remain read-only. If
 uncertainty affects the findings or next action, stop before further note
 access and ask the DM. Provisional assumptions never authorize creating or
-changing notes.
+changing notes. The same restriction applies to script-backed operations.
 
 ### Pause conditions
 

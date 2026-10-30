@@ -25,7 +25,11 @@ The plugin will give an AI assistant a focused set of tools and guidance for wor
 
 This repository contains an Agent Plugins 1.0 plugin with a portable
 vault-orientation skill and its bundled shared reference. It does not include
-an Obsidian Link Resolver integration or automated vault runtime. Installed
+an Obsidian Link Resolver integration or enabled production vault access.
+PowerShell modules implement prerequisite checks, profile validation,
+read-only inspection, preview approval, and conflict-aware atomic note writes;
+these have local synthetic acceptance coverage, not installed-client or
+cross-platform verification. Installed
 cross-skill resource loading was verified in a disposable two-skill fixture
 using owner-skill activation, not assumed sibling paths. The orientation skill
 must stop before campaign-note access when note-content-free authorization of
@@ -44,9 +48,12 @@ Campaign notes belong in your Obsidian vault, not in the plugin installation.
 The proposed `.dmassist.yaml` version-1 contract, defaults, and machine-readable
 JSON Schema are documented in
 [`specs/002-vault-configuration-contract/`](specs/002-vault-configuration-contract/).
-The canonical schema artifact is [`schemas/dmassist.schema.json`](schemas/dmassist.schema.json).
-No configuration reader or runtime validator is implemented; those remain
-runtime work. Plugin-added support files use dot-prefixed names to stay hidden
+The canonical schema artifact is packaged with its consuming skill at
+[`skills/vault-orientation/assets/dmassist.schema.json`](skills/vault-orientation/assets/dmassist.schema.json).
+The PowerShell configuration reader and runtime validator use this installed
+skill-owned artifact with built-in `Test-Json -Schema`. Production profile
+access remains blocked by the exact-vault authorization gate. Plugin-added
+support files use dot-prefixed names to stay hidden
 from Obsidian's normal note view. Campaign articles remain ordinary, visible
 Markdown notes.
 
@@ -153,12 +160,15 @@ See the [Vault Guidance Brainstorm](docs/vault-guidance-brainstorm.md) for propo
 
 ## Local Installation
 
-PowerShell is a planned prerequisite for future script-backed skills and hooks,
-to make mechanical vault operations more predictable. The current scaffold has
-no scripts and does not require PowerShell to install. Future workflows will use
-the latest stable `pwsh` and required modules, including `powershell-yaml`, with
-exact versions recorded during implementation and validation. Platform support
-and provisioning remain to be specified; see the
+PowerShell is a prerequisite only for script-backed vault operations, which
+make mechanical vault operations more predictable. Installing the plugin and
+discovering its skills does not require PowerShell, and no workflow installs or
+upgrades PowerShell or its modules. The selected `pwsh` release, exact module
+versions such as `powershell-yaml`, supported operating systems, provisioning
+guidance, and verification evidence are recorded in
+[PowerShell Runtime Support](docs/powershell-runtime-support.md). Script-backed
+vault access remains blocked until exact-vault authorization can be verified;
+see the
 [scripting proposal](docs/vault-guidance-brainstorm.md#powershell-and-predictable-operations).
 
 With GitHub Copilot CLI installed, run these commands from the repository root:
@@ -177,6 +187,16 @@ unverified resource-loading and authorization gates; installation or skill
 discovery alone does not validate campaign-note access behavior.
 
 Copilot caches installed plugins. Re-run `copilot plugin install .` after changing the local plugin, then start a new session to test it.
+
+Contributors can run the synthetic acceptance suite with Pester 6.2.0:
+
+```powershell
+pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1
+```
+
+The test-only authorization provider is confined to the harness. Passing tests
+does not authorize a real vault or establish installed-client support; see the
+[support matrix and evidence](docs/powershell-runtime-support.md).
 
 To remove the local installation:
 

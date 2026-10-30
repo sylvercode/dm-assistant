@@ -42,14 +42,14 @@ combination is documented as unsupported. Workflows never install or upgrade
 prerequisites.
 
 **Primary Dependencies**: `powershell-yaml` for YAML parsing and
-normalization; a Draft 2020-12 JSON Schema validator, with `JsonSchema.Net`
-as the researched candidate. The selected exact versions and selection date
-must be recorded alongside release support guidance. The required
+normalization; the built-in `Test-Json -Schema` cmdlet (PowerShell 7.4 or
+later, backed by `JsonSchema.Net`) as the Draft 2020-12 validator, so no
+separate validator module is required. The selected exact versions and
+selection date must be recorded alongside release support guidance. The required
 `obsidian-link-resolver` dependency remains governed by Feature 001's
 authoritative inventory and requires separate exact-vault authorization.
-Test-only: a PowerShell acceptance-test runner selected and pinned in T002;
-Pester, whose `*.Tests.ps1` convention the task list already follows, is the
-candidate. It is never a prerequisite for plugin installation or a DM's
+Test-only: Pester 6, whose `*.Tests.ps1` convention the task list already
+follows, pinned to an exact version in T002. It is never a prerequisite for plugin installation or a DM's
 workflow, and its exact version and supported PowerShell versions are
 confirmed when selected.
 
@@ -84,11 +84,10 @@ path parameters, network APIs, and any reference to `tests/` (T034). Runs in
 every claimed supported environment, installed Copilot CLI plugin/resource
 checks from multiple working directories, and the check that the installed
 plugin excludes `tests/` or gains no authorization bypass from it (T046) are
-recorded as sanitized evidence in `docs/powershell-runtime-support.md`. Until
-a runner exists, the statement that no build, test, or lint commands are
-defined remains accurate; T044 updates `AGENTS.md` and requests a
-constitution PATCH when one does. This planning phase adds no test runner or
-implementation claim.
+recorded as sanitized evidence in `docs/powershell-runtime-support.md`.
+The Pester 6.2.0 runner now exists at `tests/powershell/Invoke-Tests.ps1`;
+`AGENTS.md` documents its command, and constitution 1.0.1 records the matching
+Development Workflow amendment. No build or lint command is defined.
 
 **Target Platform**: GitHub Copilot CLI Agent Plugin installed on Windows,
 macOS, and Linux only where the selected PowerShell runtime and required
@@ -96,10 +95,10 @@ modules are supported and verified. Unsupported combinations must be
 documented; installation and discovery of the static plugin must not require
 PowerShell.
 
-**Project Type**: Agent Plugins 1.0 documentation-and-metadata scaffold.
-Feature 003 delivers design artifacts only; future scripts and bundled
+**Project Type**: Agent Plugins 1.0 plugin with locally tested runtime
+foundations. Scripts and bundled
 resources belong to an actual skill component, not a new root-level
-runtime/integration or placeholder plugin component. The proposed
+runtime/integration or placeholder plugin component. The
 `tests/powershell/` harness and `docs/powershell-runtime-support.md` are
 repository-level development and support artifacts, not plugin components.
 
@@ -117,8 +116,8 @@ paths/content, bypass OS controls, install dependencies automatically,
 send off-device telemetry, or use a source-checkout/current-directory
 fallback for packaged resources. Writes must recheck the target immediately
 before replacement, avoid leaving a partially written note, preserve
-round-trippable text, warn before documented conversion, and stop on
-undecodable content. Multi-note work stops at the first failure without
+supported round-trippable text exactly, and stop on unsupported or
+undecodable content. Note encodings are never converted. Multi-note work stops at the first failure without
 rollback. Use `-LiteralPath` for every filesystem cmdlet and never pass paths
 or content to `Invoke-Expression`, `[scriptblock]::Create`, or
 `-Command`/argument strings (contract section 3; audited by T034). The
@@ -145,7 +144,7 @@ unmeasured capacity guarantees.
 | IV. Respect character knowledge and player safety | Maintain preparation/actual-play distinction and the Feature 001 player-facing checks. | PASS |
 | V. Distinguish proposals from implemented behavior | Label all runtime, schema packaging, test-harness, and validation behavior as proposed until installed-client and runtime validation succeeds; claim no check ran until it does. | PASS |
 | Plugin and Vault Constraints | Keep reusable guidance in skills, add no integration without an implementation, keep credentials and campaign content out of the distributed plugin, and do not restructure a vault without authorization. | PASS |
-| Development Workflow | "No build, test, or lint commands" stays accurate until T002 selects a runner; T044 then updates `AGENTS.md` and requests a separate constitution PATCH through `/speckit-constitution`. This tracked follow-up is not a violation. | PASS |
+| Development Workflow | Pester 6.2.0 acceptance runner documented in `AGENTS.md`; the separate constitution 1.0.1 PATCH records the matching test command. No build or lint command exists. | PASS |
 
 Post-design re-check (2026-10-29, after the Phase 1 artifacts and task list):
 all gates still pass. The task list adds no placeholder component, and the
@@ -172,9 +171,7 @@ specs/003-powershell-runtime-safety/
 ### Source Code (repository root)
 
 ```text
-No runtime source is added in this planning phase.
-
-Proposed by tasks.md; none of this exists today:
+Implemented layout (production vault access remains authorization-gated):
 skills/
 └── vault-orientation/                  # installed plugin component
     ├── SKILL.md
@@ -190,10 +187,9 @@ docs/
 └── powershell-runtime-support.md       # support matrix and evidence, T001
 ```
 
-**Structure Decision**: Keep Feature 003's deliverables in its spec directory.
-The current repository has no PowerShell scripts, runtime loader, or test
-suite, so this phase adds no code or plugin component. For the future
-consumer, keep the canonical Feature 002 schema with the existing
+**Structure Decision**: Keep design artifacts in the spec directory and runtime
+modules in the existing skill. Keep the canonical Feature 002 schema with the
+existing
 `vault-orientation` skill rather than relying on a free-standing root schema
 directory or sibling-skill traversal. Reconcile Feature 002's schema
 references and the architecture/README documentation to this packaged

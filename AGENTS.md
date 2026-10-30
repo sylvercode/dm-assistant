@@ -1,6 +1,6 @@
 # DM Assistant Contributor Instructions
 
-This repository is an Agent Plugins 1.0 scaffold, not a running campaign assistant. Check the [README](README.md) and [plugin architecture](docs/architecture.md) before changing plugin structure. Treat planned capabilities as proposals until implemented.
+This repository is an Agent Plugins 1.0 plugin with locally tested PowerShell runtime foundations, not a production-ready campaign assistant. Exact-vault authorization and installed-client validation remain blocked or unverified. Check the [README](README.md) and [plugin architecture](docs/architecture.md) before changing plugin structure. Treat planned capabilities as proposals until implemented.
 
 ## Plugin Structure
 
@@ -20,4 +20,5 @@ This repository is an Agent Plugins 1.0 scaffold, not a running campaign assista
 ## Project Tracking and Validation
 
 - GitHub Issues tracks project epics with the `epic` label. Check current issues for scope and dependencies before starting planned work; do not treat the label as evidence that a capability is implemented.
-- No build, test, or lint commands are defined for this documentation-and-metadata scaffold. For plugin discovery checks, follow the local installation steps in the [README](README.md).
+- Run the PowerShell acceptance suite with Pester 6.2.0: `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`. Use only synthetic disposable vaults; the test-only authorization provider does not establish production authorization. See [runtime support and limitations](docs/powershell-runtime-support.md).
+- No build or lint commands are defined. For plugin discovery checks, follow the local installation steps in the [README](README.md).

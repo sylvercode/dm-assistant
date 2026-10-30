@@ -9,7 +9,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 **Prerequisites**: `plan.md`, `spec.md`; supporting context in `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`
 
-**Scope**: Produce the written version-1 `.dmassist.yaml` contract and normalized-profile JSON Schema, with design-only validation scenarios. Do not implement a YAML reader, PowerShell runtime, loader, validator integration, filesystem checks, or plugin packaging. The canonical schema file currently lives at provisional repository path `schemas/dmassist.schema.json`; Issue #4 decides its final location alongside the consuming plugin component and verifies installed packaging and loader use.
+**Scope**: Produce the written version-1 `.dmassist.yaml` contract and normalized-profile JSON Schema, with design-only validation scenarios. Do not implement a YAML reader, PowerShell runtime, loader, validator integration, filesystem checks, or plugin packaging. The canonical schema file originally lived at provisional repository path `schemas/dmassist.schema.json`; Issue #4 (Feature 003 T015) moved it to `skills/vault-orientation/assets/dmassist.schema.json` alongside the consuming skill and verifies installed packaging and loader use.
 
 **Tests**: No executable repository test suite or runtime loader exists. The one-off Draft 2020-12 schema verification below is required by SC-006 and must not add a repository/runtime dependency.
 
@@ -17,7 +17,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 - Every task uses `- [ ] T### [P?] [US#?] Description with exact file path(s)`.
 - `[P]` marks tasks that edit different files and have no incomplete prerequisites.
-- The schema path `schemas/dmassist.schema.json` is provisional as an installed-plugin location; plugin packaging and installed discovery belong to Issue #4.
+- The schema path `schemas/dmassist.schema.json` was provisional as an installed-plugin location; Issue #4 moved it to `skills/vault-orientation/assets/dmassist.schema.json` and owns plugin packaging and installed discovery.
 
 ## Phase 1: Setup
 

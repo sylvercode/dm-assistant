@@ -1,8 +1,10 @@
 # Vault Configuration Contract (`.dmassist.yaml`)
 
-**Status: Proposal.** This document defines a user-facing design contract for a
-future loader. The repository is a plugin scaffold: no configuration loader,
-discovery workflow, or runtime behavior described here is implemented.
+**Status: Version-1 design contract.** Feature 002 owns these semantics.
+Feature 003 implements the loader, validation, reference checks, and read-only
+discovery in locally tested PowerShell modules. Production vault access remains
+blocked by exact-vault authorization, and installed-client/platform
+qualification is not established.
 
 ## Purpose and boundary
 
@@ -38,7 +40,7 @@ until those checks succeed. This contract does not implement that runtime.
 
 ## Version 1 profile and JSON Schema
 
-The accompanying [`schemas/dmassist.schema.json`](../../../schemas/dmassist.schema.json)
+The accompanying [`skills/vault-orientation/assets/dmassist.schema.json`](../../../skills/vault-orientation/assets/dmassist.schema.json)
 is the canonical machine-readable JSON Schema for version 1. It uses JSON Schema Draft 2020-12
 and validates the profile's normalized object structure and values. It
 complements this written contract; it does not replace the contract's

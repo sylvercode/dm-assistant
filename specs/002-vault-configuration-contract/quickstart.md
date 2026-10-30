@@ -1,15 +1,16 @@
 # Vault Configuration Contract: Future Validation Guide
 
-**Status: Design-only.** This guide specifies future validation coverage for
-the version-1 profile schema. The repository is an Agent Plugins 1.0 scaffold:
-it has no vault-profile loader, discovery workflow, runtime scripts, or test
-suite. Nothing here is currently runnable, and these scenarios do not claim
-that executable validation exists.
+**Status: Feature 002 design-validation guide.** This feature defines the
+version-1 profile contract and schema, not its runtime. Feature 003 now
+implements a loader, validator, reference checks, and read-only discovery with
+synthetic acceptance tests. See its
+[validation guide](../003-powershell-runtime-safety/quickstart.md) for the
+runner and remaining installed-client, platform, and authorization limitations.
 
 ## Scope and setup
 
 The canonical schema artifact,
-[`schemas/dmassist.schema.json`](../../schemas/dmassist.schema.json), declares
+[`skills/vault-orientation/assets/dmassist.schema.json`](../../skills/vault-orientation/assets/dmassist.schema.json), declares
 JSON Schema Draft 2020-12 and accepts a normalized JSON-compatible
 version-1 profile, not YAML text. The profile's `version: 1` is its
 application-level format version, not the schema dialect. Use the written

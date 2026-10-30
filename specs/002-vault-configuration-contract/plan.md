@@ -99,8 +99,8 @@ No constitution violations require justification.
 
 ```text
 repository-root/
-├── schemas/
-│   └── dmassist.schema.json
+├── skills/vault-orientation/assets/
+│   └── dmassist.schema.json   # moved from schemas/ by Feature 003 T015
 └── specs/002-vault-configuration-contract/
     ├── plan.md
     ├── research.md
@@ -113,9 +113,10 @@ repository-root/
 ### Source Code (repository root)
 
 ```text
-No source code is added by this planning phase. If implemented later, scripts
-and reusable guidance belong with an actual skill under skills/<skill-name>/;
-the repository currently has no runtime loader or test suite.
+No source code is added by Feature 002. Feature 003 implements the loader and
+validation modules under skills/vault-orientation/scripts/ with a synthetic
+acceptance harness under tests/powershell/. Production access and installed
+client/platform qualification remain blocked or unverified.
 ```
 
 **Structure Decision**: Keep this phase within the feature's specification
@@ -125,9 +126,14 @@ skill, script, hook, integration, or reader implementation to the empty
 scaffold. Schema validation operates on the normalized profile structure;
 parser selection and runtime work are explicitly deferred to Issue #4.
 
-**Schema resource location**: `schemas/dmassist.schema.json` at the repository
-root is the current source location for this design artifact, not a confirmed
-installed-plugin resource path. Agent Plugins 1.0 documents recognized
+**Schema resource location**: The canonical schema now lives at
+`skills/vault-orientation/assets/dmassist.schema.json`, packaged with its
+consuming skill. Feature 003 (Issue #4, task T015) moved it there from the
+provisional repository-root path `schemas/dmassist.schema.json`, which no
+longer exists, and its installed resource lookup locates it independently of
+the working directory. The original planning rationale follows: the
+repository-root path was a source location for this design artifact, not a
+confirmed installed-plugin resource path. Agent Plugins 1.0 documents recognized
 component locations and resources bundled with skills, but does not establish
 that an arbitrary root-level schema directory will be included or discoverable
 after installation. Issue #4 must choose the final location alongside the

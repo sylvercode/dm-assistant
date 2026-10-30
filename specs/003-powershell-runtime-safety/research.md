@@ -1,8 +1,10 @@
 # Research: PowerShell Runtime and Safe Operations
 
-**Status:** Planning research for proposed future runtime behavior. The
-repository remains a documentation-and-metadata plugin scaffold; research
-choices below do not claim that a runtime or validator has been implemented.
+**Status:** Design decisions underlying the locally tested PowerShell runtime.
+Current implementation evidence and limitations are recorded in
+[`docs/powershell-runtime-support.md`](../../docs/powershell-runtime-support.md).
+These decisions do not establish production authorization or installed-client
+and cross-platform support.
 
 ## Decision 1: Use a supported PowerShell 7 runtime, selected and recorded per release
 
@@ -82,7 +84,7 @@ was rejected because cross-skill paths are not a guaranteed resource contract.
 
 **Sources:** [Plugin Architecture](../../docs/architecture.md),
 [Feature 002 data model](../002-vault-configuration-contract/data-model.md),
-[Feature 002 schema](../../schemas/dmassist.schema.json),
+[Feature 002 schema](../../skills/vault-orientation/assets/dmassist.schema.json),
 [GitHub Copilot plugin creation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating).
 
 ## Decision 4: Parse YAML, normalize it, then validate the normalized schema instance
@@ -99,21 +101,30 @@ or inspect the filesystem. `powershell-yaml` uses YamlDotNet, whose mapping
 loader rejects duplicate keys by default. Its merge-key mode is opt-in and
 must remain explicit. YAML readers may turn plain date-, boolean-, or
 number-like scalars into typed values, so normalization must apply Feature
-002's locale-independent string rules before validation. `JsonSchema.Net` is
-a candidate Draft 2020-12 validator; confirm its pinned version and installed
-PowerShell loading behavior during implementation rather than embedding its
-API in the profile contract.
+002's locale-independent string rules before validation. Use the built-in
+`Test-Json -Schema` cmdlet as the Draft 2020-12 validator: from PowerShell
+7.4 it is backed by `JsonSchema.Net` and honors the schema's `$schema`
+dialect, so it adds no separate module dependency. A probe on PowerShell
+7.6.9 validated the canonical artifact and rejected a missing `version`.
+Serialize the normalized profile to JSON before validation, and map a schema
+failure to `PROFILE_SCHEMA_INVALID` without echoing profile values. The
+cmdlet reports one violation per call, which is sufficient for that code.
+PowerShell releases before 7.4 used a validator without Draft 2020-12
+support, so they are unsupported.
 
 **Alternatives considered:** Treating JSON Schema as a YAML parser or
 filesystem validator was rejected as outside its portable validation model.
 Parser-dependent coercion was rejected because it makes profile behavior
 vary by reader. A hand-coded duplicate schema in PowerShell was rejected
-because it would drift from Feature 002's artifact.
+because it would drift from Feature 002's artifact. Loading `JsonSchema.Net`
+as a separate add-on was rejected because `Test-Json` already provides the
+same engine in supported PowerShell releases.
 
 **Sources:** [Feature 002 research](../002-vault-configuration-contract/research.md),
 [powershell-yaml](https://github.com/cloudbase/powershell-yaml),
 [YamlDotNet](https://github.com/aaubry/YamlDotNet),
 [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12/json-schema-core),
+[Test-Json](https://learn.microsoft.com/powershell/module/microsoft.powershell.utility/test-json),
 [JsonSchema.Net](https://docs.json-everything.net/schema/basics/).
 
 ## Decision 5: Resolve paths and check the canonical vault boundary before access
@@ -205,9 +216,11 @@ is supplied solely by an explicit harness parameter. Production code never
 discovers or accepts a provider from a path, environment variable, or
 configuration, and never references `tests/`. A static audit of the
 production script directory enforces the no-dynamic-execution,
-literal-path, no-network, and no-`tests/` rules. Pester is the candidate
-runner because the task list already follows its `*.Tests.ps1` convention;
-select and pin the exact runner and version when the harness is created.
+literal-path, no-network, and no-`tests/` rules. Pester 6 is the selected
+runner because the task list already follows its `*.Tests.ps1` convention
+and it is installed in the development environment; pin its exact version
+when the harness is created, and never fall back to the Pester 3 module that
+ships with Windows PowerShell.
 
 **Rationale:** Feature 001 has not defined a note-content-free exact-vault
 authorization signal, so the production gate must fail closed, and the
@@ -232,10 +245,11 @@ because repeatable results are required in every supported environment.
 
 ## Decisions deferred to implementation readiness
 
-- Select and record the exact latest stable PowerShell, YAML-reader, and
-  Draft 2020-12 validator versions, plus the selection date and per-platform
-  support matrix, when the runtime dependency set is tested for release.
-- Select and pin the acceptance-test runner (Pester is the candidate), and
+- Select and record the exact latest stable PowerShell (7.4 or later, for
+  `Test-Json` Draft 2020-12 support) and YAML-reader versions, plus the
+  selection date and per-platform support matrix, when the runtime
+  dependency set is tested for release.
+- Pin the exact Pester 6 acceptance-test runner version, and
   confirm that it supports the selected PowerShell release before relying on
   it.
 - Verify actual installed-client skill activation and owner-skill resource

@@ -2,8 +2,10 @@
 
 DM Assistant uses Agent Plugins 1.0. The repository root is the installable
 plugin directory. The repository includes a portable vault-orientation skill
-and its bundled shared reference, but no Resolver integration or automated
-vault runtime. Installed cross-skill loading passed a disposable fixture test
+and its bundled shared reference, schema, and PowerShell runtime modules.
+There is no Resolver integration or enabled production vault access. Local
+synthetic tests cover the runtime; installed-client and cross-platform runtime
+verification remain outstanding. Installed cross-skill loading passed a disposable fixture test
 using owner-skill activation and its runtime-provided resource path. The
 orientation skill must fail closed when
 exact-vault authorization cannot be established.
@@ -17,7 +19,13 @@ dm-assistant/
 |   |-- README.md
 |   `-- vault-orientation/
 |       |-- SKILL.md
-|       `-- VAULT-REFERENCE.md
+|       |-- VAULT-REFERENCE.md
+|       |-- assets/
+|       |   |-- dmassist.schema.json
+|       |   `-- runtime-dependencies.json
+|       `-- scripts/
+|-- tests/
+|   `-- powershell/
 |-- com.github.copilot/
 |   `-- agents/
 |       `-- README.md
@@ -40,7 +48,10 @@ not plugin components.
 | Skill inventory | `skills/README.md` | Declares every immediate-child skill directory containing `SKILL.md` and classifies each as vault-facing or non-vault-facing. It is contributor documentation, not a plugin component. |
 | MCP integration (future) | `mcp.json` | Register actual tool servers using the Agent Plugins MCP schema. |
 | Copilot hooks (future) | `com.github.copilot/hooks/hooks.json` | Lifecycle automation when a concrete need exists. |
-| Vault configuration schema | `schemas/dmassist.schema.json` | Canonical JSON Schema for the proposed normalized version-1 vault profile; no runtime validator is implemented. |
+| Vault configuration schema | `skills/vault-orientation/assets/dmassist.schema.json` | Canonical JSON Schema for the proposed normalized version-1 vault profile, packaged with its consuming skill and located by the skill's PowerShell resource lookup independently of the working directory. |
+| Runtime modules | `skills/vault-orientation/scripts/` | Explicit requests, prerequisite and authorization gates, installed resources, profile validation, inspection, previews, and per-note atomic writes. Production access remains fail-closed. |
+| Packaged dependency inventory | `skills/vault-orientation/assets/runtime-dependencies.json` | Runtime projection of Feature 001's authoritative dependency inventory; update both together, never infer authorization from readiness. |
+| Acceptance harness | `tests/powershell/` | Synthetic tests and explicit test-only authorization injection; never loaded or discovered by production modules or skills. |
 
 Agent Plugins 1.0 discovers skills and MCP configuration at fixed locations.
 Do not add legacy component-path fields such as `skills`, `agents`, or
@@ -106,7 +117,9 @@ skills must read the selected template before creating a note and validate that
 custom paths remain within the vault. This does not migrate existing notes or
 automatically integrate with Obsidian's Templates feature. See the
 [template selection contract](vault-guidance-brainstorm.md#article-template-storage-and-selection)
-for the full design. No templates or runtime loader exist yet.
+for the full design. No default templates or authoring workflow exist yet.
+The profile runtime validates configured template references and tracks their
+versions; this is not an implemented template-rendering workflow.
 
 ## Extension Rules
 
@@ -124,7 +137,8 @@ for the full design. No templates or runtime loader exist yet.
 
 ## Next Logical Development Steps
 
-These are future milestones, not implemented capabilities. Use the
+These milestones distinguish local runtime foundations from remaining
+production capabilities. Use the
 [Vault Guidance Brainstorm](vault-guidance-brainstorm.md) for detailed decisions,
 open questions, and acceptance scenarios.
 
@@ -136,16 +150,18 @@ open questions, and acceptance scenarios.
    exact match to skill files and each vault-facing skill's preflight.
 2. **Define the configuration contract.** The proposed `.dmassist.yaml`
    version-1 contract, defaults, and machine-readable schema are documented in
-   `specs/002-vault-configuration-contract/`. A reader, validator integration,
-   and runtime behavior are not implemented.
-3. **Establish the script runtime.** Choose supported platforms and provisioning
-   for latest stable `pwsh` and required modules, including powershell-yaml.
-   Review dependencies and record exact versions; define shared inputs,
-   structured outputs, errors, and vault-path safety checks.
-4. **Deliver read-only vault orientation.** Implement configuration loading and
-   a first inventory or validation script. Support unconfigured vault discovery,
-   resolve the target vault independently of the plugin location, and report
-   ambiguity rather than restructuring files.
+   `specs/002-vault-configuration-contract/`. Feature 003 implements its reader,
+   validator integration, reference checks, and read-only discovery under the
+   authorization gate; downstream behavior has synthetic coverage only.
+3. **Qualify the script runtime.** The selected `pwsh`, powershell-yaml, and
+   Pester versions, provisioning, and evidence are recorded in
+   [PowerShell Runtime Support](powershell-runtime-support.md). Shared inputs,
+   structured results, path boundaries, previews, and atomic writes exist.
+   Windows remains a candidate; macOS/Linux are unsupported and unverified.
+4. **Enable read-only vault orientation.** Inspection and configuration loading
+   are locally tested. Verify the real dependency authorization handoff and
+   installed-client execution before enabling campaign-note access. Keep
+   discovery read-only and report ambiguity rather than restructuring files.
 5. **Add article authoring and template selection.** Design template contents
    when authoring workflows are ready. Bundle skill defaults, read selected
    templates explicitly, and support DM overrides without overwriting them or
