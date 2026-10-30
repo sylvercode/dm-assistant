@@ -400,7 +400,7 @@ separate installed-client validation.
 - The inventory/source audit is static. Do not turn it into a requirement to
   run every skill in the supported client.
 - The current source implementation is validated except for SC-004. T001 and
-  T002 passed, and the agent-run T011 scenarios passed (two after skill
+  T002 passed, and the agent-run T011 scenarios passed (three after skill
   fixes). T011 stays open only for the SC-004 human DM walkthrough. See the
   current implementation record in `quickstart.md`.
 
@@ -420,6 +420,15 @@ offered to proceed without the reference). Each led to a narrow skill fix and
 a passing re-run. T011 remains unchecked solely because SC-004 needs five
 human DMs, which an agent cannot provide. The 2026-10-26 notes below are
 historical.
+
+**DM-provided configuration check (2026-10-29):** Launched the Resolver
+exactly as configured in the DM-provided `.temp\WitM-DM\.mcp.json`, without
+changing the configuration or calling a note tool. `initialize` reported
+version 2.1.0, and `tools/list` exposed `get_server_info`. `get_server_info`
+returned one root: the repository worktree, with a `\\?\` prefix. After
+normalization, this root is a parent of `.temp\WitM-DM`, not an exact match.
+The skill must therefore stop before reading notes from `.temp\WitM-DM` until
+the DM changes `--vault` to that folder.
 
 **2026-10-26 update (historical):** T001 now passes through consumer-to-owner skill
 activation followed by reading the owner's runtime-provided installed
