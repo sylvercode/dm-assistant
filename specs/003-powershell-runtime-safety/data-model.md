@@ -52,10 +52,10 @@ requirements; this table describes each field's role.
 | `arguments` | Operation-specific data, including the requested content effect. Clearly requested edits to one named note may proceed without redundant approval; broader, destructive, restructuring, multi-note, or continuity-changing work requires approval of its exact preview. |
 | `mode` | `inspect` (read-only), `preview` (compute proposed changes without writing), or `apply` (write only the requested targets under the safeguards). |
 | `approvedPreviewId` | Identifies the exact, still-current approved preview when the preview-and-confirm rule applies; it cannot authorize different targets or changes. |
-| `reviewedVersions` | With `approvedPreviewId`, the ordered per-target `observedVersion` and `replacementVersion` values from the approved preview, one entry per target. |
+| `reviewedVersions` | With `approvedPreviewId`, the ordered per-target `observedVersion`, `replacementVersion`, and `conversionDecision` values from the approved preview, one entry per target. |
 | `reviewedDependencyVersions` | With `approvedPreviewId`, the ordered dependency identities and versions from the approved preview, so a stateless apply can detect a changed profile, template, guidance file, or reference. |
 | `declinedReviewId` | Identifies a preview or conversion warning the DM declined or withdrew; the result is `USER_CANCELLED` with no write. Cannot be combined with an approval or conversion acknowledgement. |
-| `allowEncodingConversion` | Explicit acknowledgement, in a subsequent request, of a documented conversion warning; defaults to `false`. |
+| `allowEncodingConversion` | Explicit acknowledgement, in a subsequent `apply` request, of a documented conversion warning or of a reviewed preview stating the conversion; defaults to `false`, is invalid outside `mode: apply`, and is not a preview-digest input. |
 
 The same explicit request and unchanged inputs must select the same target
 regardless of the starting working directory.
@@ -117,8 +117,10 @@ context; then access only relevant campaign notes. An absent local-guidance
 designation is valid and distinct from a designated source that is missing or
 unreadable. A missing designated source blocks dependent work. If no local
 guidance is designated, Feature 001 permits only a specific read-only lookup
-that does not rely on uncertain folder or note-role mappings; stop if
-uncertainty affects findings or the next action. Changes to vault, dependency,
+that does not rely on uncertain folder or note-role mappings; any other
+request, including preview or apply, stops before campaign-note access with
+`AMBIGUOUS_CONTEXT`, as does a lookup whose findings or next action depend on
+that uncertainty. Changes to vault, dependency,
 guidance, campaign, or group require re-establishing the applicable checks.
 
 The current contract does not define a note-content-free signal proving that
@@ -188,8 +190,8 @@ proposed write. It is not a lock or permission to write.
 | `observedVersion` | Exact byte-content fingerprint and available file identity/metadata recorded when the note is read or previewed. Content fingerprints are for conflict detection only and are not diagnostic content. |
 | `encoding` | Detected source encoding and whether it can be safely round-tripped. |
 | `lineEndings` | Observed line-ending pattern and whether it can be safely preserved. |
-| `replacementVersion` | Fingerprint of the complete proposed replacement bytes, including any requested conversion, derived from the reviewed snapshot, dependency versions, and requested edit. It is carried into an approved apply and recomputed before writing. |
-| `conversionDecision` | `preserve`, `warn-and-convert`, or `undecodable-no-write`. Conversion target is UTF-8 without BOM and LF. |
+| `replacementVersion` | Fingerprint of the complete bytes that would be written, derived from the reviewed snapshot, dependency versions, and requested edit; for a `warn-and-convert` target, the converted UTF-8 without BOM and LF bytes. It is carried into an approved apply and recomputed before writing. |
+| `conversionDecision` | `preserve`, `warn-and-convert`, or `undecodable-no-write`. Conversion target is UTF-8 without BOM and LF. Reported by preview, carried into an approved apply, and included in the preview digest. |
 | `writeState` | `not started`, `prepared`, `rechecked`, `replaced`, `conflict`, or `failed`. |
 
 Immediately before each write, re-resolve and check the boundary, then compare
@@ -206,10 +208,10 @@ The exact proposed edit and the target versions against which it was reviewed.
 
 | Field | Meaning and constraint |
 | --- | --- |
-| `previewId` | Deterministic digest identifying the exact preview presented for approval, covering the request, target versions, replacement versions, and dependency versions (contract section 9); no preview state is stored between invocations. |
-| `targets[]` | Exact target paths with their reviewed `observedVersion` and `replacementVersion` values. |
-| `dependencyVersions[]` | Ordered identities and versions of every profile, guidance file, template, configured reference, and packaged plugin resource used to construct the proposed change. |
-| `proposedEffects[]` | Human-reviewable description or diff of intended changes, including any requested conversion. |
+| `previewId` | Deterministic digest identifying the exact preview presented for approval, covering the request (including `campaignGroup`), runtime version, target versions, replacement versions, conversion decisions, and dependency versions, serialized with RFC 8785 JCS (contract section 9); no preview state is stored between invocations. |
+| `targets[]` | Exact target paths with their reviewed `observedVersion`, `replacementVersion`, and `conversionDecision` values. |
+| `dependencyVersions[]` | Ordered identities and versions of every profile, guidance file, template, configured reference, and packaged plugin resource the runtime reads to construct the proposed change; guidance loaded only by the assistant is governed by FR-027 re-establishment. |
+| `proposedEffects[]` | Human-reviewable description or diff of intended changes, including any required encoding conversion; a preview stating a conversion serves as the conversion warning. |
 | `scopeClass` | Single named-note text edit, multi-note, deletion, reorganization, or broader established-fact change. The runtime detects multi-note, deletion, and reorganization; the registered operation declares fact-changing effects, and an unclassifiable change requires approval. |
 | `approvalState` | `not required`, `awaiting`, `approved`, `declined`, or `expired/stale`. |
 

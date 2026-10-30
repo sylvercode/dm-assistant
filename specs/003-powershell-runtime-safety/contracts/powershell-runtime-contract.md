@@ -44,10 +44,10 @@ environment-variable/home-directory expansion.
 | `arguments` | Required operation-specific data object, including the requested action and any content supplied for it. Its schema is defined by the registered operation. Values are data, never executable instructions or command fragments. |
 | `targets` | Required array of explicit vault-relative target paths for the operation; may be empty only when the operation has no file targets. Preserve the operation's declared deterministic order. |
 | `approvedPreviewId` | Required for an `apply` that falls under Feature 003 FR-011's preview-and-confirm rule; otherwise omitted. It must identify the exact, still-current preview (section 9) and cannot authorize different targets or changes. |
-| `reviewedVersions` | Required with `approvedPreviewId`; otherwise omitted. The ordered per-target entries returned by the approved preview, one per target in `targets` order, each carrying that target's `observedVersion` and `replacementVersion` (section 9). |
+| `reviewedVersions` | Required with `approvedPreviewId`; otherwise omitted. The ordered per-target entries returned by the approved preview, one per target in `targets` order, each carrying that target's `observedVersion`, `replacementVersion`, and `conversionDecision` (section 9). |
 | `reviewedDependencyVersions` | Required with `approvedPreviewId`; otherwise omitted. The ordered dependency entries returned by the approved preview, each carrying a dependency identity and its observed version (section 9); empty only when the preview used no dependency. |
 | `declinedReviewId` | Optional; valid only with `mode: apply` and mutually exclusive with `approvedPreviewId` and `allowEncodingConversion: true`. Identifies the preview (`previewId`) or conversion warning (the `requestId` of the request that returned `ENCODING_CONVERSION_WARNING`) that the DM declined or withdrew. The runtime writes nothing and returns `not completed` / `USER_CANCELLED`. |
-| `allowEncodingConversion` | Optional boolean, default `false`. A conversion-requiring write is blocked until the user has received the warning and a subsequent request explicitly acknowledges conversion. |
+| `allowEncodingConversion` | Optional boolean, default `false`; `true` is valid only with `mode: apply` and is not a preview-digest input (section 9). A conversion-requiring write is blocked until the user has received the warning, either as an `ENCODING_CONVERSION_WARNING` result or as a reviewed preview showing the conversion, and a subsequent request explicitly acknowledges conversion. |
 
 Operation-specific input schemas must define whether each field is required,
 its type, and its permitted values. Unknown operation arguments must be
@@ -66,7 +66,11 @@ these gates in order:
    separately verify that it is authorized for this exact vault.
 3. Load the plugin-owned shared reference. After the authorization gate, read
    the profile only as needed to determine any designated local guidance;
-   load that guidance through its applicable resource/path mechanism.
+   load that guidance through its applicable resource/path mechanism. When no
+   local guidance is designated, only a specific `inspect` lookup that does
+   not depend on uncertain folder or note-role mappings may proceed (FR-023);
+   any other request stops before campaign-note access with
+   `AMBIGUOUS_CONTEXT`.
 4. Establish the required campaign/group and player-facing output context.
 5. Only after all preceding gates succeed, access campaign notes as permitted
    by the relevant Feature 001/002 contract.
@@ -274,37 +278,57 @@ its allowed status.
 ## 9. Preview, approval, and safe writes
 
 Inspection and preview never write. A preview identifies the exact targets,
-proposed operation per target, each target's reviewed `observedVersion` and
-`replacementVersion`, and the reviewed dependency versions, without including
-note content in diagnostics. When FR-011 requires approval, `apply`
+proposed operation per target, each target's reviewed `observedVersion`,
+`replacementVersion`, and `conversionDecision`, and the reviewed dependency
+versions, without including note content in diagnostics. A preview assesses
+encoding for every target; a `warn-and-convert` target's conversion is stated
+in the proposed effects, and presenting that preview serves as the conversion
+warning. When FR-011 requires approval, `apply`
 must refer to that exact preview via `approvedPreviewId`; changed inputs,
 targets, proposed changes, or scope invalidate the approval. Approval does not
 cover later or additional changes. Clearly requested text edits confined to
 one named note do not require redundant broad-change approval.
 
 The runtime keeps no preview state between invocations. A target's
-`replacementVersion` is a fingerprint of its complete proposed replacement
-bytes, including any requested conversion. The preview's dependency versions
-fingerprint every profile, guidance file, template, configured reference, and
-packaged plugin resource read to construct the proposed change, ordered by
+`replacementVersion` is a fingerprint of the complete bytes that would be
+written; for a `warn-and-convert` target, these are the converted UTF-8
+without BOM and LF bytes. The preview's dependency versions fingerprint every
+profile, guidance file, template, configured reference, and packaged plugin
+resource the runtime reads to construct the proposed change, ordered by
 ordinal comparison of their vault-relative path or plugin-resource identity.
+Guidance loaded only by the assistant is not fingerprinted; FR-027
+re-establishment governs it. `runtimeVersion` is the installed plugin
+version combined with a fingerprint of the installed runtime module files, so
+a runtime change between preview and apply invalidates the approval.
 `previewId` is a deterministic digest (for example SHA-256) of the canonical
-serialization of `contractVersion`, `operation`, the canonical `vaultRoot`,
-the ordered `targets`, `arguments`, each target's reviewed `observedVersion`
-and `replacementVersion`, and the ordered dependency versions. Fingerprints are
-for change detection only and are not diagnostic content.
+serialization of `contractVersion`, `runtimeVersion`, `operation`, the
+canonical `vaultRoot`, `campaignGroup`, the ordered `targets`, `arguments`,
+each target's reviewed `observedVersion`, `replacementVersion`, and
+`conversionDecision`, and the ordered dependency versions.
+`allowEncodingConversion`, `requestId`, and `mode` are not digest inputs.
+Canonical serialization is the RFC 8785 JSON Canonicalization Scheme (JCS)
+encoded as UTF-8: object members are sorted by UTF-16 code units at every
+nesting level, array order is preserved, and no insignificant whitespace is
+emitted. Implementations must not rely on hashtable or dictionary enumeration
+order. Fingerprints are for change detection only and are not diagnostic
+content.
 
 An approved `apply` supplies `approvedPreviewId`, `reviewedVersions`, and
 `reviewedDependencyVersions`, and the runtime checks them in this order:
 
-1. Recompute the digest from the request's fields and carried versions; if it
-   does not match `approvedPreviewId`, return `CONFIRMATION_REQUIRED`.
+1. Recompute the digest from the request's fields, the carried versions and
+   conversion decisions, and the current `runtimeVersion`; if it does not
+   match `approvedPreviewId`, return `CONFIRMATION_REQUIRED`.
 2. If a target's or dependency's current version differs from its carried
    reviewed version, return `TARGET_CONFLICT` and identify the changed target
    or dependency without exposing its contents.
 3. Rebuild each replacement from the unchanged inputs; if its fingerprint
    differs from the carried `replacementVersion`, the preview no longer
    describes the write, so return `CONFIRMATION_REQUIRED`.
+4. If any target's `conversionDecision` is `warn-and-convert` and
+   `allowEncodingConversion` is not `true`, return
+   `ENCODING_CONVERSION_WARNING` without writing; a subsequent apply of the
+   same approved preview with `allowEncodingConversion: true` may proceed.
 
 A DM decline or withdrawal is reported through `declinedReviewId` and returns
 `USER_CANCELLED` without writing.
@@ -337,7 +361,8 @@ Preserve the existing encoding and line endings when they can be reliably
 round-tripped, and preserve all unrelated Markdown text and formatting.
 Otherwise, do not write on the first attempt: return
 `ENCODING_CONVERSION_WARNING` with a safe explanation of the required
-conversion. After that warning is presented, conversion requires an explicit
+conversion. After that warning, or a reviewed preview stating the conversion,
+is presented, conversion requires an explicit
 subsequent request with `allowEncodingConversion: true`; convert only reliably
 decodable text to UTF-8 without BOM and LF line endings. If decoding is
 unreliable, return `ENCODING_UNSAFE` and leave the target unchanged.
@@ -368,8 +393,8 @@ written.
 | Path rules and boundary checks | FR-007, FR-021 | Reject every forbidden lexical form before access; reject traversal and symlink escapes before target access; accept only in-vault links after canonical, component-aware checks; recheck before every access. |
 | Profile parse/normalize/schema/filesystem separation | FR-016–FR-025 | Independently exercise malformed YAML/duplicate keys, normalized scalar edge cases, schema-invalid profiles, absent-profile discovery, explicit missing directories, reference type/readability, shared or nested section mappings and undetermined destinations (`AMBIGUOUS_CONTEXT`), deterministic defaults, and stale dependencies. Schema defaults alone never mutate input. |
 | Result structure and code taxonomy | FR-010 | Verify every result has the fields in the prescribed order, exact status vocabulary, one stable code, safe diagnostics, correct target partition, and no incomplete result marked complete. Exercise each listed code and each allowed status. |
-| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad changes require approval of the exact current preview, while a single named-note text edit does not; a target, template, guidance, or profile change after preview makes the old approval fail with `TARGET_CONFLICT`, and a changed request or rebuilt replacement makes it fail with `CONFIRMATION_REQUIRED`; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
-| Conflict detection, preservation, and encoding | FR-012–FR-013 | Modify a target after preview and before final write check; verify refusal and no overwrite. Verify safely preservable bytes/line endings and unrelated text remain intact; conversion is warned and acknowledged first; undecodable text remains unchanged. |
+| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad changes require approval of the exact current preview, while a single named-note text edit does not; a target, template, guidance, or profile change after preview makes the old approval fail with `TARGET_CONFLICT`, and a changed request, runtime version, or rebuilt replacement makes it fail with `CONFIRMATION_REQUIRED`; the same preview yields the same `previewId` across separate processes; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
+| Conflict detection, preservation, and encoding | FR-012–FR-013 | Modify a target after preview and before final write check; verify refusal and no overwrite. Verify safely preservable bytes/line endings and unrelated text remain intact; conversion is warned and acknowledged first, including for an approved multi-note preview containing a conversion target; undecodable text remains unchanged. |
 | Atomicity and multi-target failure | FR-026 | Inject failure/interruption during a target write and after an earlier target succeeds; verify no partial current file, no later attempts, no rollback, correct `partially completed` status, and exact changed/unchanged/remaining target lists. |
 
 The specification and Feature 002 contract remain authoritative if a future
