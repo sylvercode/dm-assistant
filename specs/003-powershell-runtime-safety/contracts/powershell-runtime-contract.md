@@ -37,13 +37,16 @@ environment-variable/home-directory expansion.
 | --- | --- |
 | `contractVersion` | Required string identifying this interface version; current value is `1`. |
 | `requestId` | Required caller-generated correlation identifier. It is not an authorization token or a promise of retry/idempotency behavior. |
-| `operation` | Required stable identifier registered by the consuming workflow. An operation's name and argument schema must be documented before release; this contract does not invent a CLI command or a universal operation catalog. |
+| `operation` | Required stable identifier registered by the consuming workflow. An operation's name, argument schema, and whether it can change established campaign facts (section 9) must be documented before release; this contract does not invent a CLI command or a universal operation catalog. |
 | `vaultRoot` | Required explicit absolute path to the user-designated vault. It is never defaulted to the plugin or current directory. Authorization of this exact root is independently established before any vault read. |
 | `campaignGroup` | Required context object with explicit `campaign` and `group` values, or explicit `null` for a value that the requested operation does not use. Required context may not be guessed from note content. |
 | `mode` | Required enum: `inspect`, `preview`, or `apply`. `inspect` is read-only; `preview` computes and reports proposed changes without writing; `apply` may write only the requested targets and only under the safeguards below. |
 | `arguments` | Required operation-specific data object, including the requested action and any content supplied for it. Its schema is defined by the registered operation. Values are data, never executable instructions or command fragments. |
 | `targets` | Required array of explicit vault-relative target paths for the operation; may be empty only when the operation has no file targets. Preserve the operation's declared deterministic order. |
-| `approvedPreviewId` | Required for an `apply` that falls under Feature 003 FR-011's preview-and-confirm rule; otherwise omitted. It must identify the exact, still-current preview and cannot authorize different targets or changes. |
+| `approvedPreviewId` | Required for an `apply` that falls under Feature 003 FR-011's preview-and-confirm rule; otherwise omitted. It must identify the exact, still-current preview (section 9) and cannot authorize different targets or changes. |
+| `reviewedVersions` | Required with `approvedPreviewId`; otherwise omitted. The ordered per-target entries returned by the approved preview, one per target in `targets` order, each carrying that target's `observedVersion` and `replacementVersion` (section 9). |
+| `reviewedDependencyVersions` | Required with `approvedPreviewId`; otherwise omitted. The ordered dependency entries returned by the approved preview, each carrying a dependency identity and its observed version (section 9); empty only when the preview used no dependency. |
+| `declinedReviewId` | Optional; valid only with `mode: apply` and mutually exclusive with `approvedPreviewId` and `allowEncodingConversion: true`. Identifies the preview (`previewId`) or conversion warning (the `requestId` of the request that returned `ENCODING_CONVERSION_WARNING`) that the DM declined or withdrew. The runtime writes nothing and returns `not completed` / `USER_CANCELLED`. |
 | `allowEncodingConversion` | Optional boolean, default `false`. A conversion-requiring write is blocked until the user has received the warning and a subsequent request explicitly acknowledges conversion. |
 
 Operation-specific input schemas must define whether each field is required,
@@ -128,8 +131,11 @@ authorization gate. For every supplied or configured vault-relative path:
    path components and symbolic links, including intermediate links. Use a
    component-aware containment test, never a textual prefix test.
 4. Refuse an unresolved, cyclic, inaccessible, or out-of-bound resolution
-   before accessing the target. An in-vault symbolic link is allowed only
-   after its final target is verified inside the vault.
+   before accessing the target. Return `PATH_OUTSIDE_VAULT` for an
+   out-of-bound resolution or when containment cannot be proven (a cyclic or
+   unresolvable link chain), and `READ_FAILED` when a path component is
+   inaccessible. An in-vault symbolic link is allowed only after its final
+   target is verified inside the vault.
 5. Recheck the canonical boundary before each access and immediately before
    each write. Do not create a missing target directory or infer a replacement
    target.
@@ -229,13 +235,13 @@ within contract version 1.
 | `VAULT_TARGET_INVALID` | `not completed` | Vault root is missing, ambiguous, inaccessible, or not a valid explicit target. |
 | `INVALID_REQUEST` | `not completed` | Required inputs are absent, malformed, or invalid for the registered operation. |
 | `PATH_INVALID` | `not completed` | A supplied/configured relative path violates lexical path rules. |
-| `PATH_OUTSIDE_VAULT` | `not completed` or `partially completed` | Canonical or symbolic-link resolution escapes the authorized vault, including at the immediate pre-write recheck. |
+| `PATH_OUTSIDE_VAULT` | `not completed` or `partially completed` | Canonical or symbolic-link resolution escapes the authorized vault or cannot be proven contained (a cyclic or unresolvable link chain), including at the immediate pre-write recheck. |
 | `RESOURCE_MISSING` | `not completed` | Required installed plugin resource, including the canonical schema, cannot be found or read. |
 | `RESOURCE_INCOMPATIBLE` | `not completed` | Loaded installed resource does not match the required contract or dialect. |
 | `PROFILE_PARSE_INVALID` | `not completed` | YAML syntax is malformed/unsupported or contains duplicate mapping keys. |
 | `PROFILE_NORMALIZATION_INVALID` | `not completed` | Parsed values cannot be normalized under Feature 002 rules. |
 | `PROFILE_SCHEMA_INVALID` | `not completed` | Normalized profile fails the canonical JSON Schema. |
-| `PROFILE_FILESYSTEM_INVALID` | `not completed` | During profile validation, a configured section folder or reference fails containment, existence, or type checks; the entire profile is rejected (FR-020, FR-021). |
+| `PROFILE_FILESYSTEM_INVALID` | `not completed` | During profile validation, a configured path escapes the vault, or a configured section folder is missing or not a folder; the entire profile is rejected (FR-020, FR-021). |
 | `REFERENCE_UNAVAILABLE` | `not completed` | A configured guidance file, template, party note, or preparation location needed by the current operation is missing, unreadable, or invalid at use time (FR-023, FR-025). |
 | `AMBIGUOUS_CONTEXT` | `not completed` | Uncertainty affects the conclusion or next action and requires DM direction. |
 | `CONFIRMATION_REQUIRED` | `not completed` | Required preview approval for the exact proposed changes is absent or does not match. |
@@ -251,6 +257,15 @@ within contract version 1.
 Where two statuses are allowed, use `partially completed` only when an earlier
 target in the same operation changed; otherwise use `not completed`.
 
+Configured-path code selection: a lexical violation is `PATH_INVALID`. During
+profile validation, a configured path that escapes the vault, or a configured
+section folder that is missing or not a folder, is `PROFILE_FILESYSTEM_INVALID`
+(FR-020, FR-021). The existence, readability, and type of a configured
+guidance file, template, party note, or preparation location are checked only
+when an operation needs it, returning `REFERENCE_UNAVAILABLE` (FR-023,
+FR-025). A reference verified for the current operation that then changes or
+disappears before dependent work finishes is `TARGET_CONFLICT` (FR-024).
+
 The specific cause code is retained when failure occurs after earlier writes:
 for example, `WRITE_FAILED` with `partially completed`. Do not replace it with
 a generic partial-success code. A release must test every applicable code and
@@ -259,16 +274,52 @@ its allowed status.
 ## 9. Preview, approval, and safe writes
 
 Inspection and preview never write. A preview identifies the exact targets,
-proposed operation per target, and reviewed target/dependency versions without
-including note content in diagnostics. When FR-011 requires approval, `apply`
+proposed operation per target, each target's reviewed `observedVersion` and
+`replacementVersion`, and the reviewed dependency versions, without including
+note content in diagnostics. When FR-011 requires approval, `apply`
 must refer to that exact preview via `approvedPreviewId`; changed inputs,
 targets, proposed changes, or scope invalidate the approval. Approval does not
 cover later or additional changes. Clearly requested text edits confined to
 one named note do not require redundant broad-change approval.
 
+The runtime keeps no preview state between invocations. A target's
+`replacementVersion` is a fingerprint of its complete proposed replacement
+bytes, including any requested conversion. The preview's dependency versions
+fingerprint every profile, guidance file, template, configured reference, and
+packaged plugin resource read to construct the proposed change, ordered by
+ordinal comparison of their vault-relative path or plugin-resource identity.
+`previewId` is a deterministic digest (for example SHA-256) of the canonical
+serialization of `contractVersion`, `operation`, the canonical `vaultRoot`,
+the ordered `targets`, `arguments`, each target's reviewed `observedVersion`
+and `replacementVersion`, and the ordered dependency versions. Fingerprints are
+for change detection only and are not diagnostic content.
+
+An approved `apply` supplies `approvedPreviewId`, `reviewedVersions`, and
+`reviewedDependencyVersions`, and the runtime checks them in this order:
+
+1. Recompute the digest from the request's fields and carried versions; if it
+   does not match `approvedPreviewId`, return `CONFIRMATION_REQUIRED`.
+2. If a target's or dependency's current version differs from its carried
+   reviewed version, return `TARGET_CONFLICT` and identify the changed target
+   or dependency without exposing its contents.
+3. Rebuild each replacement from the unchanged inputs; if its fingerprint
+   differs from the carried `replacementVersion`, the preview no longer
+   describes the write, so return `CONFIRMATION_REQUIRED`.
+
+A DM decline or withdrawal is reported through `declinedReviewId` and returns
+`USER_CANCELLED` without writing.
+
+Each registered operation declares whether it can change established campaign
+facts. The runtime classifies multi-target, deletion, and reorganization
+changes itself; approval is required when the operation declares
+fact-changing effects or the change cannot be classified. A request cannot
+lower the declared classification.
+
 Before each write, revalidate the vault boundary, target identity, and
 target/dependency state against the state used to construct the proposed
-change. If any differs, refuse the write with `TARGET_CONFLICT`, leave that
+change: the carried reviewed versions for an approved `apply`, or otherwise
+the versions read earlier in the same invocation. If any differs, refuse the
+write with `TARGET_CONFLICT`, leave that
 target unchanged, stop the multi-target operation, and report exact outcomes.
 Rechecking must occur immediately before replacement. Implementations must
 not claim stronger concurrency guarantees than their platform primitive
@@ -317,7 +368,7 @@ written.
 | Path rules and boundary checks | FR-007, FR-021 | Reject every forbidden lexical form before access; reject traversal and symlink escapes before target access; accept only in-vault links after canonical, component-aware checks; recheck before every access. |
 | Profile parse/normalize/schema/filesystem separation | FR-016–FR-025 | Independently exercise malformed YAML/duplicate keys, normalized scalar edge cases, schema-invalid profiles, absent-profile discovery, explicit missing directories, reference type/readability, shared or nested section mappings and undetermined destinations (`AMBIGUOUS_CONTEXT`), deterministic defaults, and stale dependencies. Schema defaults alone never mutate input. |
 | Result structure and code taxonomy | FR-010 | Verify every result has the fields in the prescribed order, exact status vocabulary, one stable code, safe diagnostics, correct target partition, and no incomplete result marked complete. Exercise each listed code and each allowed status. |
-| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad changes require approval of the exact current preview, while a single named-note text edit does not; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
+| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad changes require approval of the exact current preview, while a single named-note text edit does not; a target, template, guidance, or profile change after preview makes the old approval fail with `TARGET_CONFLICT`, and a changed request or rebuilt replacement makes it fail with `CONFIRMATION_REQUIRED`; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
 | Conflict detection, preservation, and encoding | FR-012–FR-013 | Modify a target after preview and before final write check; verify refusal and no overwrite. Verify safely preservable bytes/line endings and unrelated text remain intact; conversion is warned and acknowledged first; undecodable text remains unchanged. |
 | Atomicity and multi-target failure | FR-026 | Inject failure/interruption during a target write and after an earlier target succeeds; verify no partial current file, no later attempts, no rollback, correct `partially completed` status, and exact changed/unchanged/remaining target lists. |
 

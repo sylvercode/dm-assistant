@@ -23,6 +23,10 @@ before campaign-note access. Acceptance is therefore planned in two tiers:
 production-gate tests that expect that block, and downstream tests that run
 only through a harness-injected, test-only authorization provider that never
 ships as a production capability and does not prove Feature 001's signal.
+Issue [#7](https://github.com/sylvercode/dm-assistant/issues/7) (resolver
+integration) is the likely delivery path for that signal, but its scope does
+not yet name it; production vault access stays blocked until a tracked issue
+delivers and verifies the signal.
 
 ## Technical Context
 

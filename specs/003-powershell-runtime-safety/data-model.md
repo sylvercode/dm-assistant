@@ -52,6 +52,9 @@ requirements; this table describes each field's role.
 | `arguments` | Operation-specific data, including the requested content effect. Clearly requested edits to one named note may proceed without redundant approval; broader, destructive, restructuring, multi-note, or continuity-changing work requires approval of its exact preview. |
 | `mode` | `inspect` (read-only), `preview` (compute proposed changes without writing), or `apply` (write only the requested targets under the safeguards). |
 | `approvedPreviewId` | Identifies the exact, still-current approved preview when the preview-and-confirm rule applies; it cannot authorize different targets or changes. |
+| `reviewedVersions` | With `approvedPreviewId`, the ordered per-target `observedVersion` and `replacementVersion` values from the approved preview, one entry per target. |
+| `reviewedDependencyVersions` | With `approvedPreviewId`, the ordered dependency identities and versions from the approved preview, so a stateless apply can detect a changed profile, template, guidance file, or reference. |
+| `declinedReviewId` | Identifies a preview or conversion warning the DM declined or withdrew; the result is `USER_CANCELLED` with no write. Cannot be combined with an approval or conversion acknowledgement. |
 | `allowEncodingConversion` | Explicit acknowledgement, in a subsequent request, of a documented conversion warning; defaults to `false`. |
 
 The same explicit request and unchanged inputs must select the same target
@@ -185,7 +188,7 @@ proposed write. It is not a lock or permission to write.
 | `observedVersion` | Exact byte-content fingerprint and available file identity/metadata recorded when the note is read or previewed. Content fingerprints are for conflict detection only and are not diagnostic content. |
 | `encoding` | Detected source encoding and whether it can be safely round-tripped. |
 | `lineEndings` | Observed line-ending pattern and whether it can be safely preserved. |
-| `replacementVersion` | Identity of the proposed replacement derived from the reviewed snapshot and requested edit. |
+| `replacementVersion` | Fingerprint of the complete proposed replacement bytes, including any requested conversion, derived from the reviewed snapshot, dependency versions, and requested edit. It is carried into an approved apply and recomputed before writing. |
 | `conversionDecision` | `preserve`, `warn-and-convert`, or `undecodable-no-write`. Conversion target is UTF-8 without BOM and LF. |
 | `writeState` | `not started`, `prepared`, `rechecked`, `replaced`, `conflict`, or `failed`. |
 
@@ -203,15 +206,17 @@ The exact proposed edit and the target versions against which it was reviewed.
 
 | Field | Meaning and constraint |
 | --- | --- |
-| `previewId` | Identity for the exact preview presented for approval. |
-| `targets[]` | Exact target paths and their reviewed `observedVersion` values. |
+| `previewId` | Deterministic digest identifying the exact preview presented for approval, covering the request, target versions, replacement versions, and dependency versions (contract section 9); no preview state is stored between invocations. |
+| `targets[]` | Exact target paths with their reviewed `observedVersion` and `replacementVersion` values. |
+| `dependencyVersions[]` | Ordered identities and versions of every profile, guidance file, template, configured reference, and packaged plugin resource used to construct the proposed change. |
 | `proposedEffects[]` | Human-reviewable description or diff of intended changes, including any requested conversion. |
-| `scopeClass` | Single named-note text edit, multi-note, deletion, reorganization, or broader established-fact change. |
+| `scopeClass` | Single named-note text edit, multi-note, deletion, reorganization, or broader established-fact change. The runtime detects multi-note, deletion, and reorganization; the registered operation declares fact-changing effects, and an unclassifiable change requires approval. |
 | `approvalState` | `not required`, `awaiting`, `approved`, `declined`, or `expired/stale`. |
 
 Only the exact approved preview may be applied. Approval does not authorize
 later edits or different targets. Any material change in target version,
-content, or proposed effect invalidates the preview and requires a new review
+dependency version, content, or proposed effect invalidates the preview and
+requires a new review
 and, where required, approval. Clearly requested edits confined to one named
 note do not need redundant approval, but still require conflict checks and
 safe replacement.
