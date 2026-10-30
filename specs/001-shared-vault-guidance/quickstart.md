@@ -5,7 +5,9 @@ vault-orientation skill and its bundled shared reference. Installed
 cross-skill loading (T001) and Resolver readiness and exact-vault
 authorization through `get_server_info` (T002) are verified, and the
 agent-run installed-client scenarios passed (see the implementation record
-below). The SC-004 human DM walkthrough remains outstanding. Do not treat
+below). The SC-004 human DM walkthrough is deferred to
+[#13](https://github.com/sylvercode/dm-assistant/issues/13). T011 is checked
+with that explicit deferral; SC-004 remains unperformed, not passed. Do not treat
 plugin installation, skill discovery, or source-tree presence as proof that
 campaign-note access is safe. Record unsupported or unexercised checks as
 blocked.
@@ -318,6 +320,10 @@ Conduct an informal short walkthrough with 5 DMs and assess whether at least
 4 can distinguish plugin-wide guidance from vault-specific guidance. Examples
 and scoring are not standardized; no vault reorganization is required.
 
+**Deferred:** This human validation is tracked in
+[#13](https://github.com/sylvercode/dm-assistant/issues/13). Record the actual
+walkthrough result here when conducted; agent-run scenarios do not replace it.
+
 ## 6. Verify page-local edits and the approval gate
 
 ### Clearly requested page-local edit
@@ -393,7 +399,7 @@ test run in `research.md` for exact procedure, evidence, and limitations.
 | Explicit functional link-resolution test | **Pass, single case** | At the user's request, `[[Svalich Woods]]` from `7. Argynvostholt.md` resolved to `Locations/Svalich Woods.md`. No notes changed. This does not satisfy T002's note-content-free pre-access check. |
 | Orientation preflight smoke test | **Pass, constrained** | The actual skill recognized the explicit vault and exposed Resolver tools, then paused on unverified authorization without note reads or Resolver calls. The prompt required a preflight-only stop and Resolver calls were denied; this does not pass broader acceptance scenarios. |
 | Current issue scope (T012) | **Pass** | The open #2 issue covers shared vault guidance and preflight; the open #7 issue separately owns Resolver integration. No user vault path or MCP configuration is added here. |
-| SC-004 informal DM walkthrough | **Blocked** | Requires five human DMs, with at least four distinguishing plugin-wide from vault-specific guidance. No walkthrough was conducted; agent-run scenarios cannot replace it. |
+| SC-004 informal DM walkthrough | **Deferred — not passed** | Tracked in [#13](https://github.com/sylvercode/dm-assistant/issues/13) at the DM's request; T011 is checked with this deferral. Requires five human DMs, with at least four distinguishing plugin-wide from vault-specific guidance. No walkthrough was conducted; agent-run scenarios cannot replace it. |
 
 The 2026-10-29 T011 scenarios ran in Copilot CLI 1.0.103 with Resolver 2.1.0
 under an isolated `COPILOT_HOME`, using a disposable copy of a test vault

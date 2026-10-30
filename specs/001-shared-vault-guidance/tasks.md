@@ -272,7 +272,7 @@ integrated feature within the agreed static/runtime verification scope.
   with no such basis, the skill must leave the update unchanged and ask the DM.
   Record pass, fail, or blocked. This task is a static source audit and does
   not require runtime execution of every skill.
-- [ ] T011 Run the independent installed-client and disposable-vault scenarios
+- [X] T011 Run the independent installed-client and disposable-vault scenarios
   in `specs/001-shared-vault-guidance/quickstart.md`. Use the README's local
   installation and discovery instructions. Validate installed discovery,
   cross-skill canonical-reference loading from multiple working directories,
@@ -287,6 +287,10 @@ integrated feature within the agreed static/runtime verification scope.
   unexercised behavior as passed. Include the informal SC-004 walkthrough
   result: at least 4 of 5 DMs distinguish plugin-wide from vault-specific
   guidance; examples and scoring are not standardized.
+  **Deferred human validation:** Checked at the DM's request after the
+  agent-run scenarios passed. The unperformed SC-004 walkthrough is tracked
+  separately in [#13](https://github.com/sylvercode/dm-assistant/issues/13);
+  this checkbox does not represent an SC-004 pass.
 - [X] T012 Review the completed changes against every constitution MUST and
   the Development Workflow in
   `.specify/memory/constitution.md`. Recheck current GitHub issue scope and
@@ -401,8 +405,9 @@ separate installed-client validation.
   run every skill in the supported client.
 - The current source implementation is validated except for SC-004. T001 and
   T002 passed, and the agent-run T011 scenarios passed (three after skill
-  fixes). T011 stays open only for the SC-004 human DM walkthrough. See the
-  current implementation record in `quickstart.md`.
+  fixes). T011 is checked with the SC-004 human DM walkthrough deferred to
+  [#13](https://github.com/sylvercode/dm-assistant/issues/13), not passed.
+  See the current implementation record in `quickstart.md`.
 
 ### Current execution status
 
@@ -417,9 +422,11 @@ player safety, preparation vs. history, knowledge updates, local and
 broad edits, and a permission-denied reference. Three scenarios failed on
 their first run (S10 uncertain mapping, E04 broad edit without preview, E05
 offered to proceed without the reference). Each led to a narrow skill fix and
-a passing re-run. T011 remains unchecked solely because SC-004 needs five
-human DMs, which an agent cannot provide. The 2026-10-26 notes below are
-historical.
+a passing re-run. At the DM's request, T011 is now checked with the remaining
+SC-004 walkthrough deferred to
+[#13](https://github.com/sylvercode/dm-assistant/issues/13). SC-004 requires
+five human DMs and remains unperformed, not passed. The 2026-10-26 notes below
+are historical.
 
 **DM-provided configuration check (2026-10-29):** Launched the Resolver
 exactly as configured in the DM-provided `.temp\WitM-DM\.mcp.json`, without
@@ -496,7 +503,7 @@ it does not imply completion of unexercised scenarios.
 | T011 full package install/reinstall and discovery | **PASS.** Copied the plugin manifest, complete `skills` directory, and `com.github.copilot` components into a disposable package. Installed and reinstalled it with a new isolated `COPILOT_HOME`; listing showed `dm-assistant` v0.1.0 and installation reported one skill. A fresh session without `--plugin-dir` activated `vault-orientation`, read the installed `VAULT-REFERENCE.md`, and identified aliases, tags, internal links, and callouts. This was a non-campaign resource/discovery check. |
 | T011 missing shared reference | **PASS, resource-only.** Removed `VAULT-REFERENCE.md` only from the isolated installed copy. A fresh session activated the skill and attempted its exact installed resource path; the tool returned `Path does not exist`. The response named the missing shared source and dependent campaign work, required a pause before note access, and did not read fallback copies or other files. Only `skill` and read-only `view` tools were available. This did not exercise the complete ordered campaign preflight or permission-denied unreadability. |
 | T010 static inventory/source audit | **PASS.** Exactly one immediate-child skill file, `skills/vault-orientation/SKILL.md`, matches one vault-facing inventory entry. Its source includes the canonical resource, designated local guidance, declared Resolver dependency, readiness/authorization gates, and actual-play-or-permitted-DM-judgment knowledge-update rule. Frontmatter and whitespace checks passed. This is source evidence, not runtime acceptance. |
-| Remaining T011 acceptance scenarios | **Superseded on 2026-10-29.** The agent-run scenarios were exercised after T002 passed; see the 2026-10-29 status above and `quickstart.md`. SC-004 still requires five human DMs and at least four correct distinctions, so T011 remains unchecked. |
+| Remaining T011 acceptance scenarios | **Superseded on 2026-10-29.** The agent-run scenarios were exercised after T002 passed; see the 2026-10-29 status above and `quickstart.md`. T011 is checked with SC-004 deferred to [#13](https://github.com/sylvercode/dm-assistant/issues/13). The human walkthrough remains unperformed, not passed. |
 
 **Cleanup and preservation:** Both disposable plugin installations were
 uninstalled using their isolated CLI homes; the final package-test plugin list

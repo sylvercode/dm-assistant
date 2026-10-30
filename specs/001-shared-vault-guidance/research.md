@@ -291,7 +291,10 @@ calls `get_server_info`, normalizes paths (stripping `\\?\` or converting
 Windows), and requires an exact match. A parent or child root does not match.
 It fails closed on errors or no match.
 
-**T011 — agent-run scenarios pass; SC-004 blocked.** Copilot CLI 1.0.103 ran
+**T011 — agent-run scenarios pass; SC-004 deferred.** The DM requested that
+T011 be checked with the unperformed human walkthrough tracked separately in
+[#13](https://github.com/sylvercode/dm-assistant/issues/13), not marked as
+passing. Copilot CLI 1.0.103 ran
 in prompt mode with `--no-ask-user`, an isolated `COPILOT_HOME` holding a
 disposable install of the plugin, and a Resolver configured only for a
 disposable vault copy containing fictional fixture notes. These notes were an
@@ -314,7 +317,8 @@ Each re-run passed, and the approved E04 preview was applied exactly. The
 results show that the skill guided one run per scenario. Agent behavior is
 probabilistic, and one run does not guarantee the same result every time.
 The live `.mcp.json` in the user-supplied test vault was not used because it
-authorizes a live vault. SC-004 needs human DMs, so T011 remains open.
+authorizes a live vault. SC-004 needs human DMs and remains unperformed;
+T011 is checked with the explicit deferral above.
 
 ### No-designated-guidance and knowledge boundaries
 

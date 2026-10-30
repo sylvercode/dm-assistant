@@ -17,7 +17,9 @@ planning discussion below; see `research.md` and `quickstart.md`.
 adds `get_server_info`, and the skill now requires its configured roots to
 include an exact normalized match for the established vault. The agent-run
 T011 installed-client scenarios passed after narrow skill fixes. Only the
-SC-004 human DM walkthrough remains. Where the text below calls the
+SC-004 human DM walkthrough remains, deferred at the DM's request to
+[#13](https://github.com/sylvercode/dm-assistant/issues/13); T011 is checked
+with this deferral, not an SC-004 pass. Where the text below calls the
 authorization method unverified, treat that as historical.
 
 The canonical plugin-owned shared vault reference and vault-orientation skill are now present in source. Runtime note access remains gated on the ordered preflight in FR-018, which cross-references FR-003 through FR-014 for guidance, source, dependency, context, and ambiguity obligations. A vault-facing skill is any workflow that reads, interprets, creates, or changes campaign material. The sequence is to establish the authorized vault without reading notes, verify each required dependency is available and authorized for that vault, load the shared reference and any designated vault-local guidance, establish campaign/group context and identify any handout or read-aloud section, then access campaign notes. No designated local guidance is a valid state; after other preflight checks, a lookup limited to the specific information requested may read relevant notes identified without relying on an uncertain folder or note-role mapping. It remains read-only, and consequential ambiguity pauses further access. Knowledge/world-fact updates require an actual-play record or explicit DM judgment where permitted. Only handout and read-aloud sections are player-facing; gate-check each for DM-only facts and revealing links immediately before delivery. All other task content is DM-facing. The reference includes local, paraphrased defaults for Obsidian aliases, tags, wikilinks and Markdown-style internal links, and callouts, without runtime fetching. Prefer wikilinks unless an established vault preference overrides that default. DM-designated guidance may customize defaults while preserving Obsidian syntax/semantics and shared safety requirements. The orientation skill uses its own bundled resource; installed cross-skill lookup remains an empirical gate for additional consumers. The exact-vault authorization method also remains unverified, so the skill fails closed before campaign-note access when authorization cannot be established. Inventory compliance is verified by static inventory/source audit; runtime execution of every vault-facing skill is not required.
@@ -57,7 +59,9 @@ The canonical plugin-owned shared vault reference and vault-orientation skill ar
 
 No architecture or vault-safety violations are identified. As of 2026-10-29,
 T001 and T002 pass, and the agent-run installed-client scenarios pass. SC-004
-(human DM walkthrough) is not represented as passing.
+(human DM walkthrough) is deferred to
+[#13](https://github.com/sylvercode/dm-assistant/issues/13), not represented
+as passing.
 
 ### Post-design re-evaluation
 
