@@ -226,7 +226,7 @@ The stable, consistently ordered outcome contract returned by every operation.
 | `errorDetails` | Optional concise actionable category/message and safe diagnostic context; omit full campaign content and unnecessary sensitive paths. |
 
 Statuses describe progress, while codes distinguish causes. The stable code
-vocabulary and required status mapping are defined once in
+vocabulary and allowed status mapping are defined once in
 [the runtime interface contract](contracts/powershell-runtime-contract.md#8-stable-completion-code-taxonomy);
 this model does not define a competing code set. Implementations must preserve
 those meanings, and new codes require a compatible interface-contract
@@ -349,7 +349,7 @@ the outcome rather than silently retrying.
 | `stale` | A profile or referenced dependency changes during dependent work. | Stop affected work, report `TARGET_CONFLICT`, require revalidation before retry. |
 | `conflict` | A note differs from the version reviewed when the immediate pre-write check runs. | Refuse that replacement; do not retry automatically. Prior completed target writes remain. |
 | `failed` | An operational error or interruption prevents the next safe step. | Preserve prior completed target writes; ensure the current note is not partially replaced; stop later targets and report exact outcomes. |
-| `cancelled` | User cancels before or during work. | Do not start further writes. Preserve completed writes; report `not completed` if none completed, otherwise `partially completed`. |
+| `cancelled` | The DM declines or withdraws a preview or conversion warning before apply. | Make no proposed changes; report `not completed` with `USER_CANCELLED`. A stop signal during apply is handled as `failed` with `INTERRUPTED`. |
 
 The terminal result status is derived from actual progress, not the state name:
 all requested work done is `complete`; no requested work done is `not

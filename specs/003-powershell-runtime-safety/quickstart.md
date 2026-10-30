@@ -117,7 +117,9 @@ Feature 003 is not validated by these written scenarios alone. Before claiming
 an implementation is ready, run the future harness in every published
 supported environment, verify installed-client resource lookup, and retain
 sanitized results for the cases above. Do not claim stronger concurrency
-guarantees than the tested filesystem replacement primitives provide.
+guarantees than the tested filesystem replacement primitives provide. Record
+sanitized evidence in the "Verification evidence" section of
+`docs/powershell-runtime-support.md`; this quickstart remains a guide only.
 
 The exact runtime/add-on versions, supported platform matrix, installed
 resource-loading implementation, runtime transport, operation catalog, and

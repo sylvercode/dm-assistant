@@ -77,7 +77,9 @@ fallback for packaged resources. Writes must recheck the target immediately
 before replacement, avoid leaving a partially written note, preserve
 round-trippable text, warn before documented conversion, and stop on
 undecodable content. Multi-note work stops at the first failure without
-rollback.
+rollback. The test-only authorization provider is injected only by the test
+harness; production preflight never discovers or accepts a provider from a
+path, environment variable, or configuration.
 
 **Scale/Scope**: One campaign/group context per vault; profile, operation,
 and per-note result semantics are bounded by Feature 003. Shared-campaign

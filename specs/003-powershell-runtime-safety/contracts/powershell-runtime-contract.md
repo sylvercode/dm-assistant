@@ -82,7 +82,9 @@ independent of the blocked operation may remain available.
 Installing or discovering the static plugin and its skills does not invoke
 PowerShell or install prerequisites. A script invocation must not alter
 execution policy, permissions, security software, or other operating-system
-controls.
+controls. Never pass paths or content to `Invoke-Expression`,
+`[scriptblock]::Create`, or `-Command`/argument strings; use `-LiteralPath`
+for every filesystem cmdlet.
 
 ## 4. Installed schema resource
 
@@ -214,7 +216,7 @@ Codes are case-sensitive stable identifiers. User-facing messages may be
 localized or refined, but a code's meaning and status mapping must not change
 within contract version 1.
 
-| Code | Required status | Meaning |
+| Code | Allowed status | Meaning |
 | --- | --- | --- |
 | `OK` | `complete` | Requested work completed. |
 | `NO_CHANGES` | `complete` | Request completed and no target needed changing. |
@@ -223,29 +225,32 @@ within contract version 1.
 | `VAULT_TARGET_INVALID` | `not completed` | Vault root is missing, ambiguous, inaccessible, or not a valid explicit target. |
 | `INVALID_REQUEST` | `not completed` | Required inputs are absent, malformed, or invalid for the registered operation. |
 | `PATH_INVALID` | `not completed` | A supplied/configured relative path violates lexical path rules. |
-| `PATH_OUTSIDE_VAULT` | `not completed` | Canonical or symbolic-link resolution escapes the authorized vault. |
+| `PATH_OUTSIDE_VAULT` | `not completed` or `partially completed` | Canonical or symbolic-link resolution escapes the authorized vault, including at the immediate pre-write recheck. |
 | `RESOURCE_MISSING` | `not completed` | Required installed plugin resource, including the canonical schema, cannot be found or read. |
 | `RESOURCE_INCOMPATIBLE` | `not completed` | Loaded installed resource does not match the required contract or dialect. |
 | `PROFILE_PARSE_INVALID` | `not completed` | YAML syntax is malformed/unsupported or contains duplicate mapping keys. |
 | `PROFILE_NORMALIZATION_INVALID` | `not completed` | Parsed values cannot be normalized under Feature 002 rules. |
 | `PROFILE_SCHEMA_INVALID` | `not completed` | Normalized profile fails the canonical JSON Schema. |
-| `PROFILE_FILESYSTEM_INVALID` | `not completed` | A required configured reference fails filesystem/path/type validation. |
-| `REFERENCE_UNAVAILABLE` | `not completed` | A required configured file, folder, guidance source, or template is missing, unreadable, or invalid. |
+| `PROFILE_FILESYSTEM_INVALID` | `not completed` | During profile validation, a configured section folder or reference fails containment, existence, or type checks; the entire profile is rejected (FR-020, FR-021). |
+| `REFERENCE_UNAVAILABLE` | `not completed` | A configured guidance file, template, party note, or preparation location needed by the current operation is missing, unreadable, or invalid at use time (FR-023, FR-025). |
 | `AMBIGUOUS_CONTEXT` | `not completed` | Uncertainty affects the conclusion or next action and requires DM direction. |
 | `CONFIRMATION_REQUIRED` | `not completed` | Required preview approval for the exact proposed changes is absent or does not match. |
-| `USER_CANCELLED` | `not completed` | User cancelled before the requested work was applied. |
+| `USER_CANCELLED` | `not completed` | The DM declined or withdrew a preview or conversion warning before apply; a stop signal during apply is `INTERRUPTED`. |
 | `ENCODING_CONVERSION_WARNING` | `not completed` | Safe preservation is unavailable; conversion warning must be presented and acknowledged before writing. |
 | `ENCODING_UNSAFE` | `not completed` | Text cannot be decoded reliably; no write is permitted. |
-| `TARGET_CONFLICT` | `not completed` | A target or dependency changed since the reviewed/validated snapshot; do not overwrite or continue dependent work. |
-| `READ_FAILED` | `not completed` | An operational read failed before any target was changed. |
+| `TARGET_CONFLICT` | `not completed` or `partially completed` | A target or dependency, including a configured reference, changed since the reviewed/validated snapshot and is now a stale input; do not overwrite or continue dependent work. |
+| `READ_FAILED` | `not completed` or `partially completed` | An operational read failed; status reflects whether an earlier target changed. |
 | `WRITE_FAILED` | `not completed` or `partially completed` | A write failed; use `partially completed` if an earlier target in the same operation changed. |
 | `INTERRUPTED` | `not completed` or `partially completed` | Operation was interrupted; status and exact target lists reflect any earlier completed writes. |
 | `OPERATION_FAILED` | `not completed` or `partially completed` | Other operational failure; status reflects whether any requested target changed. |
 
+Where two statuses are allowed, use `partially completed` only when an earlier
+target in the same operation changed; otherwise use `not completed`.
+
 The specific cause code is retained when failure occurs after earlier writes:
 for example, `WRITE_FAILED` with `partially completed`. Do not replace it with
 a generic partial-success code. A release must test every applicable code and
-its required status.
+its allowed status.
 
 ## 9. Preview, approval, and safe writes
 
@@ -282,6 +287,14 @@ subsequent request with `allowEncodingConversion: true`; convert only reliably
 decodable text to UTF-8 without BOM and LF line endings. If decoding is
 unreliable, return `ENCODING_UNSAFE` and leave the target unchanged.
 
+Text is reliably decodable when its bytes decode strictly, without
+replacement characters, as BOM-marked UTF-8/UTF-16 or BOM-less UTF-8; legacy
+code pages are not reliably decodable. Text is safely preservable when
+re-encoding with the detected encoding, BOM, and original line-ending bytes
+reproduces every unchanged byte. Assess encoding and decodability for every
+target before the first write; `ENCODING_CONVERSION_WARNING` and
+`ENCODING_UNSAFE` therefore always use `not completed`.
+
 For multi-target writes, process targets in the previewed deterministic order.
 On the first failure or interruption: stop, do not attempt later targets, do
 not roll back earlier completed writes, and report earlier writes as changed,
@@ -298,9 +311,9 @@ written.
 | Exact-vault block and ordered handoff | FR-004, FR-027 | With authorization missing or inconclusive, assert `not completed` / `VAULT_AUTHORIZATION_UNPROVEN`, zero profile/note reads, zero writes. With gates passing, assert pre-note order and no note access before all checks. |
 | Installed schema lookup | FR-019, FR-028 | Installed fixture locates one canonical artifact from two working directories and validates against it; missing/incompatible artifact blocks before profile use, with no checkout/vault/CWD fallback. |
 | Path rules and boundary checks | FR-007, FR-021 | Reject every forbidden lexical form before access; reject traversal and symlink escapes before target access; accept only in-vault links after canonical, component-aware checks; recheck before every access. |
-| Profile parse/normalize/schema/filesystem separation | FR-016–FR-025 | Independently exercise malformed YAML/duplicate keys, normalized scalar edge cases, schema-invalid profiles, absent-profile discovery, explicit missing directories, reference type/readability, deterministic defaults, and stale dependencies. Schema defaults alone never mutate input. |
-| Result structure and code taxonomy | FR-010 | Verify every result has the fields in the prescribed order, exact status vocabulary, one stable code, safe diagnostics, correct target partition, and no incomplete result marked complete. Exercise each listed code/status mapping. |
-| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad changes require approval of the exact current preview; command-like note content is never executed; diagnostics omit note bodies and remain on-device. |
+| Profile parse/normalize/schema/filesystem separation | FR-016–FR-025 | Independently exercise malformed YAML/duplicate keys, normalized scalar edge cases, schema-invalid profiles, absent-profile discovery, explicit missing directories, reference type/readability, shared or nested section mappings and undetermined destinations (`AMBIGUOUS_CONTEXT`), deterministic defaults, and stale dependencies. Schema defaults alone never mutate input. |
+| Result structure and code taxonomy | FR-010 | Verify every result has the fields in the prescribed order, exact status vocabulary, one stable code, safe diagnostics, correct target partition, and no incomplete result marked complete. Exercise each listed code and each allowed status. |
+| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad changes require approval of the exact current preview, while a single named-note text edit does not; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
 | Conflict detection, preservation, and encoding | FR-012–FR-013 | Modify a target after preview and before final write check; verify refusal and no overwrite. Verify safely preservable bytes/line endings and unrelated text remain intact; conversion is warned and acknowledged first; undecodable text remains unchanged. |
 | Atomicity and multi-target failure | FR-026 | Inject failure/interruption during a target write and after an earlier target succeeds; verify no partial current file, no later attempts, no rollback, correct `partially completed` status, and exact changed/unchanged/remaining target lists. |
 
