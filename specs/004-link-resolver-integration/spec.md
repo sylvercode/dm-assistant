@@ -99,4 +99,5 @@ As a Dungeon Master, I can see whether a requested link resolved, was unresolved
 - Feature 001 defines the shared dependency-readiness contract, while this feature specifies user setup, installed-client verification, and resolver-result behavior.
 - Issue #7 names `2.0.0` as its minimum, but the current Feature 001 contract and vault-orientation guidance require `2.1.0` or later to support note-content-free exact-vault authorization through `get_server_info`; this current contract is the applicable baseline.
 - One or more authorized vault roots may be configured by the DM. Only an exact match for the vault established for the current task authorizes that task.
+- Resolver readiness does not establish a trusted handoff to the PowerShell runtime; script-backed vault access remains blocked until that handoff is separately verified.
 - Shared-campaign support and dynamic template expressions remain out of scope until separately specified.
