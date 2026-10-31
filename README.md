@@ -24,29 +24,38 @@ The plugin will give an AI assistant a focused set of tools and guidance for wor
 ## Project Status
 
 This repository contains an Agent Plugins 1.0 plugin with a portable
-vault-orientation skill and its bundled shared reference. It does not include
-an Obsidian Link Resolver integration or automated vault runtime. Installed
+vault-orientation skill and its bundled shared reference. It does not bundle
+the Obsidian Link Resolver server or enable production script-backed vault access.
+PowerShell modules implement prerequisite checks, profile validation,
+read-only inspection, preview approval, and conflict-aware atomic note writes;
+these have local synthetic acceptance coverage, not installed-client or
+cross-platform verification. Installed
 cross-skill resource loading was verified in a disposable two-skill fixture
 using owner-skill activation, not assumed sibling paths. The orientation skill
-must stop before campaign-note access when note-content-free authorization of
-the exact vault cannot be established. Other planned capabilities above are
-not currently available.
+checks exact-vault authorization with the separately configured Resolver's
+`get_server_info` tool and must stop when that check cannot be established.
+The PowerShell runtime cannot yet verify a handoff from the active session and
+remains fail-closed. Other planned capabilities above are not currently available.
 
 See [Plugin Architecture](docs/architecture.md) for component locations, extension boundaries, and the separation between the plugin and campaign vaults.
 
 ## Intended Vault Structure and Workflow
 
 The following conventions describe the intended workflow for users and AI
-guidance. The current vault-orientation skill and bundled reference encode
-these boundaries, but installed-client behavior has not been validated.
+guidance. The vault-orientation skill and bundled reference encode these
+boundaries; earlier installed-client scenarios used a disposable fixture, but
+the merged script-backed workflow has not been verified in an installed client.
 Campaign notes belong in your Obsidian vault, not in the plugin installation.
 
 The proposed `.dmassist.yaml` version-1 contract, defaults, and machine-readable
 JSON Schema are documented in
 [`specs/002-vault-configuration-contract/`](specs/002-vault-configuration-contract/).
-The canonical schema artifact is [`schemas/dmassist.schema.json`](schemas/dmassist.schema.json).
-No configuration reader or runtime validator is implemented; those remain
-runtime work. Plugin-added support files use dot-prefixed names to stay hidden
+The canonical schema artifact is packaged with its consuming skill at
+[`skills/vault-orientation/assets/dmassist.schema.json`](skills/vault-orientation/assets/dmassist.schema.json).
+The PowerShell configuration reader and runtime validator use this installed
+skill-owned artifact with built-in `Test-Json -Schema`. Script-backed profile
+access remains blocked by the unverified authorization handoff. Plugin-added
+support files use dot-prefixed names to stay hidden
 from Obsidian's normal note view. Campaign articles remain ordinary, visible
 Markdown notes.
 
@@ -66,10 +75,11 @@ read-aloud section before accessing campaign notes. With no designated local
 guidance, after all other preflight checks pass, a lookup may read only
 relevant notes identified without relying on uncertain folder or note-role
 mappings. The lookup remains read-only and pauses if uncertainty affects
-findings or the next action. The orientation skill encodes these safeguards,
-but its unresolved exact-vault authorization gate requires it to fail closed;
-other skills must use the tested owner-activation pattern rather than assumed
-sibling paths. Source instructions alone do not validate runtime behavior.
+findings or the next action. Resolver 2.1.0's `get_server_info` supplies the
+skill's note-content-free exact-vault check; the PowerShell runtime still
+fails closed until it can verify a trusted active-session handoff. Other skills
+must use the tested owner-activation pattern rather than assumed sibling
+paths. Source instructions alone do not validate runtime behavior.
 
 ### Vault Sections
 
@@ -114,10 +124,12 @@ remains to be defined.
 
 ### Editing and Recovery
 
-The vault is expected to be in a Git repository. Small, requested page-local
-edits need no separate approval; major changes, including bulk edits,
-restructuring, deletion, and broad continuity changes, require a preview and DM
-approval. Git history does not replace approval or justify overwriting user edits.
+The vault is expected to be in a Git repository. A clearly requested page-local
+edit needs no separate approval unless it changes an actual-play record or
+established continuity. Multi-note edits, deletion, moves, merges,
+reorganization, and actual-play or continuity changes require a scoped preview
+followed by DM approval in a later message. Git history does not replace
+approval or justify overwriting user edits.
 
 ### Preparing and Recording Sessions
 
@@ -153,12 +165,15 @@ See the [Vault Guidance Brainstorm](docs/vault-guidance-brainstorm.md) for propo
 
 ## Local Installation
 
-PowerShell is a planned prerequisite for future script-backed skills and hooks,
-to make mechanical vault operations more predictable. The current scaffold has
-no scripts and does not require PowerShell to install. Future workflows will use
-the latest stable `pwsh` and required modules, including `powershell-yaml`, with
-exact versions recorded during implementation and validation. Platform support
-and provisioning remain to be specified; see the
+PowerShell is a prerequisite only for script-backed vault operations, which
+make mechanical vault operations more predictable. Installing the plugin and
+discovering its skills does not require PowerShell, and no workflow installs or
+upgrades PowerShell or its modules. The selected `pwsh` release, exact module
+versions such as `powershell-yaml`, supported operating systems, provisioning
+guidance, and verification evidence are recorded in
+[PowerShell Runtime Support](docs/powershell-runtime-support.md). Script-backed
+vault access remains blocked until exact-vault authorization can be verified;
+see the
 [scripting proposal](docs/vault-guidance-brainstorm.md#powershell-and-predictable-operations).
 
 With GitHub Copilot CLI installed, run these commands from the repository root:
@@ -179,6 +194,16 @@ allowed root. Installation or skill discovery alone does not validate
 campaign-note access behavior.
 
 Copilot caches installed plugins. Re-run `copilot plugin install .` after changing the local plugin, then start a new session to test it.
+
+Contributors can run the synthetic acceptance suite with Pester 6.2.0:
+
+```powershell
+pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1
+```
+
+The test-only authorization provider is confined to the harness. Passing tests
+does not authorize a real vault or establish installed-client support; see the
+[support matrix and evidence](docs/powershell-runtime-support.md).
 
 To remove the local installation:
 

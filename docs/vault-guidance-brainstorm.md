@@ -128,11 +128,12 @@ Expect the vault to be maintained in a Git repository for review and recovery,
 but verify that assumption before relying on history. Do not initialize Git,
 commit, push, or discard user changes without authorization.
 
-Small, clearly requested edits local to a page may be applied without a separate
-approval or mandatory preview. Major changes require a scoped preview and DM
-approval: for example, bulk edits, restructuring, deletion, campaign resets, or
-changes with broad continuity consequences. Impact matters more than file count;
-a one-page rewrite that changes established history can still be major.
+Small, clearly requested edits local to a page may be applied without separate
+approval or a mandatory preview unless they alter actual-play records or
+established continuity. Major changes require a scoped preview followed by DM
+approval in a later message: for example, multi-note edits, restructuring,
+deletion, campaign resets, or continuity changes. Impact matters more than
+file count; a one-page change to an actual-play record still requires approval.
 
 Keep changes within the request and protect concurrent or uncommitted user
 edits. Git is a recovery aid, not permission to make destructive changes.
@@ -249,9 +250,10 @@ Define these contracts before implementing script-backed workflows:
   or interpolated shell commands. Do not bypass execution-policy or security
   controls to make scripts run.
 - Default inspection operations to read-only. Follow the editing policy above:
-  requested local edits need no separate approval, while major changes need a
-  preview and approval. Detect intervening changes before writes, including
-  changes since any preview. Preserve Markdown content and encoding.
+  safe requested local edits need no separate approval, while actual-play or
+  continuity changes and other major changes need a preview and later-message
+  approval. Detect intervening changes before writes, including changes since
+  any preview. Preserve Markdown content and encoding.
 - Keep campaign data local and avoid unnecessary content in diagnostic logs.
   Test repeatability and failure behavior on each supported platform.
 
@@ -536,9 +538,10 @@ initial single-campaign workflows.
   without those references leaking into handouts.
 - Obsidian tags classify the intended passage without implying that every claim
   in a mixed-content note has the same status.
-- A requested local edit proceeds without redundant approval; major changes wait
-  for approval, regardless of how many pages they touch. Existing user changes
-  are preserved, and Git availability is checked before relying on recovery.
+- A safe requested local edit proceeds without redundant approval; major changes
+  and actual-play or continuity changes wait for later-message approval,
+  regardless of how many pages they touch. Existing user changes are preserved,
+  and Git availability is checked before relying on recovery.
 - `.dmassist.yaml` is discovered at the vault root, even when ordinary note
   listings omit hidden files. Plugin support artifacts use dot-prefixed names,
   while campaign articles remain visible in Obsidian.

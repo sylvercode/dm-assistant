@@ -1,9 +1,8 @@
 <!-- Sync Impact Report
-Version change: initial adoption → 1.0.0
-Modified principles: none
-Added sections: Core Principles, Plugin and Vault Constraints, Development Workflow
+Version change: 1.0.0 → 1.0.1
+Modified sections: Development Workflow — define the PowerShell acceptance test command
+Added sections: none
 Removed sections: none
-Follow-up TODOs: Confirm the original ratification date.
 -->
 # DM Assistant Constitution
 
@@ -60,8 +59,10 @@ contributors and users.
   project work. The `epic` label tracks epics; it does not prove implementation.
 - Update directly related documentation when behavior or architecture changes.
 - Validate plugin discovery using the local installation steps in `README.md`.
-- This documentation-and-metadata scaffold defines no build, test, or lint
-  commands. Do not claim those checks were run unless such commands are added.
+- Run the PowerShell acceptance suite with Pester 6.2.0:
+  `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`. Runtime prerequisites
+  and support limitations are documented in `docs/powershell-runtime-support.md`.
+- No build or lint commands are defined. Do not claim those checks were run.
 - Reviews MUST verify that changes comply with this constitution and distinguish
   implemented behavior from proposals.
 
@@ -79,4 +80,4 @@ and PATCH for clarifications and non-semantic refinements. The ratification date
 records the original adoption date and MUST NOT be reset by later amendments.
 The last-amended date changes whenever the constitution changes.
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): confirm original adoption date | **Last Amended**: 2026-10-24
+**Version**: 1.0.1 | **Ratified**: TODO(RATIFICATION_DATE): confirm original adoption date | **Last Amended**: 2026-10-30

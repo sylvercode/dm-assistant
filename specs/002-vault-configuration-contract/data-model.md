@@ -1,6 +1,6 @@
 # Data Model: Vault Configuration Contract
 
-**Status:** Proposed contract for a future plugin workflow. The repository is an Agent Plugins 1.0 scaffold; none of the entities, parsing, validation, or state transitions below are implemented.
+**Status:** Feature 002 owns this configuration design contract. Feature 003 implements parsing, validation, discovery, and dependency tracking in locally tested modules. Production authorization and installed-client/platform qualification remain blocked or unverified.
 
 ## Scope and Ownership
 
@@ -9,10 +9,10 @@ The authorized campaign vault is obtained from the user's workspace or explicit 
 Before a future workflow reads the profile or campaign notes, it must establish
 the vault and separately verify each declared required dependency's readiness
 and authorization for that vault, including readiness of the initial
-`obsidian-link-resolver`/`resolve_obsidian_link` dependency and explicit
-authorization of the intended vault. The profile cannot establish or expand
-either authorization. Before campaign-note access, complete the remaining
-ordered preflight in the
+Obsidian Link Resolver 2.1.0 or later with `resolve_obsidian_link` and
+`get_server_info`, and exact-vault authorization through the latter. The
+profile cannot establish or expand either authorization. Before campaign-note
+access, complete the remaining ordered preflight in the
 [Spec 001 Vault Guidance Loading Contract](../001-shared-vault-guidance/contracts/vault-guidance-loading.md).
 
 All paths in the profile are vault-relative. A path is usable only if its fully resolved target, including symbolic links, remains inside the authorized vault. Plugin-bundled default templates are separate plugin resources and are not profile paths.
@@ -20,7 +20,7 @@ All paths in the profile are vault-relative. A path is usable only if its fully 
 ## Schema Artifact and Normalized Profile
 
 The canonical machine-readable schema deliverable is
-[`schemas/dmassist.schema.json`](../../schemas/dmassist.schema.json). It describes the normalized version-1
+[`skills/vault-orientation/assets/dmassist.schema.json`](../../skills/vault-orientation/assets/dmassist.schema.json). It describes the normalized version-1
 profile structure and uses JSON Schema Draft 2020-12, declared with
 `$schema`; this dialect is distinct from the profile's application-level
 `version: 1`.

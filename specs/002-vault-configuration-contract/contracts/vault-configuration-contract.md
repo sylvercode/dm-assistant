@@ -1,8 +1,10 @@
 # Vault Configuration Contract (`.dmassist.yaml`)
 
-**Status: Proposal.** This document defines a user-facing design contract for a
-future loader. The repository is a plugin scaffold: no configuration loader,
-discovery workflow, or runtime behavior described here is implemented.
+**Status: Version-1 design contract.** Feature 002 owns these semantics.
+Feature 003 implements the loader, validation, reference checks, and read-only
+discovery in locally tested PowerShell modules. Production vault access remains
+blocked by exact-vault authorization, and installed-client/platform
+qualification is not established.
 
 ## Purpose and boundary
 
@@ -25,12 +27,12 @@ authorize reads or writes outside the vault.
 Before a future workflow reads `.dmassist.yaml` or campaign notes, it must
 establish the vault from the user's workspace or explicit input and verify
 each declared required runtime dependency's readiness and authorization for
-that vault as separate facts. Initially this includes verifying that
-`obsidian-link-resolver` exposes `resolve_obsidian_link` and separately
-confirming that the intended vault is an explicitly authorized root. The
-profile cannot establish or expand either authorization. Before campaign-note
-access, the workflow must then complete
-the remaining ordered preflight in the
+that vault as separate facts. Initially this includes verifying Resolver
+version `2.1.0` or later and both `resolve_obsidian_link` and `get_server_info`,
+then separately confirming via `get_server_info` that the intended vault
+exactly matches an authorized root. The profile cannot establish or expand
+either authorization. Before campaign-note access, the workflow must then
+complete the remaining ordered preflight in the
 [Spec 001 Vault Guidance Loading Contract](../../001-shared-vault-guidance/contracts/vault-guidance-loading.md):
 load the shared reference and any designated local guidance, then establish
 the relevant campaign/group and output sections. Do not access campaign notes
@@ -38,7 +40,7 @@ until those checks succeed. This contract does not implement that runtime.
 
 ## Version 1 profile and JSON Schema
 
-The accompanying [`schemas/dmassist.schema.json`](../../../schemas/dmassist.schema.json)
+The accompanying [`skills/vault-orientation/assets/dmassist.schema.json`](../../../skills/vault-orientation/assets/dmassist.schema.json)
 is the canonical machine-readable JSON Schema for version 1. It uses JSON Schema Draft 2020-12
 and validates the profile's normalized object structure and values. It
 complements this written contract; it does not replace the contract's

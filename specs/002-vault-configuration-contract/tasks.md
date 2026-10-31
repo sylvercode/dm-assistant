@@ -9,7 +9,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 **Prerequisites**: `plan.md`, `spec.md`; supporting context in `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`
 
-**Scope**: Produce the written version-1 `.dmassist.yaml` contract and normalized-profile JSON Schema, with design-only validation scenarios. Do not implement a YAML reader, PowerShell runtime, loader, validator integration, filesystem checks, or plugin packaging. The canonical schema file currently lives at provisional repository path `schemas/dmassist.schema.json`; Issue #4 decides its final location alongside the consuming plugin component and verifies installed packaging and loader use.
+**Scope**: Produce the written version-1 `.dmassist.yaml` contract and normalized-profile JSON Schema, with design-only validation scenarios. Do not implement a YAML reader, PowerShell runtime, loader, validator integration, filesystem checks, or plugin packaging. The canonical schema file originally lived at provisional repository path `schemas/dmassist.schema.json`; Issue #4 (Feature 003 T015) moved it to `skills/vault-orientation/assets/dmassist.schema.json` alongside the consuming skill and verifies installed packaging and loader use.
 
 **Tests**: No executable repository test suite or runtime loader exists. The one-off Draft 2020-12 schema verification below is required by SC-006 and must not add a repository/runtime dependency.
 
@@ -17,7 +17,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 - Every task uses `- [ ] T### [P?] [US#?] Description with exact file path(s)`.
 - `[P]` marks tasks that edit different files and have no incomplete prerequisites.
-- The schema path `schemas/dmassist.schema.json` is provisional as an installed-plugin location; plugin packaging and installed discovery belong to Issue #4.
+- The schema path `schemas/dmassist.schema.json` was provisional as an installed-plugin location; Issue #4 moved it to `skills/vault-orientation/assets/dmassist.schema.json` and owns plugin packaging and installed discovery.
 
 ## Phase 1: Setup
 
@@ -43,7 +43,7 @@ description: "Implementation tasks for the Vault Configuration Contract"
 
 **Independent Test**: Review contract and scenarios for the Spec 001 preflight, including distinct dependency-readiness and vault-authorization checks, plus absent configuration, conventional/renamed/missing sections, root-level adventure candidates, and ambiguity. Blocked work must stop before profile or campaign-note access; inferred locations must not authorize edits.
 
-- [X] T003 [US1] Define the ordered Spec 001 preflight before reading `.dmassist.yaml` or campaign notes: establish the authorized vault, separately verify `obsidian-link-resolver`/`resolve_obsidian_link` readiness and explicit authorization of the intended vault, complete remaining guidance and campaign/group checks before campaign-note access, and prohibit profile-based authorization expansion; also define absent-profile read-only discovery and its no-migration/no-creation safeguards in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`.
+- [X] T003 [US1] Define the ordered Spec 001 preflight before reading `.dmassist.yaml` or campaign notes: establish the authorized vault, separately verify Resolver 2.1.0+ readiness with `resolve_obsidian_link` and `get_server_info` and exact-root authorization, complete remaining guidance and campaign/group checks before campaign-note access, and prohibit profile-based authorization expansion; also define absent-profile read-only discovery and its no-migration/no-creation safeguards in `specs/002-vault-configuration-contract/contracts/vault-configuration-contract.md`.
 - [X] T004 [US1] Add design-only scenarios for successful and blocked Spec 001 preflight, distinct resolver-readiness and vault-authorization failures, profile-based authorization escalation attempts, and post-preflight conventional, renamed, missing, ambiguous, and root-level adventure discovery in `specs/002-vault-configuration-contract/quickstart.md`; verify blocked workflows stop before profile or campaign-note access and discovery creates or changes no files.
 - [X] T005 [US1] Verify the User Story 1 acceptance scenarios in `specs/002-vault-configuration-contract/spec.md` trace to the contract and quickstart, including preflight-before-access, separate resolver readiness and vault authorization, profile non-escalation, and failed-preflight stopping behavior without treating inference as edit authorization.
 

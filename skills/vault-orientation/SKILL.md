@@ -9,6 +9,32 @@ Use this workflow for any task that reads, interprets, creates, or changes
 campaign material. A general question that requires no campaign material does
 not need vault access.
 
+## Script-backed operations (runtime-gated)
+
+Installing the plugin and discovering its skills uses only static files and
+needs no PowerShell. Script-backed operations have locally tested runtime
+foundations but remain authorization-gated and unverified in an installed
+client; see `docs/powershell-runtime-support.md` in the plugin repository
+for the supported runtime. Before any script-backed operation that affects
+campaign material:
+
+- Establish the intended vault from the user's workspace or explicit input as
+  in step 1 below, then run the runtime prerequisite check
+  (`Invoke-DmPreflight` in this skill's `scripts/RuntimePreflight.psm1`). It
+  checks the supported runtime, request shape, dependency readiness, and
+  exact-vault authorization without reading the vault, installing, or updating
+  anything. Then complete the remaining pre-note sequence below in order.
+- If the check returns `not completed`, report its completion code and
+  message, stop the script-backed work, and do not retry around it.
+  The runtime cannot yet verify a handoff from the active session's Resolver:
+  readiness may stop with `PREREQUISITE_MISSING`, and if readiness passes,
+  authorization stops with `VAULT_AUTHORIZATION_UNPROVEN`.
+- A passing check or successful script run does not prove that shared
+  guidance was loaded. Load guidance yourself in step 3.
+- When scripts are blocked or PowerShell is unavailable, read-only assistance
+  that does not need the blocked operation remains available, subject to this
+  skill's pre-note sequence.
+
 ## Required pre-note sequence
 
 Do these steps in order. Do not inspect campaign notes, vault configuration,
@@ -25,8 +51,9 @@ profiles, or vault contents to complete an earlier step.
    session. Check the authoritative inventory in the feature specification
    when maintaining this skill; every declared dependency must be checked
    before note access.
-   - **Readiness:** both tools are available. Readiness does not prove that
-     the established vault is an authorized root.
+   - **Readiness:** both tools are available, and the reported server version
+     is at least `2.1.0`. Readiness does not prove that the established vault
+     is an authorized root.
    - **Authorization:** call `get_server_info` with no arguments. It returns
      the running server's version and the canonical vault roots configured at
      startup, without reading notes. The established vault is authorized only
@@ -34,12 +61,13 @@ profiles, or vault contents to complete an earlier step.
      removing a Windows `\\?\` prefix (`\\?\UNC\` becomes `\\`) and trailing
      separators; compare case-insensitively on Windows. A returned root that
      is only a parent or child of the established vault is not an exact match.
-   - Fail closed if the call errors, returns `isError`, or returns a missing or
-     malformed vault list, or if no root matches. Report the configured roots
-     and the established vault, then ask the DM; do not change MCP
-     configuration. Do not resolve or generate a link to prove authorization,
-     and do not infer authorization from a server name, tool availability, or
-     an unverified configuration value.
+   - Fail closed if the call errors, returns `isError`, reports a missing,
+     malformed, or incompatible version, returns a missing or malformed vault
+     list, or if no root matches. Report the configured roots and the established
+     vault when available, then ask the DM; do not change MCP configuration.
+     Do not resolve or generate a link to prove authorization, and do not infer
+     authorization from a server name, tool availability, or an unverified
+     configuration value.
    - When several roots are configured, pass the matched root as `vault_root`
      to later Resolver calls.
 3. **Load guidance.** Read `VAULT-REFERENCE.md` from this skill's own bundled
@@ -76,7 +104,8 @@ would require treating a folder name as a note role, or bulk-reading folders
 or the vault to enumerate candidates, that mapping is uncertain: ask the DM
 first. If uncertainty affects the findings or next action, stop before
 further note access and ask the DM. Provisional assumptions never authorize
-creating or changing notes.
+creating or changing notes. The same restriction applies to script-backed
+operations.
 
 ### Pause conditions
 
