@@ -16,11 +16,11 @@ As a Dungeon Master, I can install and configure the required link resolver sepa
 
 **Why this priority**: Vault-facing skills depend on this service, and an installation that cannot be discovered or safely associated with the intended vault must not proceed to campaign notes.
 
-**Independent Test**: Follow the published setup in a clean Copilot CLI session, confirm the resolver and its required tools are available, and confirm the intended vault is explicitly authorized without reading campaign notes.
+**Independent Test**: Follow the published setup in a fresh supported client session and confirm that link resolution is ready for the intended vault without reading campaign notes.
 
 **Acceptance Scenarios**:
 
-1. **Given** the DM has configured one or more explicitly authorized absolute vault roots, **When** a fresh supported client session starts, **Then** the required resolver tools are discoverable and the setup instructions do not require putting a private vault path in the plugin.
+1. **Given** the DM has configured one or more explicitly authorized absolute vault roots, **When** a fresh supported client session starts, **Then** the link-resolution service is ready for use and the setup instructions do not require putting a private vault path in the plugin.
 2. **Given** the intended vault is not an exact match for an authorized root, **When** a vault-facing skill begins, **Then** it explains the authorization problem and accesses no campaign notes.
 
 ---
@@ -37,6 +37,7 @@ As a Dungeon Master, I can rely on a vault-facing skill to stop before campaign-
 
 1. **Given** the resolver or a required tool is unavailable, **When** a vault-facing skill is requested, **Then** the skill names the unmet prerequisite, explains the setup needed, and stops before reading or changing campaign notes.
 2. **Given** the resolver is available but its reported authorized roots do not exactly match the established vault, **When** a vault-facing skill performs its preflight, **Then** it fails closed without using link resolution as proof of authorization.
+3. **Given** resolver settings changed after the current client session started, **When** a vault-facing skill is requested, **Then** it treats the active settings as unconfirmed, requests a fresh session and verification, and accesses no campaign notes.
 
 ---
 
@@ -51,14 +52,32 @@ As a Dungeon Master, I can see whether a requested link resolved, was unresolved
 **Acceptance Scenarios**:
 
 1. **Given** a link has one resolved destination, **When** it is resolved, **Then** the skill reports that destination without changing the note.
-2. **Given** a link is unresolved, has a missing subtarget, is ambiguous, or returns an error, **When** it is resolved, **Then** the skill reports that specific outcome and available details, and does not guess a destination.
+2. **Given** a link cannot be found, **When** it is resolved, **Then** the skill reports that it is unresolved and does not guess a destination.
+3. **Given** a link's requested subtarget is missing, **When** it is resolved, **Then** the skill reports the missing subtarget and does not guess a replacement.
+4. **Given** more than one destination matches a link, **When** it is resolved, **Then** the skill reports the ambiguity and available candidates without selecting one.
+5. **Given** link resolution fails, **When** it is resolved, **Then** the skill reports the failure and available details without guessing a destination.
+
+---
+
+### User Story 4 - Keep Setup Focused (Priority: P3)
+
+As a Dungeon Master, I can avoid unnecessary integrations and keep future additions tied to a demonstrated campaign workflow need.
+
+**Why this priority**: Additional integrations can complicate setup and should only be introduced when they solve a real user problem.
+
+**Independent Test**: Review the feature's proposed integrations and verify that only the required link-resolution service is included; any other proposal has a separately documented workflow gap and approval.
+
+**Acceptance Scenarios**:
+
+1. **Given** no separate workflow gap has been demonstrated, **When** this feature is delivered, **Then** it introduces no additional integrations or placeholder endpoints.
+2. **Given** a possible future integration is identified, **When** it is considered, **Then** it remains a separate proposal until its workflow gap and acceptance criteria are documented.
 
 ### Edge Cases
 
 - The resolver's configured root is a parent or child of the intended vault but is not the vault itself.
-- A tool is listed as available but the resolver version is missing, malformed, or incompatible.
-- The resolver configuration changes after the current client session starts, so the active session does not reflect the new setup.
-- Resolver output is missing, malformed, ambiguous, or reports an error.
+- The service appears available but required capabilities or supported compatibility cannot be confirmed.
+- The resolver configuration changes after the current client session starts; the stale session must not be trusted until a fresh session verifies the new settings.
+- A result is incomplete, ambiguous, or reports an error.
 - Additional integration opportunities arise during implementation without evidence of a concrete workflow gap.
 - Setup examples could accidentally be mistaken for real vault paths or copied into distributed plugin configuration.
 
@@ -66,20 +85,20 @@ As a Dungeon Master, I can see whether a requested link resolved, was unresolved
 
 ### Functional Requirements
 
-- **FR-001**: The DM MUST be able to install and configure the Obsidian Link Resolver separately from the plugin, for the supported Copilot CLI client, with one or more explicitly authorized absolute vault roots.
-- **FR-002**: Setup guidance MUST explain how to configure and verify the resolver in a fresh supported client session. It MUST use placeholders for vault-specific paths and MUST NOT store or distribute a user's private vault path in plugin content or shared configuration.
-- **FR-003**: Before any campaign-note access, every vault-facing skill MUST check the declared required-dependency inventory for resolver readiness and separately establish that the intended vault is explicitly authorized. Readiness or tool availability alone MUST NOT be treated as authorization.
-- **FR-004**: The required resolver MUST be compatible with version `2.1.0` or later and expose `resolve_obsidian_link` and `get_server_info` in the active supported client session. The version and tools MUST be verified as part of readiness.
-- **FR-005**: Authorization MUST be established without reading campaign-note content. The established vault MUST exactly match a reported authorized vault root; a parent or child root MUST NOT count as a match. Link resolution MUST NOT be used as evidence of authorization.
-- **FR-006**: If the resolver or any declared required tool is missing, unavailable, incompatible, malformed, or not confirmed for the intended vault, the vault-facing skill MUST explain the failed prerequisite and stop before campaign-note access or changes.
-- **FR-007**: A skill using link resolution MUST accurately distinguish resolved, unresolved, missing-subtarget, ambiguous, and error outcomes, and convey available result details without guessing a destination.
-- **FR-008**: Validation MUST cover resolver discovery in a fresh supported client session, authorized-vault boundaries, each specified resolution outcome, and absence of campaign-note reads or changes when the dependency is unavailable.
-- **FR-009**: Additional hooks, agents, MCP servers, or other integrations MUST remain optional unless a separate, demonstrated workflow gap justifies them. No placeholder endpoints or unsupported integration assumptions may be introduced.
-- **FR-010**: The required dependency declaration MUST remain consistent with the shared dependency-readiness contract established by Feature 001 and MUST be checked by every vault-facing skill before campaign-note access.
+- **FR-001**: The DM MUST be able to install and configure the Obsidian Link Resolver separately from the plugin and authorize one or more absolute vault roots for it.
+- **FR-002**: Setup guidance MUST explain how to configure and verify the service in a fresh supported client session. It MUST use placeholders for vault-specific paths and MUST NOT store or distribute a user's private vault path in plugin content or shared configuration.
+- **FR-003**: Before any campaign-note access, every vault-facing skill MUST confirm that the required link-resolution service is ready and separately establish that the intended vault is authorized. Service availability alone MUST NOT be treated as authorization.
+- **FR-004**: Resolver readiness and authorization MUST follow the required capabilities, supported compatibility, and exact-vault rules in Feature 001's [dependency contract](../001-shared-vault-guidance/spec.md#expected-runtime-dependencies-initial-non-exhaustive).
+- **FR-005**: Authorization MUST be established without reading campaign-note content. The established vault MUST exactly match an authorized vault root; a parent or child root MUST NOT count as a match. Link resolution MUST NOT be used as evidence of authorization.
+- **FR-006**: If the service, any required capability, its compatibility, or authorization cannot be confirmed according to the dependency contract, the vault-facing skill MUST explain the failed prerequisite and stop before campaign-note access or changes.
+- **FR-007**: A skill using link resolution MUST accurately distinguish a resolved destination, an unresolved link, a missing requested subtarget, multiple possible destinations, and a resolution failure. It MUST convey available details without guessing a destination.
+- **FR-008**: If resolver settings change after the current client session starts, a vault-facing skill MUST treat that session's settings as unconfirmed, request a fresh session and verification, and stop before campaign-note access.
+- **FR-009**: This feature MUST NOT introduce integrations beyond the required link-resolution service. Any additional hook, agent, or service MUST remain a separate proposal until a concrete workflow gap and its acceptance criteria are documented.
+- **FR-010**: Feature 001's dependency contract MUST be the authoritative source for the service's supported compatibility, required capabilities, readiness, authorization, and unavailable behavior. Every vault-facing skill MUST follow that same contract before campaign-note access.
 
 ### Key Entities
 
-- **Required resolver dependency**: The separately installed link-resolution service, its supported compatibility level, required capabilities, setup, readiness check, and failure behavior.
+- **Required link-resolution service**: The separately installed service that finds destinations for Obsidian links and confirms which vault roots are authorized.
 - **Authorized vault root**: An absolute vault location explicitly permitted by the DM for the resolver to use.
 - **Resolution outcome**: The result of resolving a link, including a resolved destination or a distinct unresolved, missing-subtarget, ambiguous, or error state.
 
@@ -87,17 +106,17 @@ As a Dungeon Master, I can see whether a requested link resolved, was unresolved
 
 ### Measurable Outcomes
 
-- **SC-001**: In 100% of fresh-session setup checks, the supported client exposes the compatible resolver and both required tools without any user-specific vault path being included in the plugin.
-- **SC-002**: A static audit finds that 100% of vault-facing skills check all declared required dependencies and establish vault authorization before any campaign-note access.
-- **SC-003**: In 100% of tested missing, unavailable, incompatible, or unauthorized dependency scenarios, no campaign notes are read or changed before the skill stops.
-- **SC-004**: In 100% of tested link-resolution cases, the skill preserves the distinction among the five required outcomes and never invents a destination.
-- **SC-005**: The setup documentation and validation introduce zero placeholder integration endpoints or undocumented assumptions about additional integrations.
+- **SC-001**: In all four documented setup checks—fresh-session availability, required capability readiness, authorization of the intended vault, and exclusion of private vault paths from the plugin—the DM can complete setup without reading campaign notes.
+- **SC-002**: Every vault-facing skill listed in the current skills inventory confirms the same required dependency and vault-authorization contract before campaign-note access.
+- **SC-003**: In each of the four blocked scenarios—service unavailable, required capability or compatibility unconfirmed, authorization not confirmed, and stale session settings—the skill stops before any campaign-note read or change.
+- **SC-004**: In each of the five link-resolution outcomes—resolved, unresolved, missing subtarget, ambiguous, and error—the skill reports the correct outcome and never guesses a destination.
+- **SC-005**: This feature introduces zero additional integrations; any later integration is considered only with a separately documented workflow gap and acceptance criteria.
 
 ## Assumptions
 
 - GitHub Copilot CLI is the supported client for this integration, consistent with the existing repository support contract.
-- Feature 001 defines the shared dependency-readiness contract, while this feature specifies user setup, installed-client verification, and resolver-result behavior.
-- Issue #7 names `2.0.0` as its minimum, but the current Feature 001 contract and vault-orientation guidance require `2.1.0` or later to support note-content-free exact-vault authorization through `get_server_info`; this current contract is the applicable baseline.
+- The Obsidian Link Resolver is the required external link-resolution service. Feature 001's [dependency inventory](../001-shared-vault-guidance/spec.md#expected-runtime-dependencies-initial-non-exhaustive) is the authoritative source for its current minimum compatible release and required capabilities.
+- Issue #7 names `2.0.0` as its minimum, but the current Feature 001 contract requires `2.1.0` or later for exact-vault authorization; this current contract is the applicable baseline.
 - One or more authorized vault roots may be configured by the DM. Only an exact match for the vault established for the current task authorizes that task.
 - Resolver readiness does not establish a trusted handoff to the PowerShell runtime; script-backed vault access remains blocked until that handoff is separately verified.
 - Shared-campaign support and dynamic template expressions remain out of scope until separately specified.
