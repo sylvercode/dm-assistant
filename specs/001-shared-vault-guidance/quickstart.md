@@ -27,7 +27,7 @@ path.
   configuration. Do not access a real campaign vault or change the user's live
   MCP configuration. Do not embed vault paths in the plugin or repository.
 - For the disposable setup, configure the Obsidian Link Resolver MCP server
-  separately (minimum compatible release `2.1.0`) with the disposable vault as
+  separately (API baseline `2.1.0`) with the disposable vault as
   an explicitly authorized absolute root. Verify server/tool readiness with
   `copilot mcp list` and `copilot mcp get obsidian-link-resolver`, then confirm
   `resolve_obsidian_link` and `get_server_info` are available in a new
@@ -36,6 +36,13 @@ path.
   exactly matches the intended disposable vault after normalization. Server or
   tool presence alone does not prove authorization, and do not resolve a
   campaign link merely to test authorization.
+- Resolver 2.1.0 can follow file symlinks outside an authorized root when
+  reading heading or block targets. Do not call `resolve_obsidian_link` until
+  the configured upstream release is verified to canonicalize every target
+  and reject targets outside the selected root, including symlinks. Pass the
+  exact root that matched the established vault as `vault_root`; do not rely
+  on `context_path` to select among configured roots. Complete the shared
+  guidance and campaign/group context gates before any link-resolution call.
 - The dependency inventory is non-exhaustive. Every vault-facing skill must
   verify all currently declared required dependencies before accessing
   campaign notes. Official Obsidian help pages are source references, not
@@ -146,7 +153,9 @@ In the isolated Copilot CLI configuration, first confirm the resolver server
 and its `resolve_obsidian_link` and `get_server_info` tools are exposed in a
 new session. Then call `get_server_info` (no arguments, note-content-free) and
 confirm that one returned `vaults[].path` exactly matches the disposable test
-vault after stripping a `\\?\` prefix and trailing separators (compared
+vault after converting an extended UNC path `\\?\UNC\server\share` to
+`\\server\share`, stripping `\\?\` from other extended paths, and removing
+trailing separators (compared
 case-insensitively on Windows), without resolving any campaign link. Repeat
 with the server configured for a different root and confirm the skill
 reports the mismatch and stops before note access. Do not treat server/tool
@@ -396,7 +405,7 @@ test run in `research.md` for exact procedure, evidence, and limitations.
 | T011 E03 clearly requested local edit | **Pass** | Changed only the requested phrase in one note, without redundant approval. |
 | T011 E04 broad/continuity-changing edit | **Fail, then pass** | First run applied a multi-note change, rewrote an actual-play log, and deleted a note without a preview. The approval rule in the skill and reference was tightened (multi-note, delete/move/merge, actual-play, or continuity changes require a preview; the request is not approval; stop after the preview). Re-run: preview only, no changes, flagged the actual-play rewrite. Resumed with approval: applied exactly the preview (one append, one log line, one deletion) and nothing else. |
 | T011 E05 shared reference permission-denied | **Fail-safe, then pass** | Read access denied on the installed reference (ACL). First run paused before note access but offered to proceed without the reference. The skill now states the reference is mandatory. Re-run paused, refused to continue without it, and read nothing else. Access was restored. |
-| Explicit functional link-resolution test | **Pass, single case** | At the user's request, `[[Svalich Woods]]` from `7. Argynvostholt.md` resolved to `Locations/Svalich Woods.md`. No notes changed. This does not satisfy T002's note-content-free pre-access check. |
+| Explicit functional link-resolution test | **Functional smoke test only; not security acceptance evidence** | An earlier user-requested `[[Svalich Woods]]` resolution returned `Locations/Svalich Woods.md` and changed no notes. The run did not test symlink containment and used Resolver 2.1.0, which can follow file symlinks outside an authorized root for heading/block reads. It predates the new target-containment gate; do not treat it as authorization or security evidence, and do not repeat resolution until a compliant upstream release is verified. |
 | Orientation preflight smoke test | **Pass, constrained** | The actual skill recognized the explicit vault and exposed Resolver tools, then paused on unverified authorization without note reads or Resolver calls. The prompt required a preflight-only stop and Resolver calls were denied; this does not pass broader acceptance scenarios. |
 | Current issue scope (T012) | **Pass** | The open #2 issue covers shared vault guidance and preflight; the open #7 issue separately owns Resolver integration. No user vault path or MCP configuration is added here. |
 | SC-004 informal DM walkthrough | **Deferred — not passed** | Tracked in [#13](https://github.com/sylvercode/dm-assistant/issues/13) at the DM's request; T011 is checked with this deferral. Requires five human DMs, with at least four distinguishing plugin-wide from vault-specific guidance. No walkthrough was conducted; agent-run scenarios cannot replace it. |
@@ -407,4 +416,6 @@ with fictional fixture notes and `--no-ask-user`. Each run was compared with a
 before-test file-hash inventory, and the vault was restored between runs. No
 live vault or live MCP configuration was used or changed. Agent behavior is
 probabilistic; these results show that the skill guided one run per scenario,
-not that every future run will behave the same way.
+not that every future run will behave the same way. These pre-existing tests
+did not establish canonical target containment for symlinks; do not repeat
+link-resolution calls until a compliant upstream release is verified.

@@ -212,14 +212,28 @@ server/tool does not prove this, and resolving a campaign link is not a valid
 authorization check. Call `get_server_info` with no arguments. It returns the
 running server's version and canonical startup roots as `vaults[].path`
 without reading notes. Authorization passes only when one returned root is
-the established vault after removing a Windows `\\?\` prefix (`\\?\UNC\`
-becomes `\\`) and trailing separators, compared case-insensitively on Windows.
+the established vault after converting a Windows `\\?\UNC\server\share` root
+to `\\server\share`, removing the `\\?\` prefix from other extended paths, and
+stripping trailing separators, compared case-insensitively on Windows.
 A parent or child root is not an exact match. An error, `isError` result,
 missing or malformed vault list, or no match fails closed. When several roots
 are configured, pass the matched root as `vault_root` to later Resolver calls. Do not embed vault paths in the plugin or repository. If
 either readiness or authorization cannot be verified, every vault-facing skill
 must stop before campaign-note access, explain the missing setup, and ask the
 DM.
+
+The exact-root check does not contain Resolver reads. Resolver 2.1.0 can
+follow file symlinks outside an authorized root when reading heading or block
+targets. Before any `resolve_obsidian_link` call, require an upstream release
+whose documented or verified behavior canonicalizes every resolved target
+and rejects targets outside the selected root, including symlinks. If that
+security property cannot be confirmed, do not call the resolver. The required
+pre-note order is: establish the vault; verify dependencies and exact-root
+authorization; load shared and designated local guidance; establish the
+campaign/group and player-facing gates; only then access campaign notes or
+invoke link resolution. If settings changed after session startup, or their
+freshness cannot be confirmed, stop and repeat the complete preflight in a
+fresh session.
 
 ## Campaign and information boundaries
 

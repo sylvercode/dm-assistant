@@ -176,24 +176,96 @@ vault access remains blocked until exact-vault authorization can be verified;
 see the
 [scripting proposal](docs/vault-guidance-brainstorm.md#powershell-and-predictable-operations).
 
-With GitHub Copilot CLI installed, run these commands from the repository root:
+### Install and configure Obsidian Link Resolver
 
-```shell
-copilot plugin install .
-copilot plugin list
+The Obsidian Link Resolver MCP server is a separate installation; the
+`dm-assistant` plugin does not install or configure it. The API baseline is
+version 2.1.0 or later, but that version alone is not safe for link resolution:
+Resolver 2.1.0 can follow file symlinks outside an authorized root when reading
+heading or block targets. Before resolving any link, require an upstream
+release whose documentation or verified behavior guarantees canonical
+target-containment checks, including symlink targets. This repository has not
+verified such a release; until then, do not call `resolve_obsidian_link`.
+This known symbolic-link limitation and follow-up validation are tracked in
+[sylvercode/obsidian-link-resolver#27](https://github.com/sylvercode/obsidian-link-resolver/issues/27).
+
+Before installing, check the version of any existing
+`obsidian-link-resolver-mcp` executable. Keep it if it already meets both the
+API and target-containment requirements; do not run an installer that would
+replace a compatible installation. If an upgrade is needed, choose a release
+that meets both requirements from the
+[upstream installation instructions](https://github.com/sylvercode/obsidian-link-resolver#mcp-server-install--update)
+(choose the MCP server installer, not the Resolver CLI-only installer).
+On Windows, the PowerShell installer requires PowerShell 7 or later (`pwsh`).
+For example, after setting `ResolverVersion` to a verified compatible release:
+
+```powershell
+$ResolverVersion = '<VERIFIED_COMPATIBLE_VERSION>'
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/sylvercode/obsidian-link-resolver/main/scripts/install-mcp.ps1))) -Version $ResolverVersion
 ```
 
-The plugin should appear as `dm-assistant`. Start a new interactive session
-and check component discovery with `/agent` and `/skills list`; the
-vault-orientation skill should be listed. No Copilot-specific agents are
-currently included. See the feature
-[validation guide](specs/001-shared-vault-guidance/quickstart.md) for the
-resource-loading and exact-vault authorization checks. The skill requires
-Obsidian Link Resolver 2.1.0 or later, configured with your vault as an
-allowed root. Installation or skill discovery alone does not validate
-campaign-note access behavior.
+```shell
+RESOLVER_VERSION='<VERIFIED_COMPATIBLE_VERSION>'
+curl -fsSL https://raw.githubusercontent.com/sylvercode/obsidian-link-resolver/main/scripts/install-mcp.sh | bash -s -- --version "$RESOLVER_VERSION"
+```
 
-Copilot caches installed plugins. Re-run `copilot plugin install .` after changing the local plugin, then start a new session to test it.
+Configure Copilot CLI's user MCP file (`~/.copilot/mcp-config.json`) with its
+local server format. Set `command` to the absolute path of the installed
+`obsidian-link-resolver-mcp` executable so Copilot can launch it regardless of
+whether the installer directory is on Copilot's inherited `PATH`. Replace
+both placeholders with absolute paths on your machine; repeat the `--vault`
+argument and path pair for each additional authorized vault root. Keep this
+personal configuration out of the plugin and any shared repository file.
+
+```json
+{
+  "mcpServers": {
+    "obsidian-link-resolver": {
+      "type": "local",
+      "command": "<ABSOLUTE_PATH_TO_OBSIDIAN_LINK_RESOLVER_MCP>",
+      "args": ["--vault", "<ABSOLUTE_PATH_TO_YOUR_VAULT>"],
+      "tools": ["get_server_info", "resolve_obsidian_link"]
+    }
+  }
+}
+```
+
+Start a fresh Copilot CLI session after configuring the server. In that
+session, use `copilot mcp get obsidian-link-resolver` or `/mcp` to confirm the
+server is available and both `get_server_info` and `resolve_obsidian_link`
+are listed. Then call `get_server_info` without arguments and check that it
+reports version 2.1.0 or later and an authorized root that exactly matches
+the intended vault. This check requires no campaign-note content; server
+availability or tool discovery alone does not establish authorization.
+The exact-root check does not establish that link resolution is safe: do not
+call `resolve_obsidian_link` until the configured release is verified to
+contain resolved targets within the selected vault, including through
+symlinks.
+The setup was verified in an isolated Copilot CLI session with a disposable
+vault using session-scoped MCP configuration; no user/global MCP configuration
+or campaign vault was changed. See the [Resolver MCP contract](specs/004-link-resolver-integration/contracts/resolver-mcp-contract.md)
+for the readiness and authorization rules.
+
+With GitHub Copilot CLI installed, start a session that loads this local plugin
+directory from the repository root:
+
+```shell
+copilot --plugin-dir .
+```
+
+In the session, check component discovery with `/agent` and `/skills list`;
+the vault-orientation skill should be listed. To verify the local plugin is
+loaded, run `copilot --plugin-dir . plugin list`; it should appear under
+**External Plugins (via --plugin-dir)** as `dm-assistant`. When starting from
+another working directory, pass the absolute path to this plugin directory.
+`--plugin-dir` loads a local plugin for that CLI session; it does not install
+or persistently register the plugin. No Copilot-specific agents are currently
+included. See the feature
+[validation guide](specs/001-shared-vault-guidance/quickstart.md) for the
+resource-loading and exact-vault authorization checks. Installation or skill
+discovery alone does not validate campaign-note access behavior.
+
+Start a new session after changing the local plugin to test the updated files.
 
 Contributors can run the synthetic acceptance suite with Pester 6.2.0:
 
@@ -204,9 +276,3 @@ pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1
 The test-only authorization provider is confined to the harness. Passing tests
 does not authorize a real vault or establish installed-client support; see the
 [support matrix and evidence](docs/powershell-runtime-support.md).
-
-To remove the local installation:
-
-```shell
-copilot plugin uninstall dm-assistant
-```

@@ -12,6 +12,13 @@
       "requiredTools": [
         "resolve_obsidian_link",
         "get_server_info"
+      ],
+      "requiredSecurityProperties": [
+        "Before link resolution, verify that the upstream release canonicalizes every resolved target and rejects targets outside the selected authorized root, including file symlinks."
+      ],
+      "knownLimitations": [
+        "Resolver 2.1.0 can follow file symlinks outside an authorized root when reading heading or block targets.",
+        "This repository has not verified an upstream release that satisfies the required target-containment property."
       ]
     }
   ]
