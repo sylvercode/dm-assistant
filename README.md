@@ -186,6 +186,8 @@ heading or block targets. Before resolving any link, require an upstream
 release whose documentation or verified behavior guarantees canonical
 target-containment checks, including symlink targets. This repository has not
 verified such a release; until then, do not call `resolve_obsidian_link`.
+This known symbolic-link limitation and follow-up validation are tracked in
+[sylvercode/obsidian-link-resolver#27](https://github.com/sylvercode/obsidian-link-resolver/issues/27).
 
 Before installing, check the version of any existing
 `obsidian-link-resolver-mcp` executable. Keep it if it already meets both the

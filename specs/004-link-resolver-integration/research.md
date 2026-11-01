@@ -17,6 +17,37 @@
 - Upstream `crates/obsidian-link-resolver-mcp/src/mcp.rs`, including tool registration, `ServerInfo`, `ConfiguredVault`, and startup vault canonicalization.
 - Upstream [Obsidian Link Resolver README](https://github.com/sylvercode/obsidian-link-resolver)
 
+### T016 upstream verification attempt (2026-11-01 UTC)
+
+**Result: blocked; no compliant published release.** GitHub release inspection
+confirmed that `v2.1.0` is still the latest published release. Upstream `main`
+is at `1ad9de58d6242bf3c158419278b1718afe583ea3`, the merge of the server-info
+feature; the recent history contains no newer containment fix.
+
+Release-source inspection confirms the unresolved boundary:
+
+- [`mcp.rs` at v2.1.0](https://github.com/sylvercode/obsidian-link-resolver/blob/v2.1.0/crates/obsidian-link-resolver-mcp/src/mcp.rs)
+  canonicalizes the context and selected root in `select_allowed_vault` and
+  checks context containment. This does not check each resolved target.
+- [`vault.rs` at v2.1.0](https://github.com/sylvercode/obsidian-link-resolver/blob/v2.1.0/crates/obsidian-link-resolver/src/vault.rs)
+  indexes entries using `path.is_file()`, which follows file symlinks, without
+  canonical target-containment validation.
+- [`resolve.rs` at v2.1.0](https://github.com/sylvercode/obsidian-link-resolver/blob/v2.1.0/crates/obsidian-link-resolver/src/resolve.rs)
+  joins the indexed relative target to the vault root and calls
+  `fs::read_to_string` when heading, block, or emplacement content is needed,
+  without first canonicalizing and checking that target against the root.
+
+These are upstream source and release checks, not a new runtime test or
+installed-client acceptance result. No Resolver tool was invoked and no vault
+notes were accessed. At the DM's request, T016 and T009 are now closed with
+explicit deferral to
+[sylvercode/obsidian-link-resolver#27](https://github.com/sylvercode/obsidian-link-resolver/issues/27),
+which tracks the known symbolic-link limitation and remaining validation.
+Neither task is reported as passing acceptance. A future published release
+must establish target containment before content reads, including file
+symlinks, before containment and the five outcome scenarios can pass.
+Link resolution remains blocked until that verification.
+
 ## Decision: Write setup guidance for Copilot CLI's MCP configuration
 
 **Decision**: Describe Copilot CLI configuration, not the upstream README's VS Code or Claude Desktop examples. Use supported Copilot CLI user configuration (`~/.copilot/mcp-config.json`) or repository MCP configuration (`.mcp.json` / `.github/mcp.json`), with the CLI's `"type": "local"` server format and placeholder vault paths. Explain that a fresh session is needed to verify active tools and authorization.
