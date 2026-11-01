@@ -1,4 +1,4 @@
-# Feature Specification: Read-Only Vault Orientation and Inventory
+# /clarFeature Specification: Read-Only Vault Orientation and Inventory
 
 **Feature Branch**: `006-vault-orientation-inventory`
 
@@ -7,6 +7,15 @@
 **Status**: Draft
 
 **Input**: GitHub issue [#8](https://github.com/sylvercode/dm-assistant/issues/8), “Implement read-only vault orientation and inventory”
+
+## Clarifications
+
+### Session 2026-11-01
+
+- Q: Which files and content may the read-only inventory inspect to infer campaign mappings? → A: Inspect folder and file names plus Markdown note contents, including frontmatter; skip dot-prefixed files and folders, attachments, and non-Markdown file contents.
+- Q: How should the workflow determine which vault profile is designated for the current orientation request? → A: Use a profile only when the DM names or selects it for this request.
+- Q: What should make a DM-selected profile invalid or incomplete enough to block note access? → A: Require readable Markdown; block only if task-essential profile guidance is missing or unusable.
+- Q: How should the inventory identify hidden or system files and folders that it must skip? → A: Skip only dot-prefixed entries.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -23,7 +32,7 @@ As a Dungeon Master, I need the assistant to establish the intended vault and lo
 1. **Given** a vault has been identified and all declared required dependencies are available and authorized for it, **When** the DM requests orientation, **Then** the assistant loads the shared reference and any designated local profile before inspecting campaign notes.
 2. **Given** the vault, a required dependency, or required guidance cannot be established, **When** orientation begins, **Then** the assistant explains the blocker and stops before reading campaign notes.
 3. **Given** a required link-resolution service is available but its authorization or required target-containment safeguards cannot be confirmed, **When** orientation is requested, **Then** the assistant stops before campaign-note access or link resolution.
-4. **Given** a profile has been designated for the requested task but is unavailable or invalid, **When** orientation begins, **Then** the assistant explains the profile problem and does not read campaign notes that depend on it.
+4. **Given** a profile has been designated for the requested task but is unavailable, unreadable, or lacks usable guidance essential to that task, **When** orientation begins, **Then** the assistant explains the profile problem and does not read campaign notes that depend on it.
 
 ---
 
@@ -41,8 +50,10 @@ As a Dungeon Master, I need a read-only inventory to identify likely campaign se
 2. **Given** adventures are represented by folders, individual files, or both, **When** the inventory runs, **Then** it reports the observed structure without requiring a migration or a particular layout.
 3. **Given** the vault uses renamed folders or additional Lore sections, **When** the inventory runs, **Then** it reports candidate mappings and preserves the existing names and organization.
 4. **Given** more than one plausible mapping could affect the requested task, **When** the inventory encounters that ambiguity, **Then** it describes the alternatives and asks the DM to decide before relying on a mapping.
-5. **Given** a profile is absent, **When** the DM requests straightforward read-only orientation, **Then** the assistant can report observable candidate mappings without requiring the DM to create a profile first.
+5. **Given** no profile is explicitly designated for the current request, **When** the DM requests straightforward read-only orientation, **Then** the assistant can report observable candidate mappings without inferring a profile from filenames or requiring the DM to create one first.
 6. **Given** an existing profile conflicts with the organization observed during inventory, **When** the conflict affects the requested task, **Then** the assistant identifies both interpretations and asks the DM before relying on either.
+7. **Given** a vault contains Markdown notes, dot-prefixed files and folders, attachments, and other non-Markdown files, **When** the inventory runs, **Then** it inspects folder and file names and Markdown note contents, including frontmatter, but does not inspect dot-prefixed entries, attachments, or non-Markdown file contents.
+8. **Given** a vault contains dot-prefixed entries and non-dot-prefixed Markdown notes marked hidden or system by the operating system, **When** the inventory runs, **Then** it skips the dot-prefixed entries and does not exclude the Markdown notes solely because of their operating-system attributes.
 
 ---
 
@@ -76,7 +87,7 @@ As a Dungeon Master, I need proposed mappings or profile content presented for m
 ### Functional Requirements
 
 - **FR-001**: The orientation workflow MUST obtain the target vault from the user's workspace or explicit input and MUST NOT treat the plugin installation directory as the campaign vault.
-- **FR-002**: Before accessing campaign notes, the workflow MUST establish the target vault, verify every currently declared required dependency and its applicable authorization, load the plugin-owned shared reference, and load any designated vault-local profile. It MUST stop and identify the unmet prerequisite if any required step fails.
+- **FR-002**: Before accessing campaign notes, the workflow MUST establish the target vault, verify every currently declared required dependency and its applicable authorization, load the plugin-owned shared reference, and load any vault-local profile the DM explicitly names or selects for the current request. It MUST stop and identify the unmet prerequisite if any required step fails.
 - **FR-003**: The workflow MUST follow the required dependency-readiness and vault-authorization rules established by Feature 001. It MUST NOT treat service availability or successful link resolution as proof of authorization.
 - **FR-004**: If the link-resolution service is needed, its authorized vault MUST exactly match the target vault, and its supported behavior MUST prevent link resolution from reaching content outside that vault. If either condition cannot be confirmed, the workflow MUST stop before using the service.
 - **FR-005**: The orientation inventory MUST be read-only: it MUST NOT create, modify, move, rename, or delete campaign files, folders, or profile content.
@@ -84,10 +95,11 @@ As a Dungeon Master, I need proposed mappings or profile content presented for m
 - **FR-007**: The inventory MUST support identifying adventures represented by root-level files, individual files within sections, and folders or arcs, while not classifying every root-level note as an adventure.
 - **FR-008**: The inventory MUST allow renamed sections and additional Lore sections to be reported as candidate mappings without changing their names or locations.
 - **FR-009**: When no profile is designated, the workflow MUST support straightforward read-only discovery. It MUST report uncertain mappings as provisional and MUST pause before relying on an ambiguity that affects the task.
-- **FR-010**: If a profile designated for the requested task is unavailable, unreadable, invalid, or incomplete, the workflow MUST identify the issue and stop before reading campaign notes that depend on it. It MUST NOT silently substitute a guessed profile or mapping.
+- **FR-010**: If a profile the DM explicitly names or selects for the requested task is unavailable, unreadable as Markdown, or lacks usable guidance essential to that task, the workflow MUST identify the issue and stop before reading campaign notes that depend on it. It MUST NOT silently substitute a guessed profile or mapping. A fixed profile schema is not required, and guidance irrelevant to the requested task is not required for completeness.
 - **FR-011**: The workflow MUST offer proposed mappings or profile content for DM review and MUST distinguish proposals from confirmed mappings.
 - **FR-012**: The workflow MUST NOT write or update a profile unless the DM explicitly approves that specific change. Any approved profile write MUST be limited to the reviewed content and MUST NOT reorganize the vault or alter campaign notes.
 - **FR-013**: If the profile conflicts with the organization observed during inventory, the workflow MUST identify both interpretations and ask the DM before relying on either interpretation for the requested task.
+- **FR-014**: The inventory MUST inspect folder and file names and Markdown note contents, including frontmatter, to identify candidate mappings. It MUST NOT inspect dot-prefixed files or folders, attachments, or the contents of non-Markdown files. It MUST NOT exclude a non-dot-prefixed entry solely because the operating system marks it hidden or system.
 
 ### Key Entities
 
@@ -106,6 +118,7 @@ As a Dungeon Master, I need proposed mappings or profile content presented for m
 - **SC-003**: In every read-only inventory check, the count of campaign files, folders, and profile content created, modified, moved, renamed, or deleted is zero.
 - **SC-004**: In all three ambiguity checks—a renamed section with multiple plausible roles, a profile that conflicts with observed organization, and multiple plausible mappings for the requested task—the workflow states the alternatives and does not rely on one before DM direction.
 - **SC-005**: In an informal walkthrough with five DMs, at least four correctly identify which parts of a proposed profile are observed and which are inferred; all five can decline the proposal without any vault changes.
+- **SC-006**: In inventory checks containing dot-prefixed entries, non-dot-prefixed files marked hidden or system by the operating system, attachments, and non-Markdown files, the workflow skips dot-prefixed entries, does not exclude non-dot-prefixed entries solely because of operating-system attributes, and does not inspect attachment or non-Markdown file contents.
 
 ## Assumptions
 
