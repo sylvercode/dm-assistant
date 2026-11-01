@@ -44,8 +44,10 @@ profiles, or vault contents to complete an earlier step.
    workspace or explicit input. Do not infer that the plugin directory is the
    vault. If the location or authorization is unclear, name what is missing
    and ask the DM; do not read notes.
-2. **Verify required dependencies and vault authorization separately.** The
-   current required runtime dependency is the Obsidian Link Resolver MCP
+2. **Verify required dependencies and vault authorization separately.** Use a
+   fresh Copilot CLI session for the Resolver preflight. For setup guidance,
+   see the README's [Local Installation section](../../README.md#local-installation).
+   The current required runtime dependency is the Obsidian Link Resolver MCP
    server, minimum compatible release `2.1.0`, exposing both
    `resolve_obsidian_link` and `get_server_info` in the active Copilot CLI
    session. Check the authoritative inventory in the feature specification
@@ -70,6 +72,9 @@ profiles, or vault contents to complete an earlier step.
      configuration value.
    - When several roots are configured, pass the matched root as `vault_root`
      to later Resolver calls.
+   - This Resolver preflight does not verify or authorize a PowerShell runtime
+     handoff. Script-backed operations remain subject to the separate,
+     fail-closed runtime checks above.
 3. **Load guidance.** Read `VAULT-REFERENCE.md` from this skill's own bundled
    resource directory using the client's supported skill-resource mechanism.
    The client documents resources within a skill directory; do not locate this
@@ -89,9 +94,21 @@ profiles, or vault contents to complete an earlier step.
 5. **Access only relevant campaign notes.** Proceed only after steps 1–4
    succeed. Use available note-access tools only within the established,
    authorized vault. Resolve Obsidian links with the required Resolver; surface
-   errors, unresolved targets, and ambiguous destinations rather than
-   guessing. Do not use broad searches or assumed folder roles to compensate
-   for missing guidance or authorization.
+   outcomes as returned and report only details defined by the Resolver
+   contract and present in the result. If expected details are absent, state
+   that they are unavailable; never infer fields, values, or destinations.
+   - **Resolved:** report the returned destination; do not change the note.
+   - **Unresolved:** report that no destination was found; do not guess one.
+   - **Missing subtarget:** report the missing requested subtarget; do not
+     invent a replacement.
+   - **Ambiguous:** report the ambiguity and any contract-defined candidates
+     present; state when candidate details are unavailable and do not select
+     a destination.
+   - **Error or incomplete result:** report the failure and only available
+     contract-defined details; state when details are unavailable and do not
+     present the result as resolved.
+   Do not use broad searches or assumed folder roles to compensate for missing
+   guidance or authorization.
 
 ### No designated local guidance
 

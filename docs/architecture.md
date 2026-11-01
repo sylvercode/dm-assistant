@@ -3,11 +3,15 @@
 DM Assistant uses Agent Plugins 1.0. The repository root is the installable
 plugin directory. The repository includes a portable vault-orientation skill
 and its bundled shared reference, schema, and PowerShell runtime modules.
-The Resolver server is configured separately, and production script-backed
-vault access is not enabled. Feature 001 exercised `get_server_info` and
-cross-skill resource loading in disposable client fixtures. The PowerShell
-runtime has no verified handoff from the active Resolver session; its
-installed-client and cross-platform verification remain outstanding. The
+The Obsidian Link Resolver is an externally installed dependency; its
+user-specific Copilot CLI configuration and authorized vault roots stay
+outside the plugin. Feature 001 verified Resolver 2.1.0, both required tools,
+and exact-vault authorization through `get_server_info` in an isolated
+Copilot CLI installed-client setup using disposable vaults. That client
+evidence does not verify a handoff to the PowerShell runtime. Local PowerShell
+tests use synthetic vaults and test-only authorization; script-backed
+campaign-vault access remains fail-closed. Installed-client verification of
+that runtime and cross-platform verification remain outstanding. The
 orientation skill must fail closed whenever exact-vault authorization cannot
 be established.
 
@@ -65,6 +69,47 @@ The plugin is an installable package, not a campaign vault. Campaign Markdown
 files remain in the user's Obsidian vault, outside the plugin installation.
 Future workflows must obtain the target vault from the user's workspace or
 explicit input, rather than assuming the plugin directory is the vault.
+
+## External Resolver Dependency
+
+The Obsidian Link Resolver MCP server is installed separately from this
+plugin. The DM configures it through Copilot CLI's supported MCP configuration
+with one or more explicitly authorized absolute vault roots. Keep that
+user-specific configuration, including private vault paths, outside the
+plugin and repository; distributed examples must use placeholders. The plugin
+does not bundle the Resolver, register a placeholder server, or own the
+user's authorization settings.
+
+Every vault-facing skill requires Resolver `2.1.0` or later and both
+`resolve_obsidian_link` and `get_server_info` in a fresh Copilot CLI session.
+Before campaign-note access, the skill calls `get_server_info` without
+arguments or note content and requires a usable configured-root list plus an
+exact match for the established vault. Normalize by removing a Windows
+`\\?\` prefix and trailing separators, comparing case-insensitively on
+Windows; parent and child roots are not matches. Server availability, tool
+discovery, and successful link resolution are not authorization evidence.
+If version, tools, root list, or exact match cannot be confirmed, stop before
+campaign-note access. Feature 001's
+[dependency contract](../specs/001-shared-vault-guidance/spec.md#expected-runtime-dependencies-initial-non-exhaustive)
+is authoritative for this preflight.
+
+## Verification Evidence Boundaries
+
+Installed-client checks and local runtime tests establish different things.
+Feature 001's disposable Copilot CLI installed-client run verified Resolver
+readiness and exact-root authorization via `get_server_info`, and exercised
+agent-run acceptance scenarios. This evidence applies to that client setup
+and disposable vaults; it does not prove the PowerShell modules can consume
+the active session's authorization signal.
+
+The local PowerShell acceptance suite validates runtime behavior against
+synthetic vaults. Its test-only authorization provider is not production
+authorization evidence. The production runtime cannot currently verify the
+active Resolver session's version, exposed tools, or exact-vault signal, so
+script-backed vault access must remain fail-closed before profile, guidance,
+or campaign-note reads. Do not treat source inspection, synthetic tests, or
+a copied package fixture as installed-client validation. Installed-client
+runtime handoff and supported-platform verification remain outstanding.
 
 The README describes intended vault conventions. Any skill that reads,
 interprets, creates, or changes campaign material is vault-facing and must be
@@ -144,10 +189,12 @@ production capabilities. Use the
 open questions, and acceptance scenarios.
 
 1. **Establish shared AI guidance.** The canonical reference and
-   vault-orientation skill are present. Installed cross-skill resource lookup
-   and exact-vault authorization through Resolver 2.1.0's `get_server_info`
-   have been verified, and agent-run acceptance scenarios pass. The informal
-   human DM walkthrough (SC-004) is still outstanding. Keep
+   vault-orientation skill are present. Feature 001's disposable Copilot CLI
+   installed-client checks verified cross-skill resource lookup, Resolver
+   2.1.0 readiness, and exact-vault authorization through `get_server_info`;
+   its agent-run acceptance scenarios pass. This does not verify the
+   PowerShell authorization handoff. The informal human DM walkthrough
+   (SC-004) is still outstanding. Keep
    `skills/README.md` as the authoritative inventory and statically audit its
    exact match to skill files and each vault-facing skill's preflight.
 2. **Define the configuration contract.** The proposed `.dmassist.yaml`
@@ -161,11 +208,13 @@ open questions, and acceptance scenarios.
    structured results, path boundaries, previews, and atomic writes exist.
    Windows remains a candidate; macOS/Linux are unsupported and unverified.
 4. **Enable script-backed vault orientation.** Inspection and configuration
-   loading are locally tested. Verify a trusted active-session authorization
-   handoff and installed-client execution before enabling script-backed
-   campaign-note access. Before enabling writes, also resolve the single-note
-   actual-play and continuity classification gap tracked by Feature 003 T048.
-   Keep discovery read-only and report ambiguity rather than restructuring files.
+   loading are locally tested with synthetic vaults; these tests do not
+   establish production authorization. Verify a trusted active-session
+   authorization handoff and installed-client execution before enabling
+   script-backed campaign-note access. Until then, keep it fail-closed.
+   Before enabling writes, also resolve the single-note actual-play and
+   continuity classification gap tracked by Feature 003 T048. Keep discovery
+   read-only and report ambiguity rather than restructuring files.
 5. **Add article authoring and template selection.** Design template contents
    when authoring workflows are ready. Bundle skill defaults, read selected
    templates explicitly, and support DM overrides without overwriting them or

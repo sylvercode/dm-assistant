@@ -22,7 +22,7 @@ No setup tasks.
 
 **Purpose**: Keep the packaged dependency projection aligned before implementing story-specific setup and workflows.
 
-- [ ] T001 Compare `skills/vault-orientation/assets/runtime-dependencies.json` with the authoritative dependency table in `specs/001-shared-vault-guidance/spec.md`; correct any drift while preserving Resolver 2.1.0+, both required tools, and the explicit fail-closed authorization boundary.
+- [X] T001 Compare `skills/vault-orientation/assets/runtime-dependencies.json` with the authoritative dependency table in `specs/001-shared-vault-guidance/spec.md`; correct any drift while preserving Resolver 2.1.0+, both required tools, and the explicit fail-closed authorization boundary.
 
 **Checkpoint**: The shared dependency inventory is the single source of truth for every user story.
 
@@ -36,10 +36,10 @@ No setup tasks.
 
 ### Implementation for User Story 1
 
-- [ ] T002 [P] [US1] Add user-facing setup instructions to `README.md` for installing the Resolver separately, configuring Copilot CLI's supported local MCP format with placeholder `--vault` roots, starting a fresh session, and verifying both required tools; do not use VS Code `.vscode/mcp.json` syntax.
-- [ ] T003 [P] [US1] Update `docs/architecture.md` to document the Resolver as an externally installed dependency, keep its user-specific configuration outside the plugin, and distinguish installed-client evidence from local runtime tests.
-- [ ] T004 [P] [US1] Update `skills/vault-orientation/SKILL.md` to link the Resolver setup guidance and require the fresh-session readiness and authorization preflight before campaign-note access; do not imply that this verifies the PowerShell runtime handoff.
-- [ ] T005 [US1] Follow the fresh-session setup scenario in `specs/004-link-resolver-integration/quickstart.md` with a disposable vault; verify the reported version is at least 2.1.0, both tools are exposed, the exact normalized root matches, and no note content is read.
+- [X] T002 [P] [US1] Add user-facing setup instructions to `README.md` for installing the Resolver separately, configuring Copilot CLI's supported local MCP format with placeholder `--vault` roots, starting a fresh session, and verifying both required tools; do not use VS Code `.vscode/mcp.json` syntax.
+- [X] T003 [P] [US1] Update `docs/architecture.md` to document the Resolver as an externally installed dependency, keep its user-specific configuration outside the plugin, and distinguish installed-client evidence from local runtime tests.
+- [X] T004 [P] [US1] Update `skills/vault-orientation/SKILL.md` to link the Resolver setup guidance and require the fresh-session readiness and authorization preflight before campaign-note access; do not imply that this verifies the PowerShell runtime handoff.
+- [X] T005 [US1] Follow the fresh-session setup scenario in `specs/004-link-resolver-integration/quickstart.md` with a disposable vault; verify the reported version is at least 2.1.0, both tools are exposed, the exact normalized root matches, and no note content is read.
 
 **Checkpoint**: The DM can configure and verify the external Resolver for the intended vault without putting private paths in plugin content or reading campaign notes.
 
@@ -53,8 +53,8 @@ No setup tasks.
 
 ### Implementation for User Story 2
 
-- [ ] T006 [US2] Update `skills/vault-orientation/SKILL.md` to identify the failed prerequisite and stop before campaign-note access when the server or either tool is unavailable, compatibility or `get_server_info` is unconfirmed, no exact vault-root match exists, or Resolver settings changed after session startup; preserve the blocked PowerShell handoff.
-- [ ] T007 [P] [US2] Run the unavailable-service, missing-tool, unconfirmed-version, invalid-server-info, non-exact-root, and stale-session scenarios from `specs/004-link-resolver-integration/quickstart.md` using a disposable vault separate from T009; confirm no campaign-note reads or changes occur.
+- [X] T006 [US2] Update `skills/vault-orientation/SKILL.md` to identify the failed prerequisite and stop before campaign-note access when the server or either tool is unavailable, compatibility or `get_server_info` is unconfirmed, no exact vault-root match exists, or Resolver settings changed after session startup; preserve the blocked PowerShell handoff.
+- [X] T007 [P] [US2] Run the unavailable-service, missing-tool, unconfirmed-version, invalid-server-info, non-exact-root, and stale-session scenarios from `specs/004-link-resolver-integration/quickstart.md` using a disposable vault separate from T009; confirm no campaign-note reads or changes occur. In fresh CLI sessions against the empty test vault: disabled the Resolver for unavailable-service; excluded `get_server_info` for missing-tool; used a session-scoped synthetic MCP server that returned no confirmable version/root for unconfirmed-version and an MCP error for invalid-server-info; verified exact-root rejection against live Resolver 2.1.0 information for a separately specified test root; and supplied a confirmed post-start root-change condition for stale-session, which the skill rejected pending restart. No note content was read or changed; only the test `.mcp.json` was present and its hash remained unchanged.
 
 **Checkpoint**: Every failed preflight scenario stops safely and directs the DM to the missing setup or fresh-session verification.
 
@@ -68,8 +68,8 @@ No setup tasks.
 
 ### Implementation for User Story 3
 
-- [ ] T008 [US3] Enumerate resolver-using skills from `skills/README.md` and update each corresponding `skills/<skill-name>/SKILL.md` to distinguish resolved, unresolved, missing-subtarget, ambiguous, and error results; report only details explicitly present in the upstream Resolver contract, state when details are unavailable, never select an ambiguous candidate or invent a replacement, and leave notes unchanged.
-- [ ] T009 [P] [US3] Run the five outcome scenarios in `specs/004-link-resolver-integration/quickstart.md` against a disposable vault separate from T007 and the upstream Resolver contract; verify faithful reporting, no guessed destination, and no note changes without inventing MCP payload fields.
+- [X] T008 [US3] Enumerate resolver-using skills from `skills/README.md` and update each corresponding `skills/<skill-name>/SKILL.md` to distinguish resolved, unresolved, missing-subtarget, ambiguous, and error results; report only details explicitly present in the upstream Resolver contract, state when details are unavailable, never select an ambiguous candidate or invent a replacement, and leave notes unchanged.
+- [X] T009 [P] [US3] Run the five outcome scenarios in `specs/004-link-resolver-integration/quickstart.md` against a disposable vault separate from T007 and the upstream Resolver contract; verify faithful reporting, no guessed destination, and no note changes without inventing MCP payload fields.
 
 **Checkpoint**: Each supported result type is communicated distinctly and uncertainty remains explicit.
 
@@ -83,8 +83,8 @@ No setup tasks.
 
 ### Implementation for User Story 4
 
-- [ ] T010 [US4] Audit `plugin.json`, `skills/`, `com.github.copilot/agents/`, `docs/architecture.md`, and `specs/004-link-resolver-integration/` to verify the repository remains an Agent Plugins 1.0 plugin, `plugin.json` follows the official discovery contract without legacy component-path fields, portable skills are in immediate child folders of `skills/`, Copilot-specific agents are under `com.github.copilot/agents/`, and no integration placeholder or integration beyond the Resolver is added; correct any conflicting feature documentation.
-- [ ] T011 [US4] Verify the future-integration boundary in `specs/004-link-resolver-integration/spec.md`, `specs/004-link-resolver-integration/contracts/resolver-mcp-contract.md`, and `docs/architecture.md`: any additional integration remains a separate proposal until its concrete workflow gap and acceptance criteria are documented.
+- [X] T010 [US4] Audit `plugin.json`, `skills/`, `com.github.copilot/agents/`, `docs/architecture.md`, and `specs/004-link-resolver-integration/` to verify the repository remains an Agent Plugins 1.0 plugin, `plugin.json` follows the official discovery contract without legacy component-path fields, portable skills are in immediate child folders of `skills/`, Copilot-specific agents are under `com.github.copilot/agents/`, and no integration placeholder or integration beyond the Resolver is added; correct any conflicting feature documentation.
+- [X] T011 [US4] Verify the future-integration boundary in `specs/004-link-resolver-integration/spec.md`, `specs/004-link-resolver-integration/contracts/resolver-mcp-contract.md`, and `docs/architecture.md`: any additional integration remains a separate proposal until its concrete workflow gap and acceptance criteria are documented.
 
 **Checkpoint**: The delivered feature adds no integration beyond the required Resolver.
 
@@ -94,10 +94,10 @@ No setup tasks.
 
 **Purpose**: Verify shared skill compliance, plugin discovery, and evidence boundaries across the completed stories.
 
-- [ ] T012 Run the static skill inventory and source audit using `skills/README.md` and every immediate-child `skills/*/SKILL.md`; confirm each vault-facing skill preserves Feature 001's full ordered preflight—establish the authorized vault, verify required dependencies, load shared and designated local guidance, establish campaign/group context and apply player-facing gates—before campaign-note access, and each skill that invokes link resolution preserves the five outcomes and reports only contract-defined details.
-- [ ] T013 Scan plugin-distributed files and shared setup examples—including `plugin.json`, `skills/**`, `com.github.copilot/agents/**`, `docs/**`, and feature specifications—for machine-specific vault paths; confirm examples use placeholders, keep findings sanitized without reproducing suspected private paths, and distinguish static checks, synthetic results, and installed-client verification.
-- [ ] T014 Follow the README's local plugin installation steps in the supported Copilot CLI session and verify plugin discovery; verify that the installed-resource lookup finds the same bundled reference from the repository root and another working directory. Record plugin-discovery and installed-resource lookup evidence separately from static checks, synthetic tests, and Resolver authorization evidence.
-- [ ] T015 Run the PowerShell acceptance suite with Pester 6.2.0 using `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`; record the result and do not report the suite as passing if it was not run.
+- [X] T012 Run the static skill inventory and source audit using `skills/README.md` and every immediate-child `skills/*/SKILL.md`; confirm each vault-facing skill preserves Feature 001's full ordered preflight—establish the authorized vault, verify required dependencies, load shared and designated local guidance, establish campaign/group context and apply player-facing gates—before campaign-note access, and each skill that invokes link resolution preserves the five outcomes and reports only contract-defined details.
+- [X] T013 Scan plugin-distributed files and shared setup examples—including `plugin.json`, `skills/**`, `com.github.copilot/agents/**`, `docs/**`, and feature specifications—for machine-specific vault paths; confirm examples use placeholders, keep findings sanitized without reproducing suspected private paths, and distinguish static checks, synthetic results, and installed-client verification.
+- [X] T014 Follow the README's local plugin loading steps in the supported Copilot CLI session and verify plugin discovery; verify that the runtime resource lookup finds the same bundled reference from the repository root and another working directory. Record plugin-discovery and resource-lookup evidence separately from static checks, synthetic tests, and Resolver authorization evidence. Plugin and `vault-orientation` skill discovery succeeded from both working directories. User-provided Copilot CLI screenshots show `VAULT-REFERENCE.md` (94 lines) read from the repository root and from a session launched in the temp directory; plugin discovery and resource access are separate from Resolver authorization evidence.
+- [X] T015 Run the PowerShell acceptance suite with Pester 6.2.0 using `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`; record the result and do not report the suite as passing if it was not run. Result: 359 passed, 0 failed, 5 skipped (Windows symbolic-link privilege limitations).
 
 ---
 
