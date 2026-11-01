@@ -1,4 +1,4 @@
-# /clarFeature Specification: Read-Only Vault Orientation and Inventory
+# Feature Specification: Read-Only Vault Orientation and Inventory
 
 **Feature Branch**: `006-vault-orientation-inventory`
 
@@ -13,9 +13,12 @@
 ### Session 2026-11-01
 
 - Q: Which files and content may the read-only inventory inspect to infer campaign mappings? → A: Inspect folder and file names plus Markdown note contents, including frontmatter; skip dot-prefixed files and folders, attachments, and non-Markdown file contents.
-- Q: How should the workflow determine which vault profile is designated for the current orientation request? → A: Use a profile only when the DM names or selects it for this request.
-- Q: What should make a DM-selected profile invalid or incomplete enough to block note access? → A: Require readable Markdown; block only if task-essential profile guidance is missing or unusable.
+- Q: How should the workflow handle the root profile and additional local guidance? → A: Load `.dmassist.yaml` and its designated guidance according to Feature 002; load other Markdown guidance only when the DM selects it for this request.
+- Q: What should make additional DM-selected Markdown guidance invalid or incomplete enough to block note access? → A: Require readable Markdown; block only if task-essential guidance is missing or unusable.
 - Q: How should the inventory identify hidden or system files and folders that it must skip? → A: Skip only dot-prefixed entries.
+- Q: Should guidance designated by `.dmassist.yaml` count as selected, with request-level selection required only for additional guidance? → A: Yes; preserve Feature 002 guidance designation behavior and require request-level selection only for additional guidance.
+- Q: When no local guidance is designated, may inventory read Markdown note contents to infer mappings? → A: No; enumerate folder and file names only and require designated guidance before reading note contents for mappings.
+- Q: May the DM explicitly select a dot-prefixed Markdown file as additional guidance? → A: Yes; load it only as explicitly selected guidance and never discover it by scanning.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -32,7 +35,7 @@ As a Dungeon Master, I need the assistant to establish the intended vault and lo
 1. **Given** a vault has been identified and all declared required dependencies are available and authorized for it, **When** the DM requests orientation, **Then** the assistant loads the shared reference and any designated local profile before inspecting campaign notes.
 2. **Given** the vault, a required dependency, or required guidance cannot be established, **When** orientation begins, **Then** the assistant explains the blocker and stops before reading campaign notes.
 3. **Given** a required link-resolution service is available but its authorization or required target-containment safeguards cannot be confirmed, **When** orientation is requested, **Then** the assistant stops before campaign-note access or link resolution.
-4. **Given** a profile has been designated for the requested task but is unavailable, unreadable, or lacks usable guidance essential to that task, **When** orientation begins, **Then** the assistant explains the profile problem and does not read campaign notes that depend on it.
+4. **Given** additional Markdown guidance has been selected for the requested task but is unavailable, unreadable, or lacks usable guidance essential to that task, **When** orientation begins, **Then** the assistant explains the guidance problem and does not read campaign notes that depend on it.
 
 ---
 
@@ -50,10 +53,12 @@ As a Dungeon Master, I need a read-only inventory to identify likely campaign se
 2. **Given** adventures are represented by folders, individual files, or both, **When** the inventory runs, **Then** it reports the observed structure without requiring a migration or a particular layout.
 3. **Given** the vault uses renamed folders or additional Lore sections, **When** the inventory runs, **Then** it reports candidate mappings and preserves the existing names and organization.
 4. **Given** more than one plausible mapping could affect the requested task, **When** the inventory encounters that ambiguity, **Then** it describes the alternatives and asks the DM to decide before relying on a mapping.
-5. **Given** no profile is explicitly designated for the current request, **When** the DM requests straightforward read-only orientation, **Then** the assistant can report observable candidate mappings without inferring a profile from filenames or requiring the DM to create one first.
+5. **Given** no additional Markdown guidance is selected for the current request, **When** the DM requests straightforward read-only orientation, **Then** the assistant can report observable candidate mappings without inferring extra guidance from filenames or requiring the DM to create a file first.
 6. **Given** an existing profile conflicts with the organization observed during inventory, **When** the conflict affects the requested task, **Then** the assistant identifies both interpretations and asks the DM before relying on either.
-7. **Given** a vault contains Markdown notes, dot-prefixed files and folders, attachments, and other non-Markdown files, **When** the inventory runs, **Then** it inspects folder and file names and Markdown note contents, including frontmatter, but does not inspect dot-prefixed entries, attachments, or non-Markdown file contents.
+7. **Given** applicable configured or request-selected local guidance has been loaded and a vault contains Markdown notes, dot-prefixed files and folders, attachments, and other non-Markdown files, **When** the inventory runs, **Then** it may inspect folder and file names and Markdown note contents, including frontmatter, but does not inspect dot-prefixed entries, attachments, or non-Markdown file contents.
 8. **Given** a vault contains dot-prefixed entries and non-dot-prefixed Markdown notes marked hidden or system by the operating system, **When** the inventory runs, **Then** it skips the dot-prefixed entries and does not exclude the Markdown notes solely because of their operating-system attributes.
+9. **Given** no configured or request-selected local guidance is available, **When** the inventory runs, **Then** it reports candidate mappings from folder and file names only and does not read Markdown note contents.
+10. **Given** the DM explicitly selects a dot-prefixed Markdown file as additional guidance, **When** the guidance preflight runs, **Then** it may load that file as guidance but does not discover it by enumerating inventory entries.
 
 ---
 
@@ -75,7 +80,7 @@ As a Dungeon Master, I need proposed mappings or profile content presented for m
 
 - The intended vault location is missing, unclear, or different from the plugin installation directory.
 - A declared required dependency is unavailable, reports an incompatible or unconfirmed state, or cannot establish authorization for the exact vault.
-- A designated profile is missing, unreadable, invalid, incomplete, or conflicts with observed organization.
+- The optional root profile is missing or invalid; selected additional Markdown guidance is missing, unreadable, incomplete for the requested task, or conflicts with observed organization.
 - A mapping is plausible based on a folder name but is contradicted by its contents or by another plausible interpretation.
 - An adventure is stored as a single file, at the vault root, or in one or more folders; the vault may also contain unrelated root-level notes.
 - A vault contains renamed sections, additional Lore subsections, or no conventional section folders.
@@ -87,24 +92,25 @@ As a Dungeon Master, I need proposed mappings or profile content presented for m
 ### Functional Requirements
 
 - **FR-001**: The orientation workflow MUST obtain the target vault from the user's workspace or explicit input and MUST NOT treat the plugin installation directory as the campaign vault.
-- **FR-002**: Before accessing campaign notes, the workflow MUST establish the target vault, verify every currently declared required dependency and its applicable authorization, load the plugin-owned shared reference, and load any vault-local profile the DM explicitly names or selects for the current request. It MUST stop and identify the unmet prerequisite if any required step fails.
+- **FR-002**: Before accessing campaign notes, the workflow MUST establish the target vault, verify every currently declared required dependency and its applicable authorization, load the plugin-owned shared reference, and follow Feature 002 for loading the optional root `.dmassist.yaml` profile and its designated guidance. It MUST load additional vault-local Markdown guidance only when the DM explicitly names or selects it for the current request. It MUST stop and identify the unmet prerequisite if any required step fails.
 - **FR-003**: The workflow MUST follow the required dependency-readiness and vault-authorization rules established by Feature 001. It MUST NOT treat service availability or successful link resolution as proof of authorization.
 - **FR-004**: If the link-resolution service is needed, its authorized vault MUST exactly match the target vault, and its supported behavior MUST prevent link resolution from reaching content outside that vault. If either condition cannot be confirmed, the workflow MUST stop before using the service.
 - **FR-005**: The orientation inventory MUST be read-only: it MUST NOT create, modify, move, rename, or delete campaign files, folders, or profile content.
 - **FR-006**: The inventory MUST report observed organization and candidate section mappings without requiring the vault to follow a prescribed folder layout or be migrated.
 - **FR-007**: The inventory MUST support identifying adventures represented by root-level files, individual files within sections, and folders or arcs, while not classifying every root-level note as an adventure.
 - **FR-008**: The inventory MUST allow renamed sections and additional Lore sections to be reported as candidate mappings without changing their names or locations.
-- **FR-009**: When no profile is designated, the workflow MUST support straightforward read-only discovery. It MUST report uncertain mappings as provisional and MUST pause before relying on an ambiguity that affects the task.
-- **FR-010**: If a profile the DM explicitly names or selects for the requested task is unavailable, unreadable as Markdown, or lacks usable guidance essential to that task, the workflow MUST identify the issue and stop before reading campaign notes that depend on it. It MUST NOT silently substitute a guessed profile or mapping. A fixed profile schema is not required, and guidance irrelevant to the requested task is not required for completeness.
+- **FR-009**: When no configured or request-selected local guidance is available, the workflow MUST support read-only discovery using folder and file names only; it MUST NOT read campaign-note contents to infer mappings. It MUST report uncertain mappings as provisional and MUST pause before relying on an ambiguity that affects the task. Feature 002 continues to govern the optional root profile and its designated guidance.
+- **FR-010**: If additional Markdown guidance explicitly selected by the DM for the requested task is unavailable, unreadable as Markdown, or lacks usable guidance essential to that task, the workflow MUST identify the issue and stop before reading campaign notes that depend on it. It MUST NOT silently substitute guessed guidance or mappings. A fixed schema is not required, and guidance irrelevant to the requested task is not required for completeness. The optional root profile and its designated guidance MUST follow Feature 002 validation and failure behavior.
 - **FR-011**: The workflow MUST offer proposed mappings or profile content for DM review and MUST distinguish proposals from confirmed mappings.
 - **FR-012**: The workflow MUST NOT write or update a profile unless the DM explicitly approves that specific change. Any approved profile write MUST be limited to the reviewed content and MUST NOT reorganize the vault or alter campaign notes.
 - **FR-013**: If the profile conflicts with the organization observed during inventory, the workflow MUST identify both interpretations and ask the DM before relying on either interpretation for the requested task.
-- **FR-014**: The inventory MUST inspect folder and file names and Markdown note contents, including frontmatter, to identify candidate mappings. It MUST NOT inspect dot-prefixed files or folders, attachments, or the contents of non-Markdown files. It MUST NOT exclude a non-dot-prefixed entry solely because the operating system marks it hidden or system.
+- **FR-014**: The inventory MUST inspect folder and file names to identify candidate mappings. It MAY inspect Markdown note contents, including frontmatter, only after applicable configured or request-selected local guidance has been loaded. It MUST NOT enumerate or inspect dot-prefixed entries as inventory items, attachments, or the contents of non-Markdown files. A dot-prefixed Markdown file explicitly selected as additional guidance may be loaded as guidance, but MUST NOT be discovered by inventory scanning. The inventory MUST NOT exclude a non-dot-prefixed entry solely because the operating system marks it hidden or system.
 
 ### Key Entities
 
 - **Target vault**: The campaign workspace explicitly established for the current orientation request.
-- **Vault profile**: Optional DM-designated guidance that records campaign context or says which existing folders or notes serve particular purposes.
+- **Vault profile**: The optional root `.dmassist.yaml` configuration, validated and loaded under Feature 002; it may record campaign context and mappings for existing folders or notes.
+- **Additional local guidance**: Markdown guidance beyond the optional root profile and its Feature 002-designated guidance, loaded only when the DM explicitly selects it for the current request.
 - **Candidate mapping**: A suggested connection between an observed vault location or content pattern and a campaign section or role, not yet confirmed by the DM.
 - **Orientation inventory**: A read-only report of the vault's observed organization, suggested mappings, and relevant uncertainties.
 - **Link-resolution service**: The separately installed service that finds the destinations of links in Obsidian notes.
@@ -113,17 +119,17 @@ As a Dungeon Master, I need proposed mappings or profile content presented for m
 
 ### Measurable Outcomes
 
-- **SC-001**: In all five prerequisite-failure checks—unclear target vault, unavailable required dependency, unconfirmed vault authorization, unavailable shared reference, and a designated profile that is missing, unreadable, invalid, or incomplete—the workflow identifies the blocker and stops before reading any campaign note that depends on it.
+- **SC-001**: In prerequisite-failure checks—unclear target vault, unavailable required dependency, unconfirmed vault authorization, unavailable shared reference, an invalid root profile when required by Feature 002, or selected additional guidance that is unavailable, unreadable, or lacks task-essential content—the workflow identifies the blocker and stops before reading any campaign note that depends on it.
 - **SC-002**: Across six sample layouts—root-level adventures with an unrelated root note, single-file adventures, folder-based arcs, a mix of files and folders, renamed sections, and additional Lore sections—the inventory identifies the observed organization in all six and never labels the unrelated root note as an adventure.
 - **SC-003**: In every read-only inventory check, the count of campaign files, folders, and profile content created, modified, moved, renamed, or deleted is zero.
 - **SC-004**: In all three ambiguity checks—a renamed section with multiple plausible roles, a profile that conflicts with observed organization, and multiple plausible mappings for the requested task—the workflow states the alternatives and does not rely on one before DM direction.
 - **SC-005**: In an informal walkthrough with five DMs, at least four correctly identify which parts of a proposed profile are observed and which are inferred; all five can decline the proposal without any vault changes.
-- **SC-006**: In inventory checks containing dot-prefixed entries, non-dot-prefixed files marked hidden or system by the operating system, attachments, and non-Markdown files, the workflow skips dot-prefixed entries, does not exclude non-dot-prefixed entries solely because of operating-system attributes, and does not inspect attachment or non-Markdown file contents.
+- **SC-006**: In inventory checks containing dot-prefixed entries, non-dot-prefixed files marked hidden or system by the operating system, attachments, and non-Markdown files, the workflow skips dot-prefixed entries, does not exclude non-dot-prefixed entries solely because of operating-system attributes, and does not inspect attachment or non-Markdown file contents. When no local guidance is designated, it reads no campaign-note contents; when designated guidance is loaded, it may inspect Markdown contents, including frontmatter.
 
 ## Assumptions
 
 - The Obsidian Link Resolver, a separately installed service for finding destinations of Obsidian note links, and any other dependencies declared as required by Feature 001 remain prerequisites for vault-facing note access; orientation does not weaken those requirements.
-- A missing profile is not itself a failure when the requested orientation can be completed through straightforward, read-only discovery.
+- A missing `.dmassist.yaml` profile is not itself a failure when the requested orientation can be completed through read-only, name-based discovery, as specified by Feature 002. Additional Markdown guidance is not inferred from filenames and is loaded only when selected for the current request; an explicitly selected dot-prefixed guidance file is allowed but is not an inventory entry. Without configured or selected local guidance, discovery does not read campaign-note contents.
 - A profile proposal is separate from the inventory. Approval authorizes only the specific reviewed profile change, not restructuring or unrelated campaign edits.
 - The initial orientation targets one explicitly established campaign vault; interpreting multiple campaigns within a shared vault is outside this feature unless separately specified.
 - The inventory reports candidate mappings and material ambiguities; it does not claim that a folder or note role is confirmed solely from its name.
