@@ -92,10 +92,12 @@ No setup tasks.
 
 ## Phase 7: Polish and Cross-Cutting Validation
 
-**Purpose**: Verify shared skill compliance and preserve evidence boundaries across the completed stories.
+**Purpose**: Verify shared skill compliance, plugin discovery, and evidence boundaries across the completed stories.
 
-- [ ] T012 Run the static skill inventory and source audit using `skills/README.md` and every immediate-child `skills/*/SKILL.md`; confirm each vault-facing skill verifies the authoritative dependency contract before campaign-note access and each skill that invokes link resolution preserves the five outcomes and reports only contract-defined details.
+- [ ] T012 Run the static skill inventory and source audit using `skills/README.md` and every immediate-child `skills/*/SKILL.md`; confirm each vault-facing skill preserves Feature 001's full ordered preflight—establish the authorized vault, verify required dependencies, load shared and designated local guidance, establish campaign/group context and apply player-facing gates—before campaign-note access, and each skill that invokes link resolution preserves the five outcomes and reports only contract-defined details.
 - [ ] T013 Scan plugin-distributed files and shared setup examples—including `plugin.json`, `skills/**`, `com.github.copilot/agents/**`, `docs/**`, and feature specifications—for machine-specific vault paths; confirm examples use placeholders, keep findings sanitized without reproducing suspected private paths, and distinguish static checks, synthetic results, and installed-client verification.
+- [ ] T014 Follow the README's local plugin installation steps in the supported Copilot CLI session and verify plugin discovery; verify that the installed-resource lookup finds the same bundled reference from the repository root and another working directory. Record plugin-discovery and installed-resource lookup evidence separately from static checks, synthetic tests, and Resolver authorization evidence.
+- [ ] T015 Run the PowerShell acceptance suite with Pester 6.2.0 using `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`; record the result and do not report the suite as passing if it was not run.
 
 ---
 
@@ -106,7 +108,7 @@ No setup tasks.
 - **Setup (Phase 1)**: No work; the plugin structure and runtime foundation already exist.
 - **Foundational (Phase 2)**: T001 must complete before story implementation so every story uses the authoritative dependency projection.
 - **User Stories (Phases 3–6)**: Depend on T001. User Story 2 and User Story 3 both modify resolver-using skill guidance after User Story 1; complete T004, then T006, then T008 in that order to avoid conflicting edits. User Story 4's audit follows the shared documentation updates.
-- **Polish (Phase 7)**: Depends on the desired user stories being complete.
+- **Polish (Phase 7)**: Depends on the desired user stories being complete. Complete T012 and address any findings before T013; complete T014 after documentation updates and the final privacy scan; then run T015 and record its result.
 
 ### User Story Dependencies
 
@@ -120,7 +122,7 @@ No setup tasks.
 - T002, T003, and T004 can run in parallel after T001 because they modify different files.
 - T005 can begin after T002 and T004 are complete.
 - T007 and T009 can run in parallel after their respective skill updates when each uses its own disposable vault.
-- Run T012 and T013 sequentially after all story work; T012 may require skill guidance corrections, which T013's final privacy/evidence scan must include.
+- Run T012–T015 sequentially after all story work. Address T012 findings before T013's final privacy/evidence scan; then validate plugin discovery and installed-resource lookup against the finalized documentation, followed by the PowerShell acceptance suite.
 
 ---
 

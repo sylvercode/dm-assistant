@@ -16,7 +16,7 @@ Document and validate the separately installed Obsidian Link Resolver integratio
 
 **Storage**: No new storage. Vault roots remain user-configured in the user's MCP client configuration.
 
-**Testing**: Static skill inventory/source audit; review setup examples for private-path placeholders; fresh Copilot CLI session checks for server readiness and exact-vault authorization; representative link-result and blocked-access scenarios. Run the existing PowerShell acceptance suite only if runtime code or its test surfaces change.
+**Testing**: Static skill inventory/source audit; review setup examples for private-path placeholders; fresh Copilot CLI session checks for server readiness and exact-vault authorization; all five link-result outcomes and six blocked-access scenarios; plugin discovery validated by following the README's local installation steps in the supported client; and installed-resource lookup verified from the repository root and another working directory. Record plugin-discovery and installed-resource evidence separately from Resolver readiness and authorization. Run `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1` with Pester 6.2.0 and record the result.
 
 **Target Platform**: GitHub Copilot CLI. Do not infer platform support for script-backed vault access from this integration; that runtime remains fail-closed pending its separate authorization handoff verification.
 
