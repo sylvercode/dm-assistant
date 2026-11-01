@@ -8,6 +8,12 @@
 
 **Input**: User description: https://github.com/sylvercode/dm-assistant/issues/6
 
+## Clarifications
+
+### Session 2026-11-01
+
+- Q: How should article templates mark static fill-in placeholders and identify which ones may be left blank? → A: Use Markdown HTML comments (`<!-- fill-in: required ... -->` or `<!-- fill-in: optional ... -->`); ask the DM for missing required information, while optional placeholders may remain unfilled.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create an article from a plugin default (Priority: P1)
@@ -59,7 +65,7 @@ As a Dungeon Master, I need generated articles to follow the vault's established
 2. **Given** no vault-specific callout convention has been established, **When** the workflow needs to distinguish read-aloud text, DM tips, cautions, or DM-only secrets, **Then** it uses the corresponding proposed native callout defaults from FR-013.
 3. **Given** the workflow creates a handout or read-aloud section, **When** the content is prepared, **Then** it contains no DM-only facts or links that reveal them and is gate-checked immediately before it is handed out or read aloud.
 4. **Given** a template contains a DM-only callout or collapsed section, **When** the workflow prepares player-facing content, **Then** it omits protected facts and revealing links entirely rather than relying on the callout, label, or collapse state to hide them.
-5. **Given** a template contains clearly labeled fill-in placeholders, **When** the workflow has the requested information, **Then** it completes those placeholders with the article content; if required information is missing, it asks the DM rather than inventing it.
+5. **Given** a template contains HTML comment fill-in markers for required or optional information, **When** the workflow has the requested information, **Then** it completes those markers with the article content; if required information is missing, it asks the DM rather than inventing it, while optional markers may remain unfilled.
 6. **Given** a template contains dynamic expressions or community-plugin syntax, **When** the workflow uses it, **Then** it does not execute those expressions or claim they were expanded, and asks the DM how to proceed if their output is needed in the article.
 7. **Given** a template is for tentative preparation, **When** the workflow creates the article, **Then** it does not present prepared events as actual-play history or use them alone to establish character or group knowledge.
 
@@ -91,8 +97,8 @@ As a Dungeon Master, I need article creation to respect the authorized vault, pr
 - A custom type's template is missing or invalid; no built-in default is substituted.
 - The configured template changes after it has been checked or read; the affected operation stops and requires revalidation before proceeding.
 - The installed plugin default cannot be located from the skill's installed resource location; authoring reports the unavailable default rather than searching from the current working directory.
-- A fill-in placeholder requests information absent from the DM's request and available context; the workflow asks for that information rather than guessing or leaving the article appearing complete.
-- A template contains dynamic expressions alongside ordinary fill-in placeholders; only the clearly labeled fill-in placeholders may be completed, while dynamic expressions remain unexecuted.
+- A required fill-in marker (`<!-- fill-in: required ... -->`) requests information absent from the DM's request and available context; the workflow asks for that information rather than guessing or leaving the article appearing complete. An optional marker (`<!-- fill-in: optional ... -->`) may remain unfilled.
+- A template contains dynamic expressions alongside static fill-in markers; only the marked placeholders may be completed, while dynamic expressions remain unexecuted.
 - A template suggests creating a folder, changing permissions, migrating notes, or weakening a safety rule; template text cannot authorize those actions.
 - Tag conventions are absent or conflict; the workflow does not silently impose a campaign-specific vocabulary.
 - A player-facing section's safety cannot be established; the section is withheld until the DM can resolve the issue.
@@ -116,7 +122,7 @@ As a Dungeon Master, I need article creation to respect the authorized vault, pr
 - **FR-012**: The workflow MUST honor established tag and callout conventions from the shared reference and designated vault-local guidance. Tags classify content and MUST NOT be used as a substitute for explanatory prose or treated as a fixed vocabulary when the DM has not established one.
 - **FR-013**: The workflow SHOULD use the proposed native Obsidian callout defaults where relevant: `quote` titled “Read aloud” for player-safe narration, `tip` titled “DM tip” for practical DM advice, `warning` with a specific title for cautions, and `note` titled “DM only” for DM-facing secrets. Designated vault guidance may customize these defaults. Callouts, hidden sections, and collapsed sections MUST NOT be treated as access controls.
 - **FR-014**: Handouts and read-aloud sections MUST be treated as player-facing. The workflow MUST exclude DM-only facts and revealing links from them and MUST gate-check each section immediately before it is handed out or read aloud. Other authoring content remains DM-facing.
-- **FR-015**: The workflow MUST complete clearly labeled, static fill-in placeholders in the selected template using information supplied by the DM or established, authorized campaign context. If required information is missing or ambiguous, it MUST ask the DM rather than inventing an answer or silently presenting an incomplete article as complete. This supported placeholder completion MUST be distinct from executing dynamic expressions, substitutions, or community-plugin syntax; those MUST remain unexecuted and MUST NOT be represented as expanded unless separately supported. If their output is needed, the workflow MUST report the limitation and ask the DM how to proceed.
+- **FR-015**: Static fill-in placeholders in the selected template MUST use Markdown HTML comments of the form `<!-- fill-in: required <description> -->` or `<!-- fill-in: optional <description> -->`. The workflow MUST complete marked placeholders using information supplied by the DM or established, authorized campaign context. If information for a required placeholder is missing or ambiguous, it MUST ask the DM rather than inventing an answer or silently presenting an incomplete article as complete; optional placeholders may remain unfilled. This supported placeholder completion MUST be distinct from executing dynamic expressions, substitutions, or community-plugin syntax; those MUST remain unexecuted and MUST NOT be represented as expanded unless separately supported. If their output is needed, the workflow MUST report the limitation and ask the DM how to proceed.
 - **FR-016**: Article authoring MUST preserve the distinction between tentative preparation and actual-play history, and MUST NOT establish character/group knowledge or world facts from preparation alone.
 - **FR-017**: Only a request to create one new article at a clear destination, without changing existing notes, actual-play records, or established continuity, qualifies as a safe page-local creation that does not require separate approval. Any additional or destructive change, or a change that restructures vault content, alters an actual-play record, or changes established continuity, MUST receive a scoped preview and DM approval before application, following [Feature 001's editing safeguards](../001-shared-vault-guidance/spec.md#functional-requirements).
 - **FR-018**: An unavailable preflight dependency, invalid authoring profile, missing required guidance, unresolved campaign context, or unsafe path MUST stop dependent work before unauthorized campaign-note access or any change. The workflow MUST clearly identify the unmet prerequisite or decision required.
@@ -139,7 +145,7 @@ As a Dungeon Master, I need article creation to respect the authorized vault, pr
 - **SC-004**: In 100% of tested cases involving an unavailable required service, invalid campaign settings, or unclear campaign context, the workflow stops before dependent note access or any write and identifies the blocker.
 - **SC-005**: In 100% of tested destination-conflict cases, existing notes and templates remain unchanged.
 - **SC-006**: In 100% of tested player-facing outputs, DM-only facts and revealing links are absent; presentation labels or hidden sections are never accepted as a substitute for this check.
-- **SC-007**: In every tested template containing clearly labeled fill-in placeholders, the workflow fills those for which it has supported information and asks the DM about required missing information; unsupported dynamic expressions remain unexecuted and are reported when their output is needed.
+- **SC-007**: In every tested template containing marked static fill-in placeholders, the workflow fills those for which it has supported information, asks the DM about required missing information, and permits optional placeholders to remain unfilled; unsupported dynamic expressions remain unexecuted and are reported when their output is needed.
 - **SC-008**: DMs can identify the selected article type, whether its source was a configured template or bundled default, and any reason authoring stopped in one response.
 - **SC-009**: A DM can register and request at least one valid custom article type using its configured template, and the workflow reads that template before creating the requested article.
 
