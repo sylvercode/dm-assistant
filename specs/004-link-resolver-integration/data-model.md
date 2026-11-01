@@ -86,7 +86,7 @@ outcomes; they do not prescribe external response field names or enum values.
 | `unresolved` | No destination was found. Report that status; do not infer or guess a destination. |
 | `missing subtarget` | The link's requested subtarget is absent. Report the missing subtarget; do not substitute a guessed one. |
 | `ambiguous` | Multiple destinations may match. Convey available candidate information without selecting one. |
-| `error` | Resolution failed or the result cannot be interpreted reliably. Report the failure and available details without guessing a destination. |
+| `error` | Resolution failed or the result cannot be interpreted reliably. Report the failure and only details defined by the Resolver contract and present in the result; identify unavailable details without guessing a destination. |
 
 The resolver's exact result representation and any available candidate or
 diagnostic fields are contract-delegated. If a response is incomplete or
@@ -158,6 +158,7 @@ cannot be classified confidently as one of these outcomes, treat it as
 - A blocked or unconfirmed preflight stops the operation before
   `resolving`; the link-resolution tool must not be used to bypass the gate.
 - Only a current `ready and authorized` preflight permits a request.
-- The terminal outcome is reported faithfully with available details and no
-  guessed destination. It does not itself mutate notes or authorize future
-  operations.
+- The terminal outcome is reported faithfully with only details defined by
+  the Resolver contract and present in the result. Identify unavailable
+  details; do not guess a destination. The outcome does not itself mutate
+  notes or authorize future operations.

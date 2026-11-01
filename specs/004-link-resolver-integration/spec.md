@@ -55,7 +55,7 @@ As a Dungeon Master, I can see whether a requested link resolved, was unresolved
 2. **Given** a link cannot be found, **When** it is resolved, **Then** the skill reports that it is unresolved and does not guess a destination.
 3. **Given** a link's requested subtarget is missing, **When** it is resolved, **Then** the skill reports the missing subtarget and does not guess a replacement.
 4. **Given** more than one destination matches a link, **When** it is resolved, **Then** the skill reports the ambiguity and available candidates without selecting one.
-5. **Given** link resolution fails, **When** it is resolved, **Then** the skill reports the failure and available details without guessing a destination.
+5. **Given** link resolution fails, **When** it is resolved, **Then** the skill reports the failure and only details defined by the Resolver contract and present in the result; it identifies unavailable details without guessing a destination.
 
 ---
 
@@ -91,7 +91,7 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 - **FR-004**: Resolver readiness and authorization MUST follow the required capabilities, supported compatibility, and exact-vault rules in Feature 001's [dependency contract](../001-shared-vault-guidance/spec.md#expected-runtime-dependencies-initial-non-exhaustive).
 - **FR-005**: Authorization MUST be established without reading campaign-note content. The established vault MUST exactly match an authorized vault root; a parent or child root MUST NOT count as a match. Link resolution MUST NOT be used as evidence of authorization.
 - **FR-006**: If the service, any required capability, its compatibility, or authorization cannot be confirmed according to the dependency contract, the vault-facing skill MUST explain the failed prerequisite and stop before campaign-note access or changes.
-- **FR-007**: A skill using link resolution MUST accurately distinguish a resolved destination, an unresolved link, a missing requested subtarget, multiple possible destinations, and a resolution failure. It MUST convey available details without guessing a destination.
+- **FR-007**: A skill using link resolution MUST accurately distinguish a resolved destination, an unresolved link, a missing requested subtarget, multiple possible destinations, and a resolution failure. It MUST report only details defined by the Resolver contract and present in the result; it MUST identify unavailable details without guessing a destination.
 - **FR-008**: If resolver settings change after the current client session starts, a vault-facing skill MUST treat that session's settings as unconfirmed, request a fresh session and verification, and stop before campaign-note access.
 - **FR-009**: This feature MUST NOT introduce integrations beyond the required link-resolution service. Any additional hook, agent, or service MUST remain a separate proposal until a concrete workflow gap and its acceptance criteria are documented.
 - **FR-010**: Feature 001's dependency contract MUST be the authoritative source for the service's supported compatibility, required capabilities, readiness, authorization, and unavailable behavior. Every vault-facing skill MUST follow that same contract before campaign-note access.
@@ -108,7 +108,7 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 
 - **SC-001**: In all four documented setup checks—fresh-session availability, required capability readiness, authorization of the intended vault, and exclusion of private vault paths from the plugin—the DM can complete setup without reading campaign notes.
 - **SC-002**: Every vault-facing skill listed in the current skills inventory confirms the same required dependency and vault-authorization contract before campaign-note access.
-- **SC-003**: In each of the four blocked scenarios—service unavailable, required capability or compatibility unconfirmed, authorization not confirmed, and stale session settings—the skill stops before any campaign-note read or change.
+- **SC-003**: In each of the six blocked scenarios—service unavailable, a required tool unavailable, compatibility or version unconfirmed, `get_server_info` failed or returned no usable vault list, no exact authorized-root match, and stale resolver settings in the active session—the skill explains the unmet prerequisite and stops before any campaign-note read or change.
 - **SC-004**: In each of the five link-resolution outcomes—resolved, unresolved, missing subtarget, ambiguous, and error—the skill reports the correct outcome and never guesses a destination.
 - **SC-005**: This feature introduces zero additional integrations; any later integration is considered only with a separately documented workflow gap and acceptance criteria.
 

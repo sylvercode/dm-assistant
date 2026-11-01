@@ -93,16 +93,18 @@ notes in the stale session.
 ## Resolution result handling
 
 For each `resolve_obsidian_link` request, preserve and communicate the
-Resolver's reported outcome and available relevant details. The skill MUST
-distinguish all five outcomes:
+Resolver's reported outcome and only details defined by the upstream contract
+and present in the result. If expected details are absent, state that they are
+unavailable; do not infer fields or values. The skill MUST distinguish all
+five outcomes:
 
 | Outcome | Required handling |
 |---|---|
 | Resolved | Report the destination returned by the Resolver; do not change the note. |
 | Unresolved | Report that no destination was found; do not guess one. |
 | Missing subtarget | Report that the requested subtarget is missing; do not invent a replacement. |
-| Ambiguous | Report the ambiguity and available candidates; do not choose a destination. |
-| Error | Report the resolution failure and available relevant details; do not guess a destination. |
+| Ambiguous | Report the ambiguity and contract-defined candidates present in the result; state when candidate details are unavailable and do not choose a destination. |
+| Error | Report the resolution failure and contract-defined details present in the result; state when details are unavailable and do not guess a destination. |
 
 Do not silently convert one outcome into another, suppress ambiguity or
 failure, or present an unconfirmed candidate as established fact.

@@ -68,7 +68,7 @@ No setup tasks.
 
 ### Implementation for User Story 3
 
-- [ ] T008 [US3] Update `skills/vault-orientation/SKILL.md` to distinguish resolved, unresolved, missing-subtarget, ambiguous, and error results; report available relevant details, never select an ambiguous candidate or invent a replacement, and leave notes unchanged.
+- [ ] T008 [US3] Enumerate resolver-using skills from `skills/README.md` and update each corresponding `skills/<skill-name>/SKILL.md` to distinguish resolved, unresolved, missing-subtarget, ambiguous, and error results; report only details explicitly present in the upstream Resolver contract, state when details are unavailable, never select an ambiguous candidate or invent a replacement, and leave notes unchanged.
 - [ ] T009 [P] [US3] Run the five outcome scenarios in `specs/004-link-resolver-integration/quickstart.md` against a disposable vault separate from T007 and the upstream Resolver contract; verify faithful reporting, no guessed destination, and no note changes without inventing MCP payload fields.
 
 **Checkpoint**: Each supported result type is communicated distinctly and uncertainty remains explicit.
@@ -83,7 +83,7 @@ No setup tasks.
 
 ### Implementation for User Story 4
 
-- [ ] T010 [US4] Audit `plugin.json`, `docs/architecture.md`, and `specs/004-link-resolver-integration/` to verify the Resolver is the only integration in scope and no placeholder MCP server, endpoint, hook, or agent is added; correct any conflicting feature documentation.
+- [ ] T010 [US4] Audit `plugin.json`, `skills/`, `com.github.copilot/agents/`, `docs/architecture.md`, and `specs/004-link-resolver-integration/` to verify the repository remains an Agent Plugins 1.0 plugin, `plugin.json` follows the official discovery contract without legacy component-path fields, portable skills are in immediate child folders of `skills/`, Copilot-specific agents are under `com.github.copilot/agents/`, and no integration placeholder or integration beyond the Resolver is added; correct any conflicting feature documentation.
 - [ ] T011 [US4] Verify the future-integration boundary in `specs/004-link-resolver-integration/spec.md`, `specs/004-link-resolver-integration/contracts/resolver-mcp-contract.md`, and `docs/architecture.md`: any additional integration remains a separate proposal until its concrete workflow gap and acceptance criteria are documented.
 
 **Checkpoint**: The delivered feature adds no integration beyond the required Resolver.
@@ -94,8 +94,8 @@ No setup tasks.
 
 **Purpose**: Verify shared skill compliance and preserve evidence boundaries across the completed stories.
 
-- [ ] T012 Run the static skill inventory and source audit using `skills/README.md` and every immediate-child `skills/*/SKILL.md`; confirm each vault-facing skill verifies the authoritative dependency contract before campaign-note access.
-- [ ] T013 Review `specs/004-link-resolver-integration/quickstart.md`, `README.md`, and `docs/architecture.md` for private vault paths and unsupported production claims; keep static checks, synthetic results, and installed-client verification clearly distinguished.
+- [ ] T012 Run the static skill inventory and source audit using `skills/README.md` and every immediate-child `skills/*/SKILL.md`; confirm each vault-facing skill verifies the authoritative dependency contract before campaign-note access and each skill that invokes link resolution preserves the five outcomes and reports only contract-defined details.
+- [ ] T013 Scan plugin-distributed files and shared setup examples—including `plugin.json`, `skills/**`, `com.github.copilot/agents/**`, `docs/**`, and feature specifications—for machine-specific vault paths; confirm examples use placeholders, keep findings sanitized without reproducing suspected private paths, and distinguish static checks, synthetic results, and installed-client verification.
 
 ---
 
@@ -105,14 +105,14 @@ No setup tasks.
 
 - **Setup (Phase 1)**: No work; the plugin structure and runtime foundation already exist.
 - **Foundational (Phase 2)**: T001 must complete before story implementation so every story uses the authoritative dependency projection.
-- **User Stories (Phases 3–6)**: Depend on T001. User Story 2 and User Story 3 both modify `skills/vault-orientation/SKILL.md` after User Story 1; complete T004, then T006, then T008 in that order to avoid conflicting edits. User Story 4's audit follows the shared documentation updates.
+- **User Stories (Phases 3–6)**: Depend on T001. User Story 2 and User Story 3 both modify resolver-using skill guidance after User Story 1; complete T004, then T006, then T008 in that order to avoid conflicting edits. User Story 4's audit follows the shared documentation updates.
 - **Polish (Phase 7)**: Depends on the desired user stories being complete.
 
 ### User Story Dependencies
 
 - **User Story 1 (P1)**: Starts after T001; implementation tasks T002–T004 touch separate files and can proceed in parallel. T005 validates the completed setup instructions and skill preflight.
 - **User Story 2 (P1)**: Starts after T004 because it extends the same skill guidance; T007 follows T006.
-- **User Story 3 (P2)**: Starts after T006 because it further updates the same skill; T009 follows T008.
+- **User Story 3 (P2)**: Starts after T006 because it further updates resolver-using skill guidance; T009 follows T008.
 - **User Story 4 (P3)**: Starts after the setup documentation in T003 and is finalized after the story changes.
 
 ### Parallel Opportunities
@@ -120,7 +120,7 @@ No setup tasks.
 - T002, T003, and T004 can run in parallel after T001 because they modify different files.
 - T005 can begin after T002 and T004 are complete.
 - T007 and T009 can run in parallel after their respective skill updates when each uses its own disposable vault.
-- Run T012 and T013 sequentially because both inspect shared documentation surfaces and T013 may require edits.
+- Run T012 and T013 sequentially after all story work; T012 may require skill guidance corrections, which T013's final privacy/evidence scan must include.
 
 ---
 

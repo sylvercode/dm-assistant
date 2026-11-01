@@ -68,16 +68,17 @@ before the next checks.
 
 Using only the disposable vault and valid preflight evidence, exercise a
 controlled input for each Resolver outcome. Confirm that the skill reports
-the outcome and available relevant details without changing notes or guessing
-a destination.
+the outcome and only details defined by the Resolver contract and present in
+the result; it identifies unavailable details without changing notes or
+guessing a destination.
 
 | Resolver outcome | Expected result |
 |---|---|
 | Resolved | Report the Resolver's destination. |
 | Unresolved | Report that no destination was found; do not guess. |
 | Missing subtarget | Report the missing requested subtarget; do not substitute another. |
-| Ambiguous | Report the ambiguity and available candidates; do not select one. |
-| Error | Report the failure and available relevant details; do not present it as resolved. |
+| Ambiguous | Report the ambiguity and contract-defined candidates present in the result; state when candidate details are unavailable and do not select one. |
+| Error | Report the failure and contract-defined details present in the result; state when details are unavailable and do not present it as resolved. |
 
 The Resolver's upstream documentation defines the exact tool arguments and
 response representation. Do not invent test payload fields or treat the
