@@ -80,18 +80,28 @@ plugin and repository; distributed examples must use placeholders. The plugin
 does not bundle the Resolver, register a placeholder server, or own the
 user's authorization settings.
 
-Every vault-facing skill requires Resolver `2.1.0` or later and both
+Every vault-facing skill requires Resolver API compatibility `2.1.0` or later and both
 `resolve_obsidian_link` and `get_server_info` in a fresh Copilot CLI session.
 Before campaign-note access, the skill calls `get_server_info` without
 arguments or note content and requires a usable configured-root list plus an
-exact match for the established vault. Normalize by removing a Windows
-`\\?\` prefix and trailing separators, comparing case-insensitively on
-Windows; parent and child roots are not matches. Server availability, tool
-discovery, and successful link resolution are not authorization evidence.
-If version, tools, root list, or exact match cannot be confirmed, stop before
-campaign-note access. Feature 001's
+exact match for the established vault. Normalize Windows extended UNC roots
+by converting `\\?\UNC\server\share` to `\\server\share`; remove the `\\?\`
+prefix from other extended paths and strip trailing separators. Compare
+case-insensitively on Windows; parent and child roots are not matches. Server
+availability, tool discovery, and successful link resolution are not
+authorization evidence. If version, tools, root list, or exact match cannot
+be confirmed, stop before campaign-note access. Feature 001's
 [dependency contract](../specs/001-shared-vault-guidance/spec.md#expected-runtime-dependencies-initial-non-exhaustive)
 is authoritative for this preflight.
+
+Exact-root authorization does not by itself confine Resolver reads. Resolver
+2.1.0 can follow a file symlink outside an authorized root while reading a
+heading or block target. Before calling `resolve_obsidian_link`, require an
+upstream release whose documented or verified behavior canonicalizes every
+resolved target and rejects targets outside the selected root, including
+symlinks. No such release has been verified here; link resolution must remain
+blocked until that security property is confirmed. Pass the exact matched
+root as `vault_root` whenever multiple roots are configured.
 
 ## Verification Evidence Boundaries
 

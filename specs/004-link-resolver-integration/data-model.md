@@ -26,7 +26,8 @@ vault-facing skill.
 | Field | Meaning and constraint |
 | --- | --- |
 | `dependencyIdentity` | Obsidian Link Resolver; a separately installed MCP server, not part of the plugin. |
-| `compatibleVersion` | Version `2.1.0` or later, per Feature 001. If compatibility cannot be confirmed, readiness is unconfirmed. |
+| `compatibleVersion` | API baseline `2.1.0` or later, per Feature 001. This alone does not establish safe resolution; a verified upstream target-containment guarantee is also required. |
+| `targetContainmentState` | Whether the configured upstream release is verified to canonicalize every resolved target and reject targets outside the selected root, including symlinks. Unconfirmed means link resolution is blocked. |
 | `requiredTools` | Both `resolve_obsidian_link` and `get_server_info` must be available in the supported client session. Exact MCP payload details are delegated to the resolver contract. |
 | `configurationRoots` | One or more absolute, user-authorized vault roots supplied to the resolver with `--vault`. Vault-specific paths are not plugin configuration or distributed plugin data. |
 | `configurationSession` | Client session in which resolver settings are active and checked. Settings changed after session startup require a fresh session and new verification. |
@@ -52,7 +53,8 @@ vault or establish a trusted handoff to another runtime.
 | Field | Meaning and constraint |
 | --- | --- |
 | `sessionIdentity` | The supported client session whose active resolver settings and tools were checked. |
-| `compatibilityState` | Confirmed compatible (`2.1.0+`) or unconfirmed. |
+| `compatibilityState` | Confirmed API-compatible (`2.1.0+`) or unconfirmed. |
+| `targetContainmentState` | Verified or unconfirmed; only verified permits invoking `resolve_obsidian_link`. Resolver 2.1.0 can follow file symlinks outside an authorized root when reading heading or block targets, and no fixing release is verified here. |
 | `toolAvailability` | Availability of both required tools; partial availability is not ready. |
 | `serverInfoState` | Whether `get_server_info` completed and provided a usable vault list, or failed/was unusable. Its arguments and payload structure remain resolver-contract delegated. |
 | `reportedCanonicalRoots` | The canonical `vaults[].path` values returned by `get_server_info`, normalized according to Feature 001. Raw response shape is contract-delegated. |
@@ -63,13 +65,16 @@ This evidence is not a campaign-note record and contains no note content.
 
 ### Link-resolution request
 
-One request to resolve a user- or task-specified Obsidian link after the
-preflight gate succeeds.
+One request to resolve a user- or task-specified Obsidian link only after the
+complete ordered pre-note sequence and target-containment gate succeed. The
+resolver may read target-note content.
 
 | Field | Meaning and constraint |
 | --- | --- |
 | `linkReference` | The requested link input passed to `resolve_obsidian_link`; its exact shape is delegated to the resolver contract. |
 | `taskVault` | The already-established and authorized vault against which resolution is requested. |
+| `matchedVaultRoot` | The exact canonical root returned by `get_server_info` that matched `taskVault`. Pass this as `vault_root`, including when multiple roots are configured; do not allow selection from context alone. |
+| `targetContainmentEvidence` | Verified upstream protection that canonicalizes resolved targets and rejects targets outside `matchedVaultRoot`, including file symlinks. Required before invocation. |
 | `preflightEvidence` | The successful, current-session readiness and exact-vault authorization evidence required before the call. |
 
 This conceptual request does not prescribe additional MCP arguments or
@@ -102,11 +107,17 @@ cannot be classified confidently as one of these outcomes, treat it as
   authorized only by an exact normalized match between its independently
   established vault and one returned canonical `vaults[].path`.
 - A parent or child root is not an exact match. Path normalization follows
-  Feature 001: remove a Windows `\\?\` prefix and trailing separators, and
+  Feature 001: convert Windows `\\?\UNC\server\share` to
+  `\\server\share`, remove `\\?\` from other extended paths and trailing separators, and
   compare case-insensitively on Windows. Do not broaden the comparison into
   containment, link resolution, or another inferred relationship.
 - A preflight evidence record is scoped to the task vault and active client
   session. It precedes and gates any link-resolution request.
+- Resolver calls can read target content. Before any such call, require
+  verified canonical target containment within the exact matched root,
+  including symlink targets; pass that exact root as `vault_root`. Exact-root
+  authorization alone is insufficient. No compliant release is verified
+  here, so link resolution remains blocked.
 - A resolution outcome belongs to one request and does not change note
   contents, authorize a vault, or silently establish another destination.
 
@@ -114,22 +125,26 @@ cannot be classified confidently as one of these outcomes, treat it as
 
 1. Establish the intended task vault independently and without campaign-note
    access.
-2. Before any campaign-note access, confirm resolver compatibility, both
-   required tools, and a usable `get_server_info` result; then confirm the
-   exact normalized match for the established task vault.
-3. `get_server_info` is the authorization check. Service presence,
+2. Confirm Resolver compatibility, both required tools, and a usable
+   `get_server_info` result; then confirm the exact normalized root match.
+3. Load shared and designated local guidance, establish campaign/group
+   context, and apply player-facing gates before campaign-note access.
+4. `get_server_info` is the authorization check. Service presence,
    `resolve_obsidian_link`, and any resolution result are not authorization.
-4. If the service or either tool is unavailable, compatibility is
+5. If the service or either tool is unavailable, compatibility is
    unconfirmed, `get_server_info` fails or has no usable vault list, or no
    exact root match exists, fail closed. Explain the unmet prerequisite and
    stop before campaign-note access or changes.
-5. A changed resolver setting makes the active session's settings
-   unconfirmed. Require a fresh session and repeat readiness and authorization
-   checks before note access.
-6. Preserve the five outcome distinctions. Do not guess, silently choose an
+6. A changed resolver setting or unknown freshness makes the active session's
+   settings unconfirmed. Require a fresh session and repeat readiness and
+   authorization checks before note access.
+7. Before a resolver call, require verified target-containment protection,
+   including symlink targets, and pass the exact matched root as
+   `vault_root`. If this cannot be confirmed, do not call the resolver.
+8. Preserve the five outcome distinctions. Do not guess, silently choose an
    ambiguous candidate, substitute a missing subtarget, or present an error
    as a resolved destination.
-7. Keep external MCP field and payload definitions delegated to the compatible
+9. Keep external MCP field and payload definitions delegated to the compatible
    resolver contract; do not turn conceptual fields here into a fabricated
    wire schema.
 
@@ -139,11 +154,13 @@ cannot be classified confidently as one of these outcomes, treat it as
 
 `unconfirmed` → `checking` → `ready and authorized` or `blocked`.
 
-- `checking` evaluates version compatibility and availability of both tools,
+- `checking` evaluates API compatibility and availability of both tools,
   obtains note-content-free server information, and compares its canonical
   roots with the established task vault.
 - Transition to `ready and authorized` only if all checks succeed and the
   exact normalized vault match is present.
+- Target-containment protection is a separate required gate for link
+  resolution; `ready and authorized` alone does not permit a resolver call.
 - Any failed, missing, or uncertain prerequisite transitions to `blocked`;
   no campaign-note access or changes may occur from that state.
 - A settings change, session change, or loss of required evidence invalidates
@@ -152,12 +169,14 @@ cannot be classified confidently as one of these outcomes, treat it as
 
 ### Link-resolution operation
 
-`not started` → `preflight` → `resolving` → one terminal outcome:
+`not started` → `ordered pre-note gates` → `target-containment gate` →
+`resolving` → one terminal outcome:
 `resolved`, `unresolved`, `missing subtarget`, `ambiguous`, or `error`.
 
 - A blocked or unconfirmed preflight stops the operation before
   `resolving`; the link-resolution tool must not be used to bypass the gate.
-- Only a current `ready and authorized` preflight permits a request.
+- Only a current `ready and authorized` preflight plus verified target
+  containment permits a request. Pass the exact matched root as `vault_root`.
 - The terminal outcome is reported faithfully with only details defined by
   the Resolver contract and present in the result. Identify unavailable
   details; do not guess a destination. The outcome does not itself mutate

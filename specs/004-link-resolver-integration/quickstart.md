@@ -11,7 +11,7 @@ normative readiness, authorization, privacy, and outcome rules, and the
 ## Prerequisites
 
 - GitHub Copilot CLI installed and available.
-- Obsidian Link Resolver MCP release `2.1.0` or later, installed separately
+- Obsidian Link Resolver MCP API baseline `2.1.0` or later, installed separately
   using the [upstream instructions](https://github.com/sylvercode/obsidian-link-resolver).
 - A disposable vault directory with no campaign content.
 - A vault-facing skill/plugin installation containing the changes being
@@ -38,13 +38,24 @@ vault paths into repository files, shared examples, or test output.
    reported version is `2.1.0` or later and that a returned canonical
    `vaults[].path` exactly matches the disposable vault under Feature 001's
    normalization rules. This call must not read note content.
-5. Confirm the vault-facing skill proceeds to link resolution only after this
-   check succeeds. Record only pass/fail and sanitized diagnostic details;
+5. Confirm the skill then loads the shared reference and any designated local
+   guidance, establishes the campaign/group and player-facing context, and
+   resolves ambiguity before campaign-note access.
+6. Do not call `resolve_obsidian_link` unless the configured upstream release
+   is verified to canonicalize every target and reject targets outside the
+   selected root, including symlinks. Resolver 2.1.0 can follow a file
+   symlink outside an authorized root when reading heading or block targets;
+   this repository has not verified a release with a fix. When resolution is
+   permitted, pass the exact root that matched as `vault_root`, including
+   when multiple roots are configured.
+7. Record only pass/fail and sanitized diagnostic details;
    avoid copying private paths or note content into test reports.
 
-**Expected result:** A fresh session reports a compatible Resolver, exposes
-both required tools, and confirms an exact authorized-root match. Server
-availability or successful link resolution alone does not satisfy this check.
+**Expected result:** A fresh session reports an API-compatible Resolver,
+exposes both required tools, and confirms an exact authorized-root match.
+Server availability or successful link resolution alone does not satisfy
+this check. If target containment has not been verified, link resolution
+remains blocked even when the API and exact-root checks pass.
 
 ## Verify fail-closed cases
 
@@ -60,13 +71,15 @@ campaign-note access or changes.
 | No exact authorized root | Configure a different test root, or only a parent/child of the intended test vault. | Stop before note access; do not treat containment or a resolved link as authorization. |
 | Stale session | Change the configured roots after the client session starts. | Treat existing evidence as unconfirmed, request a fresh session, and do not access notes. |
 | Invalid server information | Make `get_server_info` fail or return no usable root list. | Stop before note access; report that authorization could not be confirmed. |
+| Target containment unverified | Use a Resolver release without a verified guarantee that canonical targets, including symlinks, remain within the selected root. | Do not call `resolve_obsidian_link`; report the security prerequisite and stop. |
 
 Restore the valid disposable-vault configuration and create a fresh session
 before the next checks.
 
 ## Verify resolution outcomes
 
-Using only the disposable vault and valid preflight evidence, exercise a
+Using only the disposable vault and valid preflight evidence, and only after
+the target-containment security requirement above is verified, exercise a
 controlled input for each Resolver outcome. Confirm that the skill reports
 the outcome and only details defined by the Resolver contract and present in
 the result; it identifies unavailable details without changing notes or

@@ -19,7 +19,10 @@ for either source.
 ## Dependency and compatibility
 
 - **Dependency:** Obsidian Link Resolver MCP server.
-- **Minimum compatible release:** `2.1.0`.
+- **API baseline:** `2.1.0` or later. This alone is not sufficient for
+  resolution safety: Resolver 2.1.0 can follow file symlinks outside an
+  authorized root when reading heading or block targets. No upstream release
+  with verified target-containment protection has been confirmed here.
 - **Required tools:** `get_server_info` and `resolve_obsidian_link`.
 - A skill MUST confirm both tools are available in a fresh supported GitHub
   Copilot CLI session before any campaign-note access. A connected server or
@@ -59,16 +62,34 @@ Before any campaign-note read or change, the vault-facing skill MUST:
 1. Establish the intended vault from the user's workspace or explicit input;
    never assume the plugin directory is the vault.
 2. Confirm in a fresh Copilot CLI session that the Resolver is available and
-   both required tools are exposed.
+   both required tools are exposed, with API compatibility at the `2.1.0`
+   baseline.
 3. Call `get_server_info` without arguments and without supplying or reading
    note content. Confirm that the reported running version is `2.1.0` or later
    and that the result contains a usable configured-vault list.
 4. Compare the established vault with the returned canonical `vaults[].path`
-   values. A match is exact after removing a Windows `\\?\` prefix and trailing
-   separators; comparison is case-insensitive on Windows. A parent or child
-   path is not a match. At least one exact root match is required.
-5. Only after every preflight check succeeds, use `resolve_obsidian_link` for
-   the requested link-resolution task.
+   values. A match is exact after converting `\\?\UNC\server\share` to
+   `\\server\share`, removing `\\?\` from other extended paths, and stripping
+   trailing separators; comparison is case-insensitive on Windows. A parent
+   or child path is not a match. At least one exact root match is required.
+5. Load the plugin-owned shared reference and any DM-designated local
+   guidance. Establish the campaign/group context, identify player-facing
+   output, and resolve consequential ambiguity before any campaign-note
+   access. This follows Feature 001's complete ordered pre-note sequence.
+6. Before invoking the Resolver, require an upstream release whose documented
+   or verified behavior canonicalizes every resolved target and rejects
+   targets outside the selected authorized root, including symlinks. Exact
+   root authorization does not guarantee target containment. If this property
+   cannot be confirmed, stop before the Resolver call. No release meeting
+   this property has been verified here.
+7. Only after all preceding gates succeed, invoke `resolve_obsidian_link`
+   with the exact matched root as `vault_root`. Never let the Resolver choose
+   a different configured root based only on `context_path`. This request
+   may read note content, so it is subject to every preceding gate.
+
+If Resolver settings changed after session startup, or freshness cannot be
+confirmed, stop before campaign-note access. Start a fresh session and repeat
+the complete sequence.
 
 Successful link resolution, a tool listing, or server availability MUST NOT
 be treated as proof of authorization. Authorization comes only from the
@@ -79,9 +100,10 @@ campaign-note content.
 
 If the server is absent or unavailable; either required tool is missing; the
 reported version is below `2.1.0` or cannot be confirmed; `get_server_info`
-errors or supplies no usable vault list; or no canonical root exactly matches
-the intended vault, the skill MUST explain the unmet prerequisite and stop
-before campaign-note reads or changes. It MUST NOT try link resolution to
+errors or supplies no usable vault list; no canonical root exactly matches
+the intended vault; or target-containment protection is unconfirmed, the
+skill MUST explain the unmet prerequisite and stop before the affected
+campaign-note reads or Resolver call. It MUST NOT try link resolution to
 bypass a failed check or infer authorization from a partial result.
 
 If Resolver settings or authorized roots change after the current client

@@ -78,6 +78,7 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 - The service appears available but required capabilities or supported compatibility cannot be confirmed.
 - The resolver configuration changes after the current client session starts; the stale session must not be trusted until a fresh session verifies the new settings.
 - A result is incomplete, ambiguous, or reports an error.
+- A resolved heading or block target is reached through a symlink outside the authorized root, or upstream target-containment behavior is unconfirmed.
 - Additional integration opportunities arise during implementation without evidence of a concrete workflow gap.
 - Setup examples could accidentally be mistaken for real vault paths or copied into distributed plugin configuration.
 
@@ -95,6 +96,7 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 - **FR-008**: If resolver settings change after the current client session starts, a vault-facing skill MUST treat that session's settings as unconfirmed, request a fresh session and verification, and stop before campaign-note access.
 - **FR-009**: This feature MUST NOT introduce integrations beyond the required link-resolution service. Any additional hook, agent, or service MUST remain a separate proposal until a concrete workflow gap and its acceptance criteria are documented.
 - **FR-010**: Feature 001's dependency contract MUST be the authoritative source for the service's supported compatibility, required capabilities, readiness, authorization, and unavailable behavior. Every vault-facing skill MUST follow that same contract before campaign-note access.
+- **FR-011**: Before calling `resolve_obsidian_link`, a skill MUST require an upstream release whose documented or verified behavior canonicalizes every resolved target and rejects targets outside the exact selected authorized root, including file symlinks. It MUST pass the exact root that matched the established vault as `vault_root`. Exact-root authorization alone MUST NOT be treated as target containment. If either the containment guarantee or matched-root argument cannot be confirmed, the skill MUST stop before the Resolver call.
 
 ### Key Entities
 
@@ -111,6 +113,7 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 - **SC-003**: In each of the six blocked scenarios—service unavailable, a required tool unavailable, compatibility or version unconfirmed, `get_server_info` failed or returned no usable vault list, no exact authorized-root match, and stale resolver settings in the active session—the skill explains the unmet prerequisite and stops before any campaign-note read or change.
 - **SC-004**: In each of the five link-resolution outcomes—resolved, unresolved, missing subtarget, ambiguous, and error—the skill reports the correct outcome and never guesses a destination.
 - **SC-005**: This feature introduces zero additional integrations; any later integration is considered only with a separately documented workflow gap and acceptance criteria.
+- **SC-006**: In 100% of resolution attempts, the skill passes the exact matched root as `vault_root` and makes no Resolver call unless upstream target-containment behavior, including symlink handling, is verified.
 
 ## Assumptions
 

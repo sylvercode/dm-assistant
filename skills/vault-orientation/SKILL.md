@@ -45,17 +45,25 @@ profiles, or vault contents to complete an earlier step.
    vault. If the location or authorization is unclear, name what is missing
    and ask the DM; do not read notes.
 2. **Verify required dependencies and vault authorization separately.** Use a
-   fresh Copilot CLI session for the Resolver preflight. For setup guidance,
-   see the README's [Local Installation section](../../README.md#local-installation).
+   fresh Copilot CLI session for the Resolver preflight. See the public
+   [Resolver setup guide](https://github.com/sylvercode/dm-assistant#install-and-configure-obsidian-link-resolver).
    The current required runtime dependency is the Obsidian Link Resolver MCP
-   server, minimum compatible release `2.1.0`, exposing both
+   server, API baseline `2.1.0` or later, exposing both
    `resolve_obsidian_link` and `get_server_info` in the active Copilot CLI
    session. Check the authoritative inventory in the feature specification
    when maintaining this skill; every declared dependency must be checked
    before note access.
    - **Readiness:** both tools are available, and the reported server version
-     is at least `2.1.0`. Readiness does not prove that the established vault
-     is an authorized root.
+     is at least `2.1.0`. This API baseline does not establish safe link
+     resolution. Resolver 2.1.0 can follow file symlinks outside an
+     authorized root when reading heading or block targets. Before any
+     `resolve_obsidian_link` call, require an upstream release whose
+     documented or verified behavior canonicalizes every resolved target and
+     rejects targets outside the selected root, including symlinks. No such
+     release has been verified here; until that security property is
+     confirmed, do not call the resolver and explain the blocker.
+     Readiness does not prove that the established vault is an authorized
+     root.
    - **Authorization:** call `get_server_info` with no arguments. It returns
      the running server's version and the canonical vault roots configured at
      startup, without reading notes. The established vault is authorized only
@@ -70,8 +78,12 @@ profiles, or vault contents to complete an earlier step.
      Do not resolve or generate a link to prove authorization, and do not infer
      authorization from a server name, tool availability, or an unverified
      configuration value.
-   - When several roots are configured, pass the matched root as `vault_root`
-     to later Resolver calls.
+   - If Resolver settings changed after this session started, or their
+     freshness cannot be confirmed, stop before campaign-note access. Ask the
+     DM to start a fresh session and repeat the complete preflight.
+   - When several roots are configured, pass the exact matched root as
+     `vault_root` to any permitted Resolver call; do not let the Resolver
+     select another configured root from context.
    - This Resolver preflight does not verify or authorize a PowerShell runtime
      handoff. Script-backed operations remain subject to the separate,
      fail-closed runtime checks above.
@@ -93,7 +105,9 @@ profiles, or vault contents to complete an earlier step.
    before note access.
 5. **Access only relevant campaign notes.** Proceed only after steps 1–4
    succeed. Use available note-access tools only within the established,
-   authorized vault. Resolve Obsidian links with the required Resolver; surface
+   authorized vault. Resolve Obsidian links only when the Resolver's
+   target-containment security property in step 2 is verified; pass the exact
+   matched root as `vault_root`. Surface
    outcomes as returned and report only details defined by the Resolver
    contract and present in the result. If expected details are absent, state
    that they are unavailable; never infer fields, values, or destinations.

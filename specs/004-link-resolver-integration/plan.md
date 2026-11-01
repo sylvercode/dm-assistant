@@ -6,13 +6,13 @@
 
 ## Summary
 
-Document and validate the separately installed Obsidian Link Resolver integration for GitHub Copilot CLI. Follow Feature 001's authoritative dependency contract: Resolver 2.1.0 or later, both required MCP tools available, exact authorization through `get_server_info`, and fail-closed behavior before campaign-note access. Provide Copilot CLI-specific setup guidance with placeholder vault paths; do not add another integration or claim that script-backed access is enabled.
+Document and validate the separately installed Obsidian Link Resolver integration for GitHub Copilot CLI. Follow Feature 001's authoritative dependency contract: API baseline 2.1.0 or later, both required MCP tools available, exact authorization through `get_server_info`, verified target containment (including symlinks) before link resolution, and the complete ordered pre-note gates before content-reading calls. Provide Copilot CLI-specific setup guidance with placeholder vault paths; do not add another integration or claim that script-backed access is enabled.
 
 ## Technical Context
 
 **Language/Version**: Markdown documentation and portable skill instructions; no new runtime language or version is required.
 
-**Primary Dependencies**: Obsidian Link Resolver MCP 2.1.0+ (`resolve_obsidian_link`, `get_server_info`); GitHub Copilot CLI MCP configuration.
+**Primary Dependencies**: Obsidian Link Resolver MCP API baseline 2.1.0+ (`resolve_obsidian_link`, `get_server_info`), with separately verified canonical target containment before any link-resolution call; GitHub Copilot CLI MCP configuration.
 
 **Storage**: No new storage. Vault roots remain user-configured in the user's MCP client configuration.
 

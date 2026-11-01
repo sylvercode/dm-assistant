@@ -153,9 +153,13 @@ Conceptual attributes:
 The authoritative, extensible, non-exhaustive inventory is the **Expected
 Runtime Dependencies** table in `spec.md`. The initial dependency is the
 Obsidian Link Resolver MCP server,
-version `2.1.0` or later, exposing `resolve_obsidian_link` and
+API baseline `2.1.0` or later, exposing `resolve_obsidian_link` and
 `get_server_info`; the latter reports canonical startup vault roots for the
-note-content-free exact-vault authorization check. The user configures authorized vault roots in Copilot
+note-content-free exact-vault authorization check. Link resolution also
+requires verified upstream protection that canonicalizes targets and
+rejects paths outside the selected root, including symlinks. Resolver
+2.1.0 does not provide that protection, and no fixing release is verified
+here. The user configures authorized vault roots in Copilot
 CLI; private paths are not stored in the plugin. Official Obsidian help pages
 for aliases, tags, internal links, and callouts are provenance for locally
 bundled paraphrased guidance, not runtime dependencies.
@@ -167,7 +171,13 @@ bundled paraphrased guidance, not runtime dependencies.
   currently declared required dependency is available and authorized for that
   vault; load the plugin-owned shared reference and designated vault-local
   guidance; establish the campaign/group and whether requested output includes
-  a handout or read-aloud section; only then access campaign notes.
+  a handout or read-aloud section; only then access campaign notes or invoke a
+  Resolver operation that can read a note target.
+- Before link resolution, require a release verified to canonicalize resolved
+  targets and reject any target outside the selected authorized root,
+  including file symlinks. Exact-root authorization does not itself guarantee
+  target containment; with no verified release, link resolution remains
+  blocked.
 - No designated local guidance is valid. It is not a missing-source failure;
   after all other checks pass, it permits a lookup limited to the specific
   information requested, using relevant notes identified without relying on

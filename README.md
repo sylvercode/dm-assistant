@@ -179,32 +179,48 @@ see the
 ### Install and configure Obsidian Link Resolver
 
 The Obsidian Link Resolver MCP server is a separate installation; the
-`dm-assistant` plugin does not install or configure it. Install the MCP server
-at version 2.1.0 or later using the
+`dm-assistant` plugin does not install or configure it. The API baseline is
+version 2.1.0 or later, but that version alone is not safe for link resolution:
+Resolver 2.1.0 can follow file symlinks outside an authorized root when reading
+heading or block targets. Before resolving any link, require an upstream
+release whose documentation or verified behavior guarantees canonical
+target-containment checks, including symlink targets. This repository has not
+verified such a release; until then, do not call `resolve_obsidian_link`.
+
+Before installing, check the version of any existing
+`obsidian-link-resolver-mcp` executable. Keep it if it already meets both the
+API and target-containment requirements; do not run an installer that would
+replace a compatible installation. If an upgrade is needed, choose a release
+that meets both requirements from the
 [upstream installation instructions](https://github.com/sylvercode/obsidian-link-resolver#mcp-server-install--update)
-(choose the MCP server installer, not the Resolver CLI-only installer). For
-example, the upstream installers accept a pinned version:
+(choose the MCP server installer, not the Resolver CLI-only installer).
+On Windows, the PowerShell installer requires PowerShell 7 or later (`pwsh`).
+For example, after setting `ResolverVersion` to a verified compatible release:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/sylvercode/obsidian-link-resolver/main/scripts/install-mcp.ps1))) -Version 2.1.0
+$ResolverVersion = '<VERIFIED_COMPATIBLE_VERSION>'
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/sylvercode/obsidian-link-resolver/main/scripts/install-mcp.ps1))) -Version $ResolverVersion
 ```
 
 ```shell
-curl -fsSL https://raw.githubusercontent.com/sylvercode/obsidian-link-resolver/main/scripts/install-mcp.sh | bash -s -- --version 2.1.0
+RESOLVER_VERSION='<VERIFIED_COMPATIBLE_VERSION>'
+curl -fsSL https://raw.githubusercontent.com/sylvercode/obsidian-link-resolver/main/scripts/install-mcp.sh | bash -s -- --version "$RESOLVER_VERSION"
 ```
 
 Configure Copilot CLI's user MCP file (`~/.copilot/mcp-config.json`) with its
-local server format. Replace the placeholder with an absolute path on your
-machine; repeat the `--vault` argument and path pair for each additional
-authorized vault root. Keep this personal configuration out of the plugin and
-any shared repository file.
+local server format. Set `command` to the absolute path of the installed
+`obsidian-link-resolver-mcp` executable so Copilot can launch it regardless of
+whether the installer directory is on Copilot's inherited `PATH`. Replace
+both placeholders with absolute paths on your machine; repeat the `--vault`
+argument and path pair for each additional authorized vault root. Keep this
+personal configuration out of the plugin and any shared repository file.
 
 ```json
 {
   "mcpServers": {
     "obsidian-link-resolver": {
       "type": "local",
-      "command": "obsidian-link-resolver-mcp",
+      "command": "<ABSOLUTE_PATH_TO_OBSIDIAN_LINK_RESOLVER_MCP>",
       "args": ["--vault", "<ABSOLUTE_PATH_TO_YOUR_VAULT>"],
       "tools": ["get_server_info", "resolve_obsidian_link"]
     }
@@ -219,6 +235,10 @@ are listed. Then call `get_server_info` without arguments and check that it
 reports version 2.1.0 or later and an authorized root that exactly matches
 the intended vault. This check requires no campaign-note content; server
 availability or tool discovery alone does not establish authorization.
+The exact-root check does not establish that link resolution is safe: do not
+call `resolve_obsidian_link` until the configured release is verified to
+contain resolved targets within the selected vault, including through
+symlinks.
 The setup was verified in an isolated Copilot CLI session with a disposable
 vault using session-scoped MCP configuration; no user/global MCP configuration
 or campaign vault was changed. See the [Resolver MCP contract](specs/004-link-resolver-integration/contracts/resolver-mcp-contract.md)
@@ -228,7 +248,7 @@ With GitHub Copilot CLI installed, start a session that loads this local plugin
 directory from the repository root:
 
 ```shell
-copilot --plugin-dir . -i
+copilot --plugin-dir .
 ```
 
 In the session, check component discovery with `/agent` and `/skills list`;
