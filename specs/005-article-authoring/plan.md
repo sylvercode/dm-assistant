@@ -30,10 +30,16 @@ explicitly authorized Obsidian vault. Built-in defaults are bundled resources
 of the authoring skill. The optional `.dmassist.yaml` profile remains at the
 vault root.
 
-**Testing**: Pester 6.2.0 synthetic-vault acceptance suite via
-`pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`; static skill
-inventory/source audit; installed-client validation is separate and must not
-be inferred from synthetic tests.
+**Testing**: Add Feature 005 Pester coverage in
+`tests/powershell/ArticleAuthoring.Tests.ps1` for installed template
+packaging, profile/template path validation, consumed-input freshness, and
+safe-operation integration, using synthetic disposable vaults and the
+test-only authorization provider where needed. Keep skill-level client
+scenarios (selection, user-visible outcomes, and player-safety decisions) in
+`quickstart.md` for supported installed-client evaluation. Run the existing
+Pester 6.2.0 suite with
+`pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`; do not infer
+installed-client or production authorization evidence from local tests.
 
 **Target Platform**: GitHub Copilot CLI Agent Plugins 1.0. PowerShell runtime
 support is locally tested on Windows; cross-platform support is not established.
@@ -117,7 +123,7 @@ skills/
 tests/
 └── powershell/
     ├── Invoke-Tests.ps1
-    └── * article-authoring acceptance tests
+    └── ArticleAuthoring.Tests.ps1
 ```
 
 **Structure Decision**: Use one `article-authoring` skill to own all built-in
@@ -126,7 +132,8 @@ acceptance harness only for runtime-backed behaviors; keep tests on synthetic
 disposable vaults. Any added runtime code must remain within the existing
 `skills/vault-orientation/scripts/` component boundary unless a later design
 demonstrates that the authoring skill needs a separate, skill-owned operation
-module.
+module. Pester tests verify packaging and runtime-backed behavior; evaluate
+skill-level content and response behavior separately in the supported client.
 
 ## Constitution Check (Post-Design)
 

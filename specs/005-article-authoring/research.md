@@ -95,7 +95,9 @@ operation.
 - Stop if the target already exists, its destination is ambiguous, or a
   required folder is absent; do not overwrite or create folders by
   assumption.
-- A single new article at a clear destination may use the page-local path.
+- A single new article at one explicit vault-relative Markdown destination may
+  use the page-local path. Feature 002 has no article-destination field, so
+  section-folder and template mappings alone do not identify a note path.
   Any additional, destructive, restructuring, actual-play, or
   continuity-changing edits require a scoped preview and explicit DM
   approval before application.

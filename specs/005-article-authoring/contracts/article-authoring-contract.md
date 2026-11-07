@@ -63,22 +63,24 @@ or creating the article.
 
 ## Required preflight and access order
 
-Before reading campaign notes, the profile, or vault-owned templates, the
-skill activates `vault-orientation` through the client's skill tool and
-completes its required pre-note sequence in order. That skill owns vault
-establishment, dependency readiness, exact-vault authorization, shared and
-designated guidance loading, task-context establishment, Resolver
-target-containment gating, and pause conditions; see
+The skill activates `vault-orientation` through the client's skill tool.
+Follow its ordered sequence: establish the intended vault; verify required
+dependency readiness and exact-vault authorization; load the canonical shared
+reference; only then read the profile as needed to identify designated
+vault-local guidance; load that guidance and establish task context before
+campaign-note or template access. The orientation skill owns these gates,
+Resolver target-containment gating, and pause conditions; see
 `skills/vault-orientation/SKILL.md` and
 `specs/001-shared-vault-guidance/contracts/vault-guidance-loading.md`. Do not
-restate, reorder, or skip those steps. A failed, unavailable, stale, or
-inconclusive gate blocks dependent access and all writes.
+restate or skip those gates. A profile read at this point is limited to
+identifying designated guidance and is not authorization. A failed,
+unavailable, stale, or inconclusive gate blocks dependent access and all
+writes.
 
 Authoring-specific additions, applied only after that sequence succeeds:
 
-1. **Validate configuration.** Inspect `.dmassist.yaml` only as Feature 002
-   requires to validate template mappings and identify designated guidance.
-   Do not use partial settings.
+1. **Validate configuration.** Validate `.dmassist.yaml` under Feature 002
+   after the guidance-discovery read. Do not use partial settings.
 2. **Resolve the type and template.** Settle any ambiguity in article type,
    template, destination, content, or audience before dependent note access
    or changes.
@@ -91,6 +93,7 @@ Authoring-specific additions, applied only after that sequence succeeds:
    `resolve_obsidian_link` stops until `vault-orientation`'s Resolver
    target-containment gate is satisfied; Resolver readiness and authorization
    still apply when the request needs no link resolution.
+
 ## Static HTML-comment fill-in markers
 
 The only supported template fill-in marker forms are the literal Markdown
@@ -135,20 +138,26 @@ and report the limitation.
 ## Destination, freshness, and write boundaries
 
 Before creating an article, resolve one clear destination in the authorized
-vault and confirm that it does not already contain an article. An existing
-target is a conflict: do not overwrite, reformat, move, or choose an alternate
-path by guesswork; explain the conflict and ask the DM for direction. If a
-required destination folder is absent, do not create it. If the destination
-is ambiguous, pause and ask rather than selecting a folder or filename
-without direction.
+vault and confirm that it does not already contain an article. It is clear
+only when the DM explicitly supplies one vault-relative Markdown path.
+Feature 002 has no article-destination field: its section-folder and template
+mappings do not by themselves identify a note path. The path must resolve
+inside the authorized vault, its parent must already exist, and its target
+must not already contain an article. An existing target is a conflict:
+do not overwrite, reformat, move, or choose an alternate path by guesswork;
+explain the conflict and ask the DM for direction. If a required destination
+folder is absent or multiple paths remain plausible, pause and ask rather
+than selecting a folder or filename without direction.
 
-Validate that the selected profile, template, guidance, vault boundary,
-destination identity, and other dependencies remain the same for the
-operation. If an input changes after validation/read or before the write,
-invalidate the affected operation, report the stale input, and require
-revalidation. Do not automatically retry with mixed old and new inputs or
-reuse approval for a changed proposal. Recheck containment and target state
-immediately before writing, following Feature 003's safe-write contract.
+Bind freshness checks to every input consumed by the operation: profile and
+selected mapping, designated guidance, selected template, relevant campaign
+context, authorization and boundary evidence, and destination identity,
+existence, and parent state. If an input changes after validation/read or
+before the write, invalidate dependent work, report the stale input, and
+require revalidation. Do not automatically retry with mixed old and new
+inputs or reuse approval for a changed proposal. Recheck containment and
+target state immediately before writing, following Feature 003's safe-write
+contract.
 
 Only a request to create one new article at a clear, non-conflicting
 destination—without changing existing notes, actual-play records, or
@@ -162,22 +171,28 @@ received.
 
 ## Audience and campaign-safety contract
 
-Treat handouts and read-aloud sections as player-facing. Immediately before a
-section is handed out or read aloud, gate-check that section and omit DM-only
-facts and links that reveal them. If safety cannot be established, withhold
-the section and ask the DM for direction. A `DM only` label, callout,
-collapsed/hidden section, HTML comment, or file location is not an access
-control; omit protected facts and revealing links entirely from player-facing
-content. Creating a handout does not authorize publishing or sharing it.
+Treat handouts and read-aloud sections as player-facing. A fact is DM-only
+when the DM identifies it as such or designated guidance/context identifies
+it as DM-facing. A link is revealing when its target or known result exposes
+such a fact. Omit protected facts and revealing links entirely from
+player-facing content. A `DM only` label, callout, collapsed/hidden section,
+HTML comment, or file location is not an access control. If safety cannot be
+established from authorized, relevant context, withhold the section and ask
+the DM for direction. Gate-check after the final content change and directly
+before delivery or reading; if content changes after the check, repeat it.
+Creating a handout does not authorize publishing or sharing it.
 
 All other article content is DM-facing. Preserve the distinction between
 tentative preparation and actual-play history: prepared events do not prove
 that events occurred or establish character/group knowledge or world facts.
 Do not silently resolve contradictions, change established continuity, or
-rewrite run adventure plans. Apply established vault tag, link, and callout
-conventions where known; do not invent a campaign tag vocabulary. Proposed
-native callout defaults from Feature 005 are style guidance only and never
-security boundaries.
+rewrite run adventure plans. Apply conventions established by explicit DM
+instructions, designated vault-local guidance, the shared reference, or
+relevant authorized notes; do not invent a campaign tag vocabulary. When no
+applicable vault-specific callout convention exists, use the proposed native
+defaults from Feature 005. A warning callout title names the particular
+caution or consequence, not only a generic label such as “Warning”. These
+defaults are style guidance only and never security boundaries.
 
 ## User-visible outcomes
 
@@ -185,14 +200,18 @@ The response for an article request must make the result understandable in
 one response, without exposing note contents in diagnostics:
 
 - **Created:** identify the requested article type, whether its source was a
-  configured DM template or bundled default, and the created destination.
-  State unresolved optional markers or unsupported expressions when relevant.
-- **Blocked:** identify the unmet prerequisite, invalid/missing template,
+  configured DM template or bundled default, and the created destination in
+  one response. State unresolved optional markers or unsupported expressions
+  when relevant.
+- **Blocked:** identify the requested article type when known, state the
+  selected source if template selection occurred (otherwise say selection was
+  not reached), identify the unmet prerequisite, invalid/missing template,
   required information, unsafe or stale path/input, destination conflict, or
-  approval needed; say what operation did not proceed and what the DM can do
-  next. Do not describe a blocked or failed write as success.
+  approval needed, and confirm that no article was created. Say what the DM
+  can do next. Do not describe a blocked or failed write as success.
 - **No template available:** identify the unregistered/unavailable type or
-  source and ask how the DM wants to proceed; do not create an article from an
+  source, state that selection was not reached if no template was selected,
+  and ask how the DM wants to proceed; do not create an article from an
   invented structure.
 - **Awaiting approval:** summarize the scope and destination in a preview,
   state that no change has yet been applied, and wait for explicit approval.
