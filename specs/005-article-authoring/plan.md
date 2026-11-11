@@ -1,6 +1,6 @@
 # Implementation Plan: Article Authoring and Template Selection
 
-**Branch**: `005-article-authoring` | **Date**: 2026-11-01 | **Spec**: [spec.md](spec.md)
+**Branch**: `sylvercode-article-authoring-templates` | **Date**: 2026-11-01 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/005-article-authoring/spec.md`
 
