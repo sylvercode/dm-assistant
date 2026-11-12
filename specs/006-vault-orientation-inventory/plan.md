@@ -22,7 +22,7 @@ currently registered.
 
 ## Technical Context
 
-**Language/Version**: PowerShell 7.6.9 (`pwsh`), using the Feature 003 selected runtime.
+**Language/Version**: Stable PowerShell 7.6.9 or later (`pwsh`), Core edition.
 
 **Primary Dependencies**: Obsidian Link Resolver 2.1.0 or later with
 `resolve_obsidian_link` and `get_server_info` as declared by Feature 001;
@@ -41,7 +41,7 @@ local plugin-discovery checks, and the five-DM SC-005 walkthrough.
 Installed-client and production authorization handoff checks remain separate.
 
 **Target Platform**: Windows is the current candidate environment with
-PowerShell 7.6.9 and `powershell-yaml` 0.4.12; it is not qualified for
+stable PowerShell 7.6.9 or later and `powershell-yaml` 0.4.12; it is not qualified for
 production script-backed vault access. macOS/Linux are unsupported and
 unverified.
 

@@ -27,15 +27,24 @@ This repository contains an Agent Plugins 1.0 plugin with a portable
 vault-orientation skill and its bundled shared reference. It does not bundle
 the Obsidian Link Resolver server or enable production script-backed vault access.
 PowerShell modules implement prerequisite checks, profile validation,
-read-only inspection, preview approval, and conflict-aware atomic note writes;
-these have local synthetic acceptance coverage, not installed-client or
-cross-platform verification. Installed
-cross-skill resource loading was verified in a disposable two-skill fixture
-using owner-skill activation, not assumed sibling paths. The orientation skill
-checks exact-vault authorization with the separately configured Resolver's
+read-only inspection and inventory, review-only profile proposals, preview
+approval, and conflict-aware atomic note writes; these have local synthetic
+acceptance coverage, not installed-client or cross-platform verification.
+Inventory remains an explicit PowerShell import/invocation rather than an
+installed command or dispatcher, and the production authorization handoff is
+unverified and fail-closed. Installed cross-skill resource loading was
+verified in a disposable two-skill fixture using owner-skill activation, not
+assumed sibling paths. The orientation skill checks exact-vault authorization
+with the separately configured Resolver's
 `get_server_info` tool and must stop when that check cannot be established.
 The PowerShell runtime cannot yet verify a handoff from the active session and
-remains fail-closed. Other planned capabilities above are not currently available.
+remains fail-closed. Feature 006's static skill audit passed; local discovery
+found the skill but the plugin-list grouping differed from the documented
+expectation. The runtime gate accepts stable PowerShell 7.6.9 or later. Under
+PowerShell 7.7.0, the full Pester suite passed 459 tests with 7 file-symlink
+tests skipped; the five-DM review remains outstanding. These results do not establish
+installed-client behavior or production authorization. Other planned
+capabilities above are not currently available.
 
 See [Plugin Architecture](docs/architecture.md) for component locations, extension boundaries, and the separation between the plugin and campaign vaults.
 

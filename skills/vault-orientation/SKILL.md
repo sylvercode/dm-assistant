@@ -138,6 +138,80 @@ further note access and ask the DM. Provisional assumptions never authorize
 creating or changing notes. The same restriction applies to script-backed
 operations.
 
+## Read-only inventory operation
+
+The PowerShell inventory entry point is available only through explicit
+module import and invocation; the operation registry does not dispatch it and
+the installed plugin does not currently register a command or transport for
+it. The inventory module runs the runtime preflight itself, but the assistant
+must still complete the pre-note sequence above and independently load the
+shared reference. A script-reported reference state does not establish that
+the assistant read the reference. Never use the Resolver to enumerate the
+vault or establish traversal containment.
+
+The local developer call is:
+
+```powershell
+Import-Module -Name .\skills\vault-orientation\scripts\VaultInventory.psm1 -ErrorAction Stop
+$outcome = Invoke-DmInventory -Request $request
+```
+
+The request must name the explicit authorized vault, use
+`vault.orientation.inventory` in `inspect` mode, and provide null campaign and
+group values with an empty target list. The runtime validates dependencies,
+exact-vault authorization, profile, configured/default guidance, and
+request-selected guidance before enumerating. A local call, synthetic test
+authorization, or successful link resolution does not verify production
+authorization; script-backed production access remains fail-closed until the
+active-session authorization handoff is verified.
+
+Inventory includes only non-dot-prefixed directory and Markdown names.
+Directories are not excluded because their names have extensions, and
+non-dot-prefixed Markdown remains eligible regardless of Hidden/System
+attributes. It omits dot-prefixed entries, all non-Markdown filenames, and
+selected guidance files; it never opens attachments or other non-Markdown
+contents. Directory links are listed by name but never traversed. A Markdown
+file link is eligible only when both its visible name and contained final
+target are Markdown and the target has no dot-prefixed path component;
+escaping, cyclic, unresolvable, or changed targets fail without a partial
+report.
+
+Without successfully loaded applicable local guidance, inventory is names-only
+and does not read or fingerprint campaign-note contents. Loaded configured,
+default-designated, or explicitly selected guidance opens the content gate
+only after all required sources pass; then eligible Markdown may be inspected
+for explicit frontmatter labels or body self-identification. Mappings require
+an explicit profile/guidance assignment, an exact conventional section name,
+a whole-word Adventure/Arc role token, or permitted explicit note-content
+evidence. Thematic resemblance is insufficient. Direct profile/guidance
+assignments are `observed`; names and permitted note-content evidence are
+`inferred` and remain provisional. Orientation-only alternatives are
+informational; a proposal-affecting unresolved alternative requires DM
+direction. When `proposeProfile` is true, the result can include a
+`drafted-unapproved` proposal with schema-validated YAML, candidate evidence,
+and a reviewable diff. If a choice is unresolved or a supplied decision is
+stale or unknown, the successful inventory report still includes the current
+alternatives, while proposal `content` and `differences` are `null`; provide
+fresh DM direction in a new request. Decisions are not approval and do not
+change evidence classifications. A proposal is never written: the DM may
+decline by taking no further action. Existing profile text and comments are
+preserved when a safe proposal can be represented; if safe preservation or
+disclosure is impossible, the operation fails without returning a partial
+report.
+
+Do not treat proposal content or its diff as a write preview. A future
+profile-specific writer must preview the exact target, content, encoding, and
+bytes, receive explicit approval in a later message, and revalidate the
+authorization, vault root, target, dependencies, and runtime identity before
+a no-clobber create or guarded replacement. Do not use `note.replace-text` or
+a direct file write to apply a profile proposal. The existing generic
+`note.replace-text` operation can technically target an existing
+`.dmassist.yaml` after its own gates; a single ordinary-target edit need not
+have a preview, and replacement YAML is not validated against the profile
+schema. This is a workflow boundary, not a runtime-wide guard. Production
+script-backed vault access remains fail-closed until the active-session
+authorization handoff is verified.
+
 ### Pause conditions
 
 If a required dependency is missing, unavailable, incompatible, or not

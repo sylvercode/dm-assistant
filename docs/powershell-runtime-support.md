@@ -26,28 +26,27 @@ does not treat a configured server as proof of readiness or authorization.
 | Item | Selection |
 | --- | --- |
 | Selection date | 2026-10-29 |
-| PowerShell | `pwsh` **7.6.9**, the latest stable PowerShell 7 release available at selection time |
-| Minimum PowerShell | 7.4, required so the built-in `Test-Json -Schema` validates JSON Schema Draft 2020-12; versions other than the selected release are unsupported |
+| PowerShell | Stable `pwsh` **7.6.9 or later**, Core edition; prereleases are rejected |
+| Schema capability | `Test-Json -Schema` needs PowerShell 7.4 or later for JSON Schema Draft 2020-12; the runtime gate requires 7.6.9 or later |
 | YAML reader | `powershell-yaml` **0.4.12** (exact version), required by profile-dependent operations |
 | JSON Schema validator | Built-in `Test-Json -Schema`; no separate validator module |
 | Test runner (test-only) | Pester **6.2.0** (exact version); never a prerequisite for installing the plugin or for a DM's workflow |
 
 The runtime prerequisite check in
-`skills/vault-orientation/scripts/RuntimePreflight.psm1` enforces the selected
-PowerShell version, operating system, and exact module versions, and returns
+`skills/vault-orientation/scripts/RuntimePreflight.psm1` enforces the minimum
+stable PowerShell version, operating system, and exact module versions, and returns
 `PREREQUISITE_MISSING` without installing or upgrading anything.
 
 ## Support matrix
 
-A combination is listed as supported only after it passes the prerequisite,
-repeatability, and failure checks and reliably performs the path-resolution,
-atomic-replace, and encoding checks the contract requires. Every other
-combination is unsupported.
+Passing the prerequisite gate is not proof of production support. Individual
+runtime combinations require separate validation of path-resolution,
+atomic-replace, encoding, and authorization behavior.
 
 | Operating system | PowerShell | Add-ons | Status |
 | --- | --- | --- | --- |
-| Windows | 7.6.9 | `powershell-yaml` 0.4.12 | Candidate, not supported for production script-backed vault access. Local path-boundary, atomic-replace, and encoding cases pass; four file-symlink cases, installed-client checks, and the runtime authorization handoff remain unverified. |
-| Windows | Any other version | Any | Unsupported |
+| Windows | Stable 7.6.9 or later, Core | `powershell-yaml` 0.4.12 | Accepted by the runtime gate; production script-backed vault access remains blocked. Only individually recorded versions and checks have been validated; file-symlink cases, installed-client checks, and the runtime authorization handoff remain unverified. |
+| Windows | Below 7.6.9, prerelease, or non-Core | Any | Rejected by the runtime gate |
 | macOS | Any | Any | Unsupported (unverified) |
 | Linux | Any | Any | Unsupported (unverified) |
 
@@ -56,9 +55,9 @@ combination is unsupported.
 Obtain prerequisites yourself before using a script-backed workflow; the
 workflow only checks them.
 
-1. Install PowerShell 7.6.9 by following Microsoft's
+1. Install stable PowerShell 7.6.9 or later by following Microsoft's
    [Installing PowerShell on Windows](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)
-   guidance (for example, the MSI or `winget` package for that exact version).
+   guidance.
 2. In `pwsh`, install the exact YAML reader version for the current user:
    `Install-Module -Name powershell-yaml -RequiredVersion 0.4.12 -Scope CurrentUser`.
 3. Confirm with `$PSVersionTable.PSVersion` and
@@ -104,10 +103,10 @@ recorded. All tests use synthetic disposable vaults.
   - The result did not change for authorization-like request fields,
     environment variables, profile keys, `.mcp.json` content, marker files,
     or vault names.
-- **Failure cases.** These all returned `PREREQUISITE_MISSING` before any
+- **Failure cases under the then-exact version gate.** These all returned `PREREQUISITE_MISSING` before any
   readiness or authorization check:
   - PowerShell 7.3.12, 7.4.0, and 7.7.0, and Windows PowerShell 5.1 (Desktop
-    edition);
+    edition). The gate now accepts stable 7.7.0;
   - macOS, Linux, or an unknown operating system;
   - `powershell-yaml` missing, 0.4.7, or only 0.4.13.
 
@@ -275,8 +274,77 @@ Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
   performed. The runtime handoff and single-note classification remain
   outstanding before production script-backed writes.
 
+## Feature 006 inventory and profile proposals
+
+The read-only inventory is implemented in
+`skills/vault-orientation/scripts/VaultInventory.psm1` and is reachable only
+through explicit import followed by `Invoke-DmInventory -Request $request`.
+Registration validates the operation but does not dispatch it; there is no
+installed command or transport for inventory. The caller must independently
+complete the shared-reference and exact-vault preflight. Synthetic test
+authorization verifies local logic only and does not enable production
+script-backed vault access.
+
+Inventory reports eligible directory and Markdown names, evidence-backed
+candidate mappings, and current ambiguity alternatives. It is names-only when
+no applicable local guidance loads and reads note content only after guidance
+passes. Proposals are opt-in and remain `drafted-unapproved`; generated YAML
+is checked against the installed version-one profile schema and its difference
+is returned for review. A current mapping choice must be supplied in a new
+request and does not change the evidence classification or authorize a write.
+Unresolved, stale, or unknown choices return `AMBIGUOUS_CONTEXT` with the
+current inventory and alternatives, but null proposal content and differences.
+Unmatched decisions are represented only by their request index and the
+`stale-or-unknown` reason.
+
+When an existing profile can be safely edited as text for review, unrelated
+content, comments, formatting, and line endings are retained and every
+proposal change is shown. If safe preservation or disclosure is not possible,
+the request returns `OPERATION_FAILED` without an inventory report. Proposal
+generation, review, mapping decisions, and decline (taking no further action)
+never write or cache anything.
+
+This is not a profile-write implementation. Any future profile-specific
+writer must preview the exact target, content, encoding, and bytes; receive
+explicit approval in a later message; bind `approvedPreviewId`, `reviewedVersions`,
+and `reviewedDependencyVersions`; and revalidate authorization, canonical
+root, target, dependencies, and plugin/runtime/module identity before a
+no-clobber creation or guarded replacement. A post-commit failure must report
+the actual or uncertain outcome.
+
+**Existing generic-editor limitation:** `note.replace-text` can technically
+target an existing `.dmassist.yaml` after its own preflight and containment
+gates. A single ordinary-target edit need not have a preview, and replacement
+YAML is not validated against the profile schema. This feature does not add a
+runtime-wide guard; callers must not use that generic operation or direct
+writes to apply proposals. Production script-backed access still fails closed
+because the active-session authorization handoff is unverified.
+
 ### Remaining acceptance work
 
+- **Feature 006 static audit (T036):** One immediate-child skill,
+  `skills/vault-orientation/SKILL.md`, matches the sole inventory entry.
+  Inspection confirmed the shared-reference, designated-guidance, required
+  dependency, and exact-vault authorization gates precede note access.
+- **Feature 006 local discovery (T037):** In the fresh
+  `copilot --plugin-dir .` session, `/skills list` showed `vault-orientation`
+  and `/agent` found no custom agents. The separate
+  `copilot --plugin-dir . plugin list` command showed `dm-assistant` under
+  Installed plugins, not the documented **External Plugins (via --plugin-dir)**
+  grouping, so T037 remains incomplete. This is session-scoped discovery only.
+- **Feature 006 Pester validation (T038), 2026-11-11:** On Windows with
+  PowerShell 7.7.0, `powershell-yaml` 0.4.12, and Pester 6.2.0, the focused
+  inventory suite passed 44 tests, failed 0, and skipped 1; the full suite
+  passed 459, failed 0, and skipped 7. The skips concern file symbolic links
+  that require Windows Developer Mode or elevation in this environment.
+  An earlier run under the then-exact version gate returned
+  `PREREQUISITE_MISSING` for PowerShell 7.7.0; the gate now accepts stable
+  PowerShell 7.6.9 or later.
+- **Feature 006 human review (T039):** The five-DM SC-005 walkthrough has not
+  been performed, so no usability result is claimed.
+- Neither synthetic authorization nor local discovery establishes
+  installed-client or production authorization support. The production
+  PowerShell authorization handoff remains unverified and fail-closed.
 - **T045:** No five-DM usability walkthrough has been performed. SC-006's
   anonymized pass rate is not available; automated result-contract checks do
   not substitute for this review.

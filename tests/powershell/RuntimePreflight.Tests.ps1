@@ -109,8 +109,9 @@ Describe 'RuntimePreflight production gate' {
         It 'returns PREREQUISITE_MISSING for PowerShell <Version> (<Edition>)' -ForEach @(
             @{ Version = '7.3.12'; Edition = 'Core' }
             @{ Version = '7.4.0'; Edition = 'Core' }
-            @{ Version = '7.7.0'; Edition = 'Core' }
+            @{ Version = '7.6.8'; Edition = 'Core' }
             @{ Version = '5.1.26100'; Edition = 'Desktop' }
+            @{ Version = '7.7.0'; Edition = 'Desktop' }
         ) {
             Mock -ModuleName RuntimePreflight -CommandName Get-DmRuntimeEnvironment -MockWith {
                 [pscustomobject]@{ powerShellVersion = [version]$Version; edition = $Edition; operatingSystem = 'Windows' }
@@ -121,9 +122,22 @@ Describe 'RuntimePreflight production gate' {
             Should -Invoke -ModuleName DependencyPreflight -CommandName Get-DmDependencyReadiness -Times 0 -Exactly -Scope It
         }
 
-        It 'rejects a prerelease with the supported PowerShell version number' {
+        It 'accepts stable PowerShell <Version> at or above the minimum' -ForEach @(
+            @{ Version = '7.6.9' }
+            @{ Version = '7.6.10' }
+            @{ Version = '7.7.0' }
+        ) {
             Mock -ModuleName RuntimePreflight -CommandName Get-DmRuntimeEnvironment -MockWith {
-                [pscustomobject]@{ powerShellVersion = [version]'7.6.9'; edition = 'Core'; operatingSystem = 'Windows'; isPrerelease = $true }
+                [pscustomobject]@{ powerShellVersion = [version]$Version; edition = 'Core'; operatingSystem = 'Windows'; isPrerelease = $false }
+            }
+            (Test-DmRuntimePrerequisite -Operation 'notes.inspect').passed | Should -BeTrue
+        }
+
+        It 'rejects a prerelease with a PowerShell version at or above the minimum' -ForEach @(
+            @{ Version = '7.6.9' }, @{ Version = '7.7.0' }
+        ) {
+            Mock -ModuleName RuntimePreflight -CommandName Get-DmRuntimeEnvironment -MockWith {
+                [pscustomobject]@{ powerShellVersion = [version]$Version; edition = 'Core'; operatingSystem = 'Windows'; isPrerelease = $true }
             }
             Set-TestDependencyReadiness -State ready
             Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code 'PREREQUISITE_MISSING' -Targets $targets

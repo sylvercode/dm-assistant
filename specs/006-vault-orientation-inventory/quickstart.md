@@ -1,11 +1,14 @@
 # Quickstart: Read-Only Vault Orientation and Inventory
 
-**Status: Proposed validation guide; Feature 006 is pending implementation.**
-The scenarios below define acceptance checks for a future
-`vault.orientation.inventory` operation. They are not claims about current
-runtime behavior. The [operation contract](contracts/vault-orientation-inventory.md)
-defines request/result details and failure codes; the [data model](data-model.md)
-defines the request-scoped inventory concepts and validation boundaries.
+**Status: Implementation in progress.** The explicit PowerShell entry point,
+preflight/guidance gates, deterministic inventory, evidence-backed mappings,
+ambiguity reporting, and review-only profile proposals are implemented locally
+and have focused synthetic acceptance coverage. The five-DM walkthrough and
+local plugin discovery remain incomplete; installed-client behavior and
+production authorization remain unverified. The
+[operation contract](contracts/vault-orientation-inventory.md) defines
+request/result details and failure codes; the [data model](data-model.md)
+defines request-scoped inventory concepts and validation boundaries.
 
 **Binding reporting clarification:** Report only eligible directory and
 Markdown names, never image, attachment, or other non-Markdown filenames; do
@@ -18,7 +21,7 @@ the original request, without echoing the skipped path.
 
 ## Prerequisites and test boundary
 
-- PowerShell 7.6.9 on the candidate Windows environment, the declared
+- Stable PowerShell 7.6.9 or later on the candidate Windows environment, the declared
   `powershell-yaml` 0.4.12 dependency for profile scenarios, and Pester 6.2.0.
   See [PowerShell Runtime Support](../../docs/powershell-runtime-support.md)
   for current support and installation limits. Windows is a candidate, not
@@ -40,9 +43,7 @@ the original request, without echoing the skipped path.
   apply, but the Resolver is not needed for inventory traversal or containment.
   Do not call link-resolution operations as part of these checks.
 
-The following are **future acceptance commands**, not instructions to run an
-unimplemented operation. Once implementation adds the proposed test file, run
-its focused suite:
+Run the focused synthetic acceptance suite:
 
 ```powershell
 pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1 -Path tests\powershell\VaultOrientationInventory.Tests.ps1
@@ -54,19 +55,17 @@ Then run the complete acceptance suite as a regression check:
 pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1
 ```
 
-The inventory operation and its Pester tests do not exist yet, so the focused
-command is not expected to pass against the current tree. The runner's `-Path`
-parameter accepts a test file or folder. Use the common request/result harness
-and production modules; do not make a test-only implementation of the
-inventory algorithm.
+The runner's `-Path` parameter accepts a test file or folder. Use the common
+request/result harness and production modules; do not make a test-only
+implementation of the inventory algorithm. File-symlink cases may be skipped
+when the environment cannot create those links; report such skips explicitly.
 
 ## Explicit local operation invocation
 
 The operation registry validates request metadata but is not a dispatcher.
-The caller must explicitly import the installed skill-owned module and call
-the exported function; the installed plugin does not currently register a
-transport or automatic command for this operation. Once implemented, the
-manual PowerShell invocation is:
+The caller must explicitly import the skill-owned module and call the exported
+function; the installed plugin does not currently register a transport or
+automatic command for this operation. The manual PowerShell invocation is:
 
 ```powershell
 $modulePath = Join-Path (Get-Location) 'skills\vault-orientation\scripts\VaultInventory.psm1'
@@ -79,8 +78,8 @@ $outcome = Invoke-DmInventory -Request $request
 the explicit authorized vault root and zero-target inspect envelope. Import
 and registration do not establish authorization; the function must perform
 the existing preflight itself and return the shared result with
-`inventoryReport`. This example is a future acceptance target, not a claim
-that the module exists or that the current installed client can dispatch it.
+`inventoryReport`. This example does not establish production authorization or show that the current installed
+client can dispatch the operation.
 
 ## Local discovery and static source audit
 
@@ -131,16 +130,16 @@ an unimplemented or uninspectable behavior blocked rather than passed.
 
 ## Proposed call and request/result acceptance
 
-After Feature 006 is implemented, a caller must explicitly import its proposed
-module and invoke the entry point; registration supplies validation metadata
-and is **not** an automatic dispatcher or installed transport:
+The implemented local operation still requires an explicit module import and
+invocation; registration supplies validation metadata and is **not** an
+automatic dispatcher or installed transport:
 
 ```powershell
 Import-Module -Name .\skills\vault-orientation\scripts\VaultInventory.psm1 -ErrorAction Stop
 $outcome = Invoke-DmInventory -Request $request
 ```
 
-This call is not available today. Construct `$request` using the Feature 003
+Construct `$request` using the Feature 003
 envelope and an explicitly established absolute root from the synthetic
 fixture, not the plugin directory. Set `contractVersion` to `"1"`, supply a
 caller-generated `requestId`, and require exactly
@@ -214,10 +213,17 @@ setup and snapshot reads from the operation's instrumented reads. Any fixture
 change used to simulate stale evidence happens between calls, before the next
 snapshot.
 
-## Future inventory acceptance scenarios
+## Inventory acceptance scenarios
 
-These cases are acceptance targets for the future operation, not tests to run
-against today's tree. Run each as an isolated Pester case once implemented.
+These cases are the acceptance oracle for the implementation. The focused
+suite currently covers the preflight/guidance gates, six layout oracles,
+names-only and guidance-enabled reads, mapping evidence, privacy exclusions,
+no-write snapshots, orientation/proposal ambiguity, fresh/stale decisions,
+schema validation, and profile-text preservation. Environment-dependent
+file-link cases are skipped when symlink creation is unavailable. The
+five-DM walkthrough, local plugin discovery, installed-client behavior, and
+production authorization remain outstanding or unverified and must not be
+reported as passed.
 Where a scenario is expected to reach inventory behavior, use the harness-only
 exact-root authorization provider for that synthetic fixture. Assert the
 Feature 003 envelope and Feature 006 payload as described above and in the
@@ -416,16 +422,22 @@ proposal workflow exists:
 
 ## Completion and evidence
 
-The guide is satisfied only when the future focused tests pass, the full suite
-remains green, local discovery and the static source audit pass, and
-the five-DM walkthrough meets SC-005. Record sanitized
-pass/fail counts, skipped symlink cases, and platform/runtime versions
-separately from installed-client checks. Test results using synthetic fixtures
-and mocked authorization do not establish production access, installed-client
-behavior, or support for untested operating systems. The production
-authorization handoff remains a separate fail-closed prerequisite; a
-successful local test must not be presented as real-vault authorization.
+The implementation exists locally, but Feature 006 acceptance remains
+incomplete until the focused tests and full suite pass, local discovery and
+the static source audit pass, and the five-DM walkthrough meets SC-005. The
+static audit found one skill with a one-to-one inventory match and verified
+its pre-note gates. Interactive discovery found `vault-orientation` and no
+Copilot-specific agents, but the separate plugin listing did not show
+`dm-assistant` under the documented **External Plugins (via --plugin-dir)**
+grouping, so local discovery remains incomplete.
 
-These are proposed checks pending implementation. Until then, the current
-runtime does not provide the Feature 006 inventory operation, and this guide
-does not imply that any listed scenario has been executed.
+On 2026-11-11, under Windows, PowerShell 7.7.0, and Pester 6.2.0, the
+focused suite passed 44 tests, failed 0, and skipped 1; the full suite passed
+459, failed 0, and skipped 7. File-symlink cases were skipped because this
+environment requires Windows Developer Mode or elevation to create them.
+The five-DM review has not been performed.
+Synthetic fixtures and mocked authorization do not establish production
+access, installed-client behavior, or support for untested operating systems.
+The production authorization handoff remains a separate fail-closed
+prerequisite; a successful local test must not be presented as real-vault
+authorization.

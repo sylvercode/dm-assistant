@@ -41,6 +41,169 @@ Describe 'Vault profile filesystem and reference validation' {
         $result.code | Should -Be 'PATH_INVALID'
     }
 
+    It 'rejects configured guidance with a non-Markdown visible path before reading or fingerprinting it' {
+        $path = 'Lore/guide.txt'
+        [System.IO.File]::WriteAllText((Join-Path -Path (Join-Path -Path $fixture.Root -ChildPath 'Lore') -ChildPath 'guide.txt'), 'Synthetic guidance.')
+        $reads = [System.Collections.Generic.List[string]]::new()
+        Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultTargetBytes -MockWith {
+            $reads.Add([string]$Resolution.path)
+            $reads.Add([string]$Resolution.resolvedPath)
+            $bytes = [System.IO.File]::ReadAllBytes([string]$Resolution.resolvedPath)
+            [pscustomobject][ordered]@{
+                ok = $true
+                code = $null
+                bytes = $bytes
+                version = 'sha256:' + [System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+            }
+        }
+        $profile = [ordered]@{ guidance = [ordered]@{ path = $path } }
+
+        $reference = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind guidance
+        { Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $profile } | Should -Throw
+
+        $reference.passed | Should -BeFalse
+        $reference.code | Should -Be 'REFERENCE_UNAVAILABLE'
+        $reads | Should -Not -Contain $path
+    }
+
+    It 'rejects default guidance whose Markdown visible path resolves to a non-Markdown target before reads' {
+        $path = '.dmassist-guidance.md'
+        $target = Join-Path -Path (Join-Path -Path $fixture.Root -ChildPath 'Lore') -ChildPath 'guidance.txt'
+        [System.IO.File]::WriteAllText($target, 'Synthetic guidance.')
+        $reads = [System.Collections.Generic.List[string]]::new()
+        Mock -ModuleName VaultConfiguration -CommandName Resolve-DmVaultTarget -ParameterFilter {
+            $Path -ceq '.dmassist-guidance.md'
+        } -MockWith {
+            [pscustomobject][ordered]@{
+                path = $Path
+                status = 'resolved'
+                code = $null
+                exists = $true
+                itemType = 'file'
+                resolvedPath = $target
+                resolvedRelativePath = 'Lore/guidance.txt'
+                viaLink = $true
+                reason = ''
+            }
+        }
+        Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultTargetBytes -MockWith {
+            $reads.Add([string]$Resolution.path)
+            $reads.Add([string]$Resolution.resolvedPath)
+            $bytes = [System.IO.File]::ReadAllBytes([string]$Resolution.resolvedPath)
+            [pscustomobject][ordered]@{
+                ok = $true
+                code = $null
+                bytes = $bytes
+                version = 'sha256:' + [System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+            }
+        }
+
+        $reference = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind guidance
+        { Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $null } | Should -Throw
+
+        $reference.passed | Should -BeFalse
+        $reference.code | Should -Be 'REFERENCE_UNAVAILABLE'
+        $reads | Should -Not -Contain $path
+        $reads | Should -Not -Contain $target
+    }
+
+    It 'rejects configured guidance whose Markdown visible path resolves to a non-Markdown target before reads' {
+        $path = 'Lore/visible.md'
+        $target = Join-Path -Path (Join-Path -Path $fixture.Root -ChildPath 'Lore') -ChildPath 'guidance.txt'
+        [System.IO.File]::WriteAllText($target, 'Synthetic guidance.')
+        $reads = [System.Collections.Generic.List[string]]::new()
+        Mock -ModuleName VaultConfiguration -CommandName Resolve-DmVaultTarget -ParameterFilter {
+            $Path -ceq 'Lore/visible.md'
+        } -MockWith {
+            [pscustomobject][ordered]@{
+                path = $Path
+                status = 'resolved'
+                code = $null
+                exists = $true
+                itemType = 'file'
+                resolvedPath = $target
+                resolvedRelativePath = 'Lore/guidance.txt'
+                viaLink = $true
+                reason = ''
+            }
+        }
+        Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultTargetBytes -MockWith {
+            $reads.Add([string]$Resolution.path)
+            $reads.Add([string]$Resolution.resolvedPath)
+            $bytes = [System.IO.File]::ReadAllBytes([string]$Resolution.resolvedPath)
+            [pscustomobject][ordered]@{
+                ok = $true
+                code = $null
+                bytes = $bytes
+                version = 'sha256:' + [System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+            }
+        }
+        $profile = [ordered]@{ guidance = [ordered]@{ path = $path } }
+
+        $reference = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind guidance
+        { Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $profile } | Should -Throw
+
+        $reference.passed | Should -BeFalse
+        $reference.code | Should -Be 'REFERENCE_UNAVAILABLE'
+        $reads | Should -Not -Contain $path
+        $reads | Should -Not -Contain $target
+    }
+
+    It 'does not read or fingerprint guidance after a lexical or resolved-boundary failure' {
+        $reads = [System.Collections.Generic.List[string]]::new()
+        Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultTargetBytes -MockWith {
+            $reads.Add([string]$Resolution.path)
+            $reads.Add([string]$Resolution.resolvedPath)
+            $bytes = [System.IO.File]::ReadAllBytes([string]$Resolution.resolvedPath)
+            [pscustomobject][ordered]@{
+                ok = $true
+                code = $null
+                bytes = $bytes
+                version = 'sha256:' + [System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+            }
+        }
+
+        $invalid = Test-DmProfileReference -Boundary $root.boundary -Path '../outside/secret.md' -Kind guidance
+        { Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $null -ReferencePaths @('../outside/secret.md') } | Should -Throw
+
+        $invalid.code | Should -Be 'PATH_INVALID'
+        $reads | Should -Not -Contain '../outside/secret.md'
+
+        Mock -ModuleName VaultConfiguration -CommandName Resolve-DmVaultTarget -ParameterFilter {
+            $Path -ceq 'EscapingGuidance.md'
+        } -MockWith {
+            [pscustomobject][ordered]@{
+                path = $Path
+                status = 'outside'
+                code = 'PATH_OUTSIDE_VAULT'
+                exists = $false
+                itemType = 'missing'
+                resolvedPath = $null
+                resolvedRelativePath = $null
+                viaLink = $true
+                reason = 'outside'
+            }
+        }
+
+        $escaped = Test-DmProfileReference -Boundary $root.boundary -Path 'EscapingGuidance.md' -Kind guidance
+        { Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $null -ReferencePaths @('EscapingGuidance.md') } | Should -Throw
+
+        $escaped.passed | Should -BeFalse
+        $escaped.code | Should -Be 'PATH_OUTSIDE_VAULT'
+        $reads | Should -Not -Contain 'EscapingGuidance.md'
+    }
+
+    It 'continues to accept readable non-Markdown non-guidance references' {
+        $path = 'Lore/party-reference.txt'
+        $absolutePath = Join-Path -Path (Join-Path -Path $fixture.Root -ChildPath 'Lore') -ChildPath 'party-reference.txt'
+        [System.IO.File]::WriteAllText($absolutePath, 'Synthetic party reference.')
+
+        $result = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind party
+
+        $result.passed | Should -BeTrue
+        $result.version | Should -Match '^sha256:[0-9a-f]{64}$'
+    }
+
     It 'rejects unsafe configured reference paths during profile validation' {
         $profile = [ordered]@{ party = [ordered]@{ note = '../outside/secret.md' } }
         (Test-DmProfileFilesystem -Boundary $root.boundary -Profile $profile).code | Should -Be 'PATH_INVALID'

@@ -95,9 +95,9 @@ function Test-DmRuntimePrerequisite {
     .SYNOPSIS
     Checks the selected runtime and module prerequisites without changing them.
     .DESCRIPTION
-    Checks the exact supported runtime: OS, PowerShell edition and version,
-    and required module versions. Returns a gate outcome; any mismatch blocks
-    with PREREQUISITE_MISSING. Never installs or updates anything.
+    Checks the operating system, PowerShell edition and minimum stable version,
+    and exact required module versions. Returns a gate outcome; any mismatch
+    blocks with PREREQUISITE_MISSING. Never installs or updates anything.
     .PARAMETER Operation
     Operation identifier included in a blocked result.
     .PARAMETER Targets
@@ -135,12 +135,12 @@ function Test-DmRuntimePrerequisite {
     $isPrerelease = $false
     $prereleaseProperty = $environment.PSObject.Properties['isPrerelease']
     if ($null -ne $prereleaseProperty) { $isPrerelease = [bool]$prereleaseProperty.Value }
-    $psSupported = $null -ne $version -and $version -eq $support.powerShellVersion -and $edition -ceq $support.edition -and -not $isPrerelease
+    $psSupported = $null -ne $version -and $version -ge $support.powerShellVersion -and $edition -ceq $support.edition -and -not $isPrerelease
     $observedPs = "$edition $version"
     $evidence.Add((New-DmEvidence -Gate $gate -Subject 'powershell' -State $(if ($psSupported) { 'supported' } else { 'unsupported' }) -Detail $observedPs))
     if (-not $psSupported) {
-        return (& $block "PowerShell $observedPs is not supported; PowerShell $($support.edition) $($support.powerShellVersion) is required." `
-                ([ordered]@{ requirement = 'powershell'; observed = $observedPs; required = "$($support.edition) $($support.powerShellVersion)" }))
+        return (& $block "PowerShell $observedPs is not supported; stable PowerShell $($support.edition) $($support.powerShellVersion) or later is required." `
+                ([ordered]@{ requirement = 'powershell'; observed = $observedPs; required = "$($support.edition) $($support.powerShellVersion) or later (stable)" }))
     }
 
     foreach ($module in $support.modules) {

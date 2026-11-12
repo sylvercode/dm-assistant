@@ -393,6 +393,17 @@ function Resolve-DmSectionDestination {
     [pscustomobject][ordered]@{ resolved = $true; code = $null; sections = [string[]]$matches.ToArray() }
 }
 
+function Test-DmMarkdownPath {
+    <#
+    .SYNOPSIS
+    Checks whether a path has the Markdown extension.
+    .PARAMETER Path
+    Vault-relative visible or resolved path to check.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+    [System.IO.Path]::GetExtension($Path) -ieq '.md'
+}
+
 function Test-DmProfileReference {
     <#
     .SYNOPSIS
@@ -414,10 +425,25 @@ function Test-DmProfileReference {
     if (-not $lexical.isValid) { return [pscustomobject][ordered]@{ passed = $false; code = 'PATH_INVALID'; message = 'The configured reference path is invalid.' } }
     $resolution = Resolve-DmVaultTarget -Boundary $Boundary -Path $Path
     if ($resolution.code) {
-        return [pscustomobject][ordered]@{ passed = $false; code = [string]$resolution.code; message = 'The configured reference could not be safely resolved.' }
+        return [pscustomobject][ordered]@{
+            passed = $false
+            code = [string]$resolution.code
+            message = 'The configured reference could not be safely resolved.'
+            boundaryFailure = $true
+        }
+    }
+    if ($Kind -ceq 'guidance' -and -not (Test-DmMarkdownPath -Path $Path)) {
+        return [pscustomobject][ordered]@{ passed = $false; code = 'REFERENCE_UNAVAILABLE'; message = 'The configured guidance is not a Markdown file.' }
     }
     if (-not $resolution.exists -or $resolution.itemType -cne 'file') {
         return [pscustomobject][ordered]@{ passed = $false; code = 'REFERENCE_UNAVAILABLE'; message = 'The configured reference is missing or is not a file.' }
+    }
+    if ($Kind -ceq 'guidance') {
+        $resolvedRelativePath = [string]$resolution.resolvedRelativePath
+        if ([string]::IsNullOrWhiteSpace($resolvedRelativePath) -or
+            -not (Test-DmMarkdownPath -Path $resolvedRelativePath)) {
+            return [pscustomobject][ordered]@{ passed = $false; code = 'REFERENCE_UNAVAILABLE'; message = 'The configured guidance target is not a Markdown file.' }
+        }
     }
     $read = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $resolution
     if (-not $read.ok) {
@@ -439,13 +465,16 @@ function Get-DmProfileDependencyVersions {
     Optional byte fingerprint captured when the profile was parsed and validated.
     .PARAMETER ReferencePaths
     Exact profile references used by this operation; unrelated references are not read.
+    .PARAMETER AdditionalGuidancePaths
+    Additional request-selected guidance dependencies that must be Markdown.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$Boundary,
         [AllowNull()][System.Collections.IDictionary]$Profile,
         [AllowNull()][string]$ExpectedProfileVersion,
-        [AllowNull()][string[]]$ReferencePaths
+        [AllowNull()][string[]]$ReferencePaths,
+        [AllowNull()][string[]]$AdditionalGuidancePaths
     )
     $versions = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
     $profileResolution = Resolve-DmVaultTarget -Boundary $Boundary -Path '.dmassist.yaml'
@@ -475,6 +504,14 @@ function Get-DmProfileDependencyVersions {
             @('.dmassist-guidance.md')
         }
     }
+    $guidancePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    if ($null -ne $Profile -and $Profile.Contains('guidance')) {
+        [void]$guidancePaths.Add([string]$Profile.guidance.path)
+    }
+    else {
+        [void]$guidancePaths.Add('.dmassist-guidance.md')
+    }
+    foreach ($path in $AdditionalGuidancePaths) { [void]$guidancePaths.Add([string]$path) }
     $distinctPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($path in $ReferencePaths) {
         if (-not $distinctPaths.Add([string]$path)) { continue }
@@ -482,6 +519,18 @@ function Get-DmProfileDependencyVersions {
         if (-not $lexical.isValid) { throw 'A profile dependency path is invalid.' }
         $resolution = Resolve-DmVaultTarget -Boundary $Boundary -Path $path
         if ($resolution.code) { throw 'A profile dependency could not be safely resolved.' }
+        if ($guidancePaths.Contains([string]$path)) {
+            if (-not (Test-DmMarkdownPath -Path ([string]$path))) {
+                throw 'A guidance dependency is not a Markdown file.'
+            }
+            if ($resolution.exists -and $resolution.itemType -ceq 'file') {
+                $resolvedRelativePath = [string]$resolution.resolvedRelativePath
+                if ([string]::IsNullOrWhiteSpace($resolvedRelativePath) -or
+                    -not (Test-DmMarkdownPath -Path $resolvedRelativePath)) {
+                    throw 'A guidance dependency target is not a Markdown file.'
+                }
+            }
+        }
         if (-not $resolution.exists -or $resolution.itemType -cne 'file') { $version = 'absent' }
         else {
             $read = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $resolution
@@ -638,13 +687,69 @@ function Get-DmPreNoteContext {
         $guidanceVersion = [string]$guidance.version
     }
 
+    $selectedGuidancePaths = [System.Collections.Generic.List[string]]::new()
+    $selectedGuidanceVersions = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    if ([string]$request.operation -ceq 'vault.orientation.inventory') {
+        $arguments = if ($request.PSObject.Properties['arguments']) { $request.arguments } else { $null }
+        $selectedGuidance = @()
+        $optionalGuidance = @()
+        if ($arguments -is [System.Collections.IDictionary]) {
+            if ($arguments.Contains('selectedGuidance')) { $selectedGuidance = @($arguments.selectedGuidance) }
+            if ($arguments.Contains('optionalGuidance')) { $optionalGuidance = @($arguments.optionalGuidance) }
+        }
+        elseif ($null -ne $arguments) {
+            if ($arguments.PSObject.Properties['selectedGuidance']) { $selectedGuidance = @($arguments.selectedGuidance) }
+            if ($arguments.PSObject.Properties['optionalGuidance']) { $optionalGuidance = @($arguments.optionalGuidance) }
+        }
+        $optionalGuidanceSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        foreach ($path in $optionalGuidance) { [void]$optionalGuidanceSet.Add([string]$path) }
+
+        foreach ($path in $selectedGuidance) {
+            $selectedPath = [string]$path
+            $selected = Test-DmProfileReference -Boundary $Preflight.boundary -Path $selectedPath -Kind guidance
+            if (-not $selected.passed) {
+                $selectedCode = [string]$selected.code
+                $selectedBoundaryFailure = $false
+                if ($selected.PSObject.Properties['boundaryFailure']) {
+                    $selectedBoundaryFailure = [bool]$selected.boundaryFailure
+                }
+                if ($optionalGuidanceSet.Contains($selectedPath) -and
+                    $selectedCode -cin @('REFERENCE_UNAVAILABLE', 'READ_FAILED') -and
+                    -not $selectedBoundaryFailure) {
+                    continue
+                }
+                if ($selectedCode -ceq 'READ_FAILED' -and -not $selectedBoundaryFailure) {
+                    $selectedCode = 'REFERENCE_UNAVAILABLE'
+                }
+                if ([string]::IsNullOrWhiteSpace($selectedCode)) { $selectedCode = 'REFERENCE_UNAVAILABLE' }
+                $blocked = New-DmBlockedResult -Operation $Preflight.operation -CompletionCode $selectedCode -Targets $Preflight.targets `
+                    -Message $selected.message -RemainingWork @('Restore or correct the selected guidance, then retry.')
+                return [pscustomobject][ordered]@{ passed = $false; result = $blocked; profile = $null; discovery = $null; dependencyVersions = @(); context = $null }
+            }
+            if (-not $selectedGuidanceVersions.ContainsKey($selectedPath)) {
+                $selectedGuidancePaths.Add($selectedPath)
+                $selectedGuidanceVersions.Add($selectedPath, [string]$selected.version)
+            }
+            $guidanceLoaded = $true
+        }
+    }
+
     try {
         $profileArgument = if ($profilePresent) { $loaded.profile } else { $null }
+        $referencePaths = @($guidancePath) + @($selectedGuidancePaths.ToArray())
         $dependencies = Get-DmProfileDependencyVersions -Boundary $Preflight.boundary -Profile $profileArgument `
-            -ExpectedProfileVersion ([string]$loaded.sourceVersion) -ReferencePaths @($guidancePath)
+            -ExpectedProfileVersion ([string]$loaded.sourceVersion) -ReferencePaths $referencePaths `
+            -AdditionalGuidancePaths $selectedGuidancePaths.ToArray()
         $guidanceSnapshot = @($dependencies | Where-Object { [string]$_.identity -ceq $guidancePath })
         if ($guidanceSnapshot.Count -ne 1 -or [string]$guidanceSnapshot[0].version -cne $guidanceVersion) {
             throw 'The guidance changed after validation and before its dependency snapshot.'
+        }
+        foreach ($selectedPath in $selectedGuidanceVersions.Keys) {
+            $selectedSnapshot = @($dependencies | Where-Object { [string]$_.identity -ceq $selectedPath })
+            if ($selectedSnapshot.Count -ne 1 -or
+                [string]$selectedSnapshot[0].version -cne $selectedGuidanceVersions[$selectedPath]) {
+                throw 'Selected guidance changed after validation and before its dependency snapshot.'
+            }
         }
     }
     catch {
@@ -664,6 +769,7 @@ function Get-DmPreNoteContext {
         passed = $true
         result = $null
         profile = $loaded.profile
+        sourceProfile = $loaded.sourceProfile
         discovery = $discovery
         dependencyVersions = $dependencies
         sequence = @('vault-root-selected', 'dependency-readiness', 'vault-authorization', 'shared-reference', $(if ($profilePresent) { 'profile-validated' } else { 'profile-absence' }), $(if ($guidanceLoaded) { 'guidance-loaded' } else { 'guidance-absence' }), 'campaign-group')

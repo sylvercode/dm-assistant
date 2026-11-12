@@ -267,7 +267,7 @@ profile-specific preview, approval, validation, and creation semantics.
 
 ## Platform, test, scale, and operational limits
 
-**Decision:** Target the existing PowerShell 7.6.9 runtime and Windows
+**Decision:** Target stable PowerShell 7.6.9 or later and the Windows
 candidate environment, validate with Pester 6.2.0 and synthetic disposable
 vaults, and keep production script-backed note access fail-closed until the
 trusted active-session authorization handoff is verified. Limit each request
