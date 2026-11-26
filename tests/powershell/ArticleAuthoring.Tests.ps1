@@ -598,6 +598,33 @@ Describe 'Bundled article template static syntax' {
             [IO.File]::ReadAllText($destination) | Should -BeExactly $draft
         }
 
+        It 'rejects only complete case-sensitive required markers' {
+            $markers = @(
+                @{ destination = 'Uppercase Marker.md'; content = '# <!-- fill-in: REQUIRED title -->' }
+                @{ destination = 'Missing Description.md'; content = '# <!-- fill-in: required -->' }
+                @{ destination = 'Unterminated Marker.md'; content = '# <!-- fill-in: required title' }
+            )
+            foreach ($marker in $markers) {
+                $caseRequest = [ordered]@{}
+                foreach ($key in $request.Keys) { $caseRequest[$key] = $request[$key] }
+                $caseRequest.destination = $marker.destination
+                $prepared = Invoke-TestArticleStage prepare $caseRequest
+                $prepared.preparationId | Should -Not -BeNullOrEmpty
+                $caseRequest.preparationId = $prepared.preparationId
+                $caseRequest.content = $marker.content
+
+                $preview = Invoke-TestArticleStage preview $caseRequest
+                $preview.result.completionCode | Should -BeExactly 'OK'
+                $caseRequest.previewId = $preview.preview.previewId
+                (Invoke-TestArticleStage apply $caseRequest).result.completionCode | Should -BeExactly 'OK'
+                [IO.File]::ReadAllText((Join-Path $fixture.Root $marker.destination)) | Should -BeExactly $marker.content
+            }
+
+            $request.preparationId = (Invoke-TestArticleStage prepare $request).preparationId
+            $request.content = '# <!-- fill-in: required title -->'
+            (Invoke-TestArticleStage preview $request).result.completionCode | Should -BeExactly 'INVALID_REQUEST'
+        }
+
         It 'revalidates a bundled template edit before apply' {
             $templatePath = Join-Path $script:TemplateDirectory 'character.md'
             $originalBytes = [System.IO.File]::ReadAllBytes($templatePath)

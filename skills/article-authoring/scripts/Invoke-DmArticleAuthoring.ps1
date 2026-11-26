@@ -98,7 +98,8 @@ function Invoke-ArticleStage {
     }
     $targets = @($destination)
     if ($Action -ne 'prepare' -and ($inputData.content -isnot [string] -or
-        [string]::IsNullOrWhiteSpace($inputData.content) -or $inputData.content -match '<!--\s*fill-in:\s*required\b')) {
+        [string]::IsNullOrWhiteSpace($inputData.content) -or
+        $inputData.content -cmatch '<!-- fill-in: required [^<>\s](?:[^<>\r\n]*[^<>\s])? -->')) {
         return (New-ArticleBlock 'INVALID_REQUEST' 'Supply a nonempty draft with all required markers filled.')
     }
 
