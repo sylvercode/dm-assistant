@@ -121,6 +121,24 @@ function Invoke-ArticleStage {
     }
     $preflight = Invoke-DmPreflight -Request $request
     if (-not $preflight.passed) { return @{ result = $preflight.result } }
+    if (@('note.create-article', 'note.create-article-fact-change') -contains $operation) {
+        $canonicalInputCheck = Get-DmArticleAuthoringInputTargets -Preflight $preflight
+        if (-not $canonicalInputCheck.ok) {
+            return (New-ArticleBlock ([string]$canonicalInputCheck.code) ([string]$canonicalInputCheck.message))
+        }
+        $canonicalInputs = [System.Collections.Generic.List[object]]::new()
+        foreach ($canonicalInput in @($canonicalInputCheck.inputs)) {
+            $originalInput = @($inputs | Where-Object { [string]$_.identity -ceq [string]$canonicalInput.identity }) | Select-Object -First 1
+            $canonicalInputs.Add([pscustomobject][ordered]@{
+                identity = [string]$canonicalInput.identity
+                path = [string]$originalInput.path
+                version = [string]$canonicalInput.observedVersion
+                canonicalPath = [string]$canonicalInput.resolution.resolvedPath
+            })
+        }
+        $inputs = [object[]]$canonicalInputs.ToArray()
+        $request.authoringInputs = $inputs
+    }
     $shared = Get-DmSharedReferenceResource -Operation $operation -Targets $targets
     if (-not $shared.passed) { return @{ result = $shared.result } }
     $context = Get-DmPreNoteContext -Preflight $preflight

@@ -141,6 +141,17 @@ function Test-DmExpectedInputTargets {
             $changed.Add($identity)
             continue
         }
+        if ($inputTarget.PSObject.Properties['canonicalPath']) {
+            $comparison = [System.StringComparison]$Boundary.comparison
+            if (-not [string]::Equals(
+                [string]$boundaryCheck.resolution.resolvedPath,
+                [string]$inputTarget.canonicalPath,
+                $comparison
+            )) {
+                $changed.Add($identity)
+                continue
+            }
+        }
 
         switch ([string]$resolution.status) {
             'resolved' {

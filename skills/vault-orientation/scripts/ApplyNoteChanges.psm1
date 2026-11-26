@@ -312,6 +312,15 @@ function Invoke-DmApply {
 
         $runtimeVersion = $null
         if (-not [string]::IsNullOrWhiteSpace([string]$preflight.request.approvedPreviewId)) {
+            if ($operation -cin @('note.create-article', 'note.create-article-fact-change')) {
+                $canonicalInputCheck = Get-DmArticleAuthoringInputTargets -Preflight $preflight
+                if (-not $canonicalInputCheck.ok) {
+                    $result = New-DmApplyBlockedResult -Operation $operation -Code ([string]$canonicalInputCheck.code) -Targets $targets `
+                        -RemainingWork @('Revalidate the destination and consumed article inputs, then preview the change again.') `
+                        -Message ([string]$canonicalInputCheck.message)
+                    return [pscustomobject][ordered]@{ result = $result; applied = @() }
+                }
+            }
             try { $runtimeVersion = Get-DmRuntimeVersion }
             catch {
                 $result = New-DmApplyBlockedResult -Operation $operation -Code 'CONFIRMATION_REQUIRED' -Targets $targets `

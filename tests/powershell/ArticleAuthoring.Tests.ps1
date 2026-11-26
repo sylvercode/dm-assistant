@@ -338,6 +338,24 @@ Describe 'Article-authoring source package layout (not installed-client resource
             Assert-TestArticleAuthoringStale -Fixture $script:ArticleFixture -ExpectedInputs $expected -Target $writeTarget
         }
 
+        It 'invalidates a destination canonical resolution changed after preview while the lexical path is unchanged' {
+            $expected = New-TestArticleAuthoringSnapshot -Fixture $script:ArticleFixture
+            $destination = @($expected | Where-Object { $_.identity -ceq 'destination' }) | Select-Object -First 1
+            $writeTarget = New-TestArticleWriteTarget -Fixture $script:ArticleFixture -ExpectedInputs $expected
+
+            $retargetedResolution = $destination.resolution.PSObject.Copy()
+            $retargetedResolution.resolvedPath = Join-Path $script:ArticleFixture.Root 'Lore\Retargeted Article.md'
+            $retargetedDestination = [pscustomobject][ordered]@{
+                identity = 'destination'
+                resolution = $retargetedResolution
+                observedVersion = [string]$destination.observedVersion
+                canonicalPath = [string]$retargetedResolution.resolvedPath
+            }
+            $expected = @($expected | Where-Object { $_.identity -cne 'destination' }) + @($retargetedDestination)
+
+            Assert-TestArticleAuthoringStale -Fixture $script:ArticleFixture -ExpectedInputs $expected -Target $writeTarget
+        }
+
         It 'invalidates a destination that disappeared after validation' {
             $expected = New-TestArticleAuthoringSnapshot -Fixture $script:ArticleFixture
             [System.IO.File]::Delete($script:ArticleFixture.DestinationPath)
@@ -798,7 +816,7 @@ Describe 'Bundled article template static syntax' {
                     reviewedVersions = $previewOutcome.preview.reviewedVersions
                     reviewedDependencyVersions = $previewOutcome.preview.reviewedDependencyVersions
                 }
-            (Invoke-DmApply -Request $changedProposalApply).result.completionCode | Should -BeExactly 'CONFIRMATION_REQUIRED'
+            (Invoke-DmApply -Request $changedProposalApply).result.completionCode | Should -BeExactly 'TARGET_CONFLICT'
             Test-Path -LiteralPath (Join-Path $fixture.Root 'Articles\Reviewed Article.md') | Should -BeFalse
         }
     }

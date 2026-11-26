@@ -334,6 +334,17 @@ function Get-DmArticleAuthoringInputTargets {
                 message = 'A consumed authoring input is outside the verified vault boundary.'
             }
         }
+        if ($inputEntry.PSObject.Properties['canonicalPath']) {
+            $comparison = [System.StringComparison]$Preflight.boundary.comparison
+            if (-not [string]::Equals([string]$resolution.resolvedPath, [string]$inputEntry.canonicalPath, $comparison)) {
+                return [pscustomobject][ordered]@{
+                    ok = $false
+                    code = 'TARGET_CONFLICT'
+                    inputs = @()
+                    message = 'A consumed destination or parent resolves to a changed canonical path.'
+                }
+            }
+        }
 
         $actualVersion = $null
         switch ([string]$inputEntry.identity) {
@@ -373,8 +384,23 @@ function Get-DmArticleAuthoringInputTargets {
             identity = [string]$inputEntry.identity
             resolution = $resolution
             observedVersion = [string]$actualVersion
+            canonicalPath = [string]$resolution.resolvedPath
         })
     }
+
+    $canonicalRequestInputs = [System.Collections.Generic.List[object]]::new()
+    foreach ($target in @($targets.ToArray())) {
+        $original = @($request.authoringInputs | Where-Object {
+            [string]$_.identity -ceq [string]$target.identity
+        }) | Select-Object -First 1
+        $canonicalRequestInputs.Add([pscustomobject][ordered]@{
+            identity = [string]$target.identity
+            path = [string]$original.path
+            version = [string]$target.observedVersion
+            canonicalPath = [string]$target.canonicalPath
+        })
+    }
+    $request.authoringInputs = [object[]]$canonicalRequestInputs.ToArray()
 
     [pscustomobject][ordered]@{ ok = $true; code = $null; inputs = [object[]]$targets.ToArray(); message = '' }
 }

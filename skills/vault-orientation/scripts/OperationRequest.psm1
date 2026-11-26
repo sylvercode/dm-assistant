@@ -499,19 +499,27 @@ function Test-DmOperationRequest {
                     $identity = Get-DmExactField -Object $entry -Name 'identity'
                     $path = Get-DmExactField -Object $entry -Name 'path'
                     $version = Get-DmExactField -Object $entry -Name 'version'
+                    $canonicalPath = Get-DmExactField -Object $entry -Name 'canonicalPath'
                     $pathCheck = if ($path.value -is [string]) { Test-DmVaultRelativePath -Path $path.value } else { $null }
                     $allowedVersion = $version.value -is [string] -and (
                         $version.value -ceq 'directory' -or (Test-DmVersionValue -Value $version.value)
                     )
-                    $ok = $names.Count -eq 3 -and $identity.present -and (Test-DmPlainText -Value $identity.value -MaxLength 128) -and
+                    $unknownNames = @($names | Where-Object { $_ -cnotin @('identity', 'path', 'version', 'canonicalPath') })
+                    $canonicalValid = -not $canonicalPath.present -or (
+                        $canonicalPath.value -is [string] -and [System.IO.Path]::IsPathFullyQualified([string]$canonicalPath.value)
+                    )
+                    $ok = $unknownNames.Count -eq 0 -and @($names).Count -ge 3 -and @($names).Count -le 4 -and
+                        $canonicalValid -and $identity.present -and (Test-DmPlainText -Value $identity.value -MaxLength 128) -and
                         $path.present -and $null -ne $pathCheck -and $pathCheck.isValid -and $version.present -and $allowedVersion
                     if ($ok -and -not $identities.Add([string]$identity.value)) { $ok = $false }
                     if ($ok) {
-                        $entries.Add([pscustomobject][ordered]@{
+                        $entryValue = [ordered]@{
                             identity = [string]$identity.value
                             path = [string]$path.value
                             version = [string]$version.value
-                        })
+                        }
+                        if ($canonicalPath.present) { $entryValue['canonicalPath'] = [string]$canonicalPath.value }
+                        $entries.Add([pscustomobject]$entryValue)
                     }
                 }
                 if (-not $ok) { $problems.Add("authoringInputs[$index] must carry one unique identity, a valid vault-relative path, and a valid version.") }
