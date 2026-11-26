@@ -42,10 +42,12 @@ environment-variable/home-directory expansion.
 | `contractVersion` | Required string identifying this interface version; current value is `1`. |
 | `requestId` | Required caller-generated correlation identifier. It is not an authorization token or a promise of retry/idempotency behavior. |
 | `operation` | Required stable identifier registered by the consuming workflow. An operation's name, argument schema, and whether it can change established campaign facts (section 9) must be documented before release; this contract does not invent a CLI command or a universal operation catalog. |
-| `vaultRoot` | Required explicit absolute path to the user-designated vault. It is never defaulted to the plugin or current directory. Authorization of this exact root is independently established before any vault read. |
+| `vaultRoot` | Required explicit absolute path to the user-designated vault. It is never defaulted to the plugin or current directory. The caller checks authorization for this exact root before any vault read. |
+| `callerPreflight` | Explicit caller confirmation: exactly `{ vaultRoot: <absolute path>, dependenciesReady: <Boolean>, vaultAuthorized: <Boolean> }`. Required to pass production preflight. Copilot supplies true values only after completing live MCP checks. Omission/null blocks; malformed values return `INVALID_REQUEST`; negative readiness returns `PREREQUISITE_MISSING`; negative or non-matching-root authorization returns `VAULT_AUTHORIZATION_UNPROVEN`. |
 | `campaignGroup` | Required context object with explicit `campaign` and `group` values, or explicit `null` for a value that the requested operation does not use. Required context may not be guessed from note content. |
 | `mode` | Required enum: `inspect`, `preview`, or `apply`. `inspect` is read-only; `preview` computes and reports proposed changes without writing; `apply` may write only the requested targets and only under the safeguards below. |
 | `arguments` | Required operation-specific data object, including the requested action and any content supplied for it. Its schema is defined by the registered operation. Values are data, never executable instructions or command fragments. |
+| `authoringInputs` | Optional except for the two article-creation operations, where it is required. Carries the exact vault-relative input paths and observed versions consumed by article authoring, including one absent destination and its existing parent when it is below the vault root. |
 | `targets` | Required array of explicit vault-relative target paths for the operation; may be empty only when the operation has no file targets. Preserve the operation's declared deterministic order. |
 | `approvedPreviewId` | Required for an `apply` that falls under Feature 003 FR-011's preview-and-confirm rule; otherwise omitted. It must identify the exact, still-current preview (section 9) and cannot authorize different targets or changes. |
 | `reviewedVersions` | Required with `approvedPreviewId`; otherwise omitted. The ordered per-target entries returned by the approved preview, one per target in `targets` order, each carrying that target's `observedVersion`, `replacementVersion`, and `conversionDecision` (section 9). |
@@ -57,6 +59,36 @@ its type, and its permitted values. Unknown operation arguments must be
 rejected rather than interpreted as commands. The runtime validates `vaultRoot`
 as a user-designated root; vault-relative path restrictions in section 5 apply
 to `targets` and configured references, not to the absolute root input itself.
+
+The Feature 005 article-authoring operations are additive to contract version
+`1`; existing requests remain unchanged. `note.create-article` accepts one
+non-empty string argument, `content`, and is registered as a page-local-safe
+create that cannot change established facts. `note.create-article-fact-change`
+accepts the same argument but is registered as fact-changing and always
+requires exact preview approval. The operation registration, not a caller
+flag, controls this distinction. Both require one explicit vault-relative
+Markdown target that is absent and whose parent directory already exists; a
+root-level target uses the vault root as its parent. Neither operation creates
+folders, overwrites an existing file, or infers a destination from profile
+mappings.
+
+For these operations, `authoringInputs` is an array of unique
+`{ identity, path, version }` records. Exactly one `destination` record must
+match the sole target and carry version `absent`. A non-root destination also
+requires exactly one matching `destination-parent` record with version
+`directory`; root-level destinations omit that record. Every other consumed
+file input carries a `sha256:<lowercase-hex>` version. Paths are validated and
+resolved within the authorized vault before they are read. The full input
+records are included in the preview digest and their states are rechecked
+during preview and immediately before creation. Any stale or invalid input
+blocks the operation.
+
+Article creation uses the standard result structure: a successful apply lists
+the new path in `changedTargets`; blocked or failed creation reports no changed
+target. The implementation stages bytes on the destination filesystem and
+creates the target without overwrite, so a concurrent destination creation
+fails as a conflict. The new file inherits access rules from its parent
+directory.
 
 ## 3. Prerequisite and pre-note handoff
 
@@ -78,21 +110,41 @@ these gates in order:
 5. Only after all preceding gates succeed, access campaign notes as permitted
    by the relevant Feature 001/002 contract.
 
-Feature 001 defines a note-content-free exact-vault check using the active
-Resolver's `get_server_info` response. The PowerShell runtime cannot yet
-verify that active-session response or its readiness through a trusted
-handoff. **Until that handoff is implemented and verified, script-backed
-vault access remains blocked before profile, guidance, or campaign-note
-access and before any write.** An unconfirmed dependency returns
-`PREREQUISITE_MISSING`; if readiness is established but authorization is not,
-the operation returns `VAULT_AUTHORIZATION_UNPROVEN`. Resolver availability,
-a caller-supplied path, or successful link resolution is not proof of
-authorization. Production preflight accepts no authorization assertion from
-request fields, paths, environment variables, configuration, or the profile;
-a synthetic provider used only by the acceptance harness never proves the
-production handoff works. A failed, missing, incompatible, or inconclusive
-gate fails closed. Non-vault read-only assistance independent of the blocked
-operation may remain available.
+**Revised trust boundary (2026-11-17):** Copilot, not PowerShell, checks the
+live Resolver version, exposed tools, and exact-vault authorization using
+`get_server_info`. The caller supplies `callerPreflight` only after all
+inventory dependencies and the exact vault pass those checks. This replaces
+the unimplemented independently verified active-session handoff. Standalone
+PowerShell callers have the same precondition; this API is not an MCP
+authorization enforcement boundary against a dishonest caller.
+
+PowerShell validates the confirmation's shape and root scope, then enforces
+runtime prerequisites, canonical filesystem containment, input freshness,
+no-overwrite creation, and approval-bound writes. It does not spawn another
+Copilot session or infer readiness from a configuration/server name. Root
+comparison removes Windows extended prefixes (including UNC), normalizes the
+absolute path and trailing separators, and compares case-insensitively on
+Windows; parent/child roots do not match. Confirmation is caller-reported
+evidence, not a token, signature, or independently verified MCP observation.
+
+As revised on 2026-11-20, the caller may reuse a successful live check across
+operations for the same exact vault in the same active client session.
+A new session or vault requires a new check; a known or suspected Resolver
+configuration or authorized-root change requires a fresh session and check.
+Dependency failure or lost evidence blocks further access pending rechecking.
+This accepts that unnoticed changes may go undetected. Evidence remains in
+active session context only, never stored in a profile, environment variable,
+or vault file. Each request still carries its caller confirmation. The writer
+rechecks the supplied confirmation and filesystem boundary, not the live MCP session.
+The confirmation is included in preview digests; changed scope requires a
+fresh preview and approval. A synthetic provider is still test-only and does
+not validate installed-client behavior.
+
+Resolver symlink-target containment qualification is deferred to the vault
+owner and is not a preflight or release gate. Owners may intentionally configure
+external link targets. This does not relax PowerShell's filesystem containment,
+authorize unrelated reads, or permit copying an external Resolver target into
+a script request outside the selected vault.
 
 Installing or discovering the static plugin and its skills does not invoke
 PowerShell or install prerequisites. A script invocation must not alter
@@ -289,7 +341,12 @@ targets, proposed changes, or scope invalidate the approval. Approval does not
 cover later or additional changes. A clearly requested local text edit
 confined to one named note does not require redundant approval unless it
 changes an actual-play record or established continuity. Approval-required
-work must be confirmed in a later message after the preview is presented.
+work must be explicitly confirmed by the DM after the preview is presented.
+The caller may use the native question tool, but must not treat a guess,
+default, missing response, or tool permission approval as DM confirmation.
+If a human response cannot be established, the caller must stop and request
+approval in a later DM message. The runtime checks the caller-supplied preview
+binding; it does not authenticate the source of the approval.
 
 The runtime keeps no preview state between invocations. A target's
 `replacementVersion` is a fingerprint of the complete bytes that would be
@@ -307,7 +364,7 @@ to either between preview and apply invalidates the approval.
 `previewId` is a deterministic digest (for example SHA-256) of the canonical
 serialization of `contractVersion`, `runtimeVersion`, `operation`, the
 canonical `vaultRoot`, `campaignGroup`, the ordered `targets`, `arguments`,
-each target's reviewed `observedVersion`, `replacementVersion`, and
+`authoringInputs` when present, each target's reviewed `observedVersion`, `replacementVersion`, and
 `conversionDecision`, and the ordered dependency versions. `requestId` and
 `mode` are not digest inputs.
 Canonical serialization is the RFC 8785 JSON Canonicalization Scheme (JCS)
@@ -384,7 +441,7 @@ written.
 | Path rules and boundary checks | FR-007, FR-021 | Reject every forbidden lexical form before access; reject traversal and symlink escapes before target access; accept only in-vault links after canonical, component-aware checks; recheck before every access. |
 | Profile parse/normalize/schema/filesystem separation | FR-016–FR-025 | Independently exercise malformed YAML/duplicate keys, normalized scalar edge cases, schema-invalid profiles, absent-profile discovery, explicit missing directories, reference type/readability, shared or nested section mappings and undetermined destinations (`AMBIGUOUS_CONTEXT`), deterministic defaults, and stale dependencies. Schema defaults alone never mutate input. |
 | Result structure and code taxonomy | FR-010 | Verify every result has the fields in the prescribed order, exact status vocabulary, one stable code, safe diagnostics, correct target partition, and no incomplete result marked complete. Exercise each listed code and each allowed status. |
-| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad, actual-play, and continuity-changing edits require approval of the exact current preview in a later message, while a clearly requested non-continuity-changing local edit does not; a target, template, guidance, or profile change after preview makes the old approval fail with `TARGET_CONFLICT`, and a changed request, runtime version, or rebuilt replacement makes it fail with `CONFIRMATION_REQUIRED`; the same preview yields the same `previewId` across separate processes; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
+| Read-only, approval, and content-as-data safeguards | FR-008–FR-009, FR-011, FR-014 | Inspection/preview produce zero writes; broad, actual-play, and continuity-changing edits require explicit DM approval of the exact current preview after it is shown, while a clearly requested non-continuity-changing local edit does not; a target, template, guidance, or profile change after preview makes the old approval fail with `TARGET_CONFLICT`, and a changed request, runtime version, or rebuilt replacement makes it fail with `CONFIRMATION_REQUIRED`; the same preview yields the same `previewId` across separate processes; a DM decline or withdrawal returns `USER_CANCELLED`; command-like note content and paths are never executed or wildcard-expanded; diagnostics omit note bodies and remain on-device. |
 | Conflict detection, preservation, and encoding | FR-012–FR-013 | Modify a target after preview and before final write check; verify refusal and no overwrite. Verify supported UTF-8/UTF-16 bytes, line endings, and unrelated text remain intact; unsupported or undecodable text returns `ENCODING_UNSAFE` and remains unchanged. |
 | Atomicity and multi-target failure | FR-026 | Inject failure/interruption during a target write and after an earlier target succeeds; verify no partial current file, no later attempts, no rollback, correct `partially completed` status, and exact changed/unchanged/remaining target lists. |
 

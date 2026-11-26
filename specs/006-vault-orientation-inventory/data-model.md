@@ -1,7 +1,7 @@
 # Data Model: Read-Only Vault Orientation and Inventory
 
-**Status: Design proposal; Feature 006 inventory and profile proposals are
-not implemented.** This request-scoped model reuses Feature 001's
+**Status: Locally implemented inventory and review-only proposals; profile
+writing remains a proposal.** This request-scoped model reuses Feature 001's
 shared-guidance and pre-note policy, Feature 002's profile and
 configured/default-guidance semantics, and Feature 003's operation request,
 preflight, boundary, and result mechanics. It defines no persistent storage,
@@ -28,9 +28,9 @@ not work to implement in this feature.
 
 The target vault is supplied by the user's workspace or explicit input; it is
 never inferred from the plugin directory, process working directory, notes,
-profile, or environment. Until Feature 003's trusted active-session
-authorization handoff is verified, script-backed vault access remains
-fail-closed before profile, guidance, or campaign-note reads.
+profile, or environment. The caller performs the live MCP checks and supplies
+root-scoped `callerPreflight`; PowerShell checks that confirmation but does not
+independently authenticate MCP. Failed confirmations block reads.
 
 ## Entities and fields
 
@@ -257,8 +257,7 @@ operation is registered with `FactChanging = false` and `ChangeKind = edit`,
 so the current runtime does not require preview approval for a single target.
 Its replacement is not validated against the proposed-profile schema; checks
 of the existing profile and dependencies do not validate the replacement.
-Production authorization nevertheless remains fail-closed until the trusted
-active-session handoff is verified.
+Caller confirmation does not enforce this profile-specific policy.
 
 The user chose **document the existing limitation only**: Feature 006 does
 not plan or implement a generic-writer guard or a profile writer. Separately
@@ -291,8 +290,7 @@ withdrawal, stale approval, validation failure, or an unsupported/unproven
 boundary must stop before any target write. The future writer must define
 atomic-commit and interruption behavior and report an actual or uncertain
 post-commit outcome honestly rather than assuming every reported write failure
-left the target unchanged. Production authorization remains fail-closed until
-the trusted active-session handoff is verified.
+left the target unchanged.
 
 ## State transitions
 

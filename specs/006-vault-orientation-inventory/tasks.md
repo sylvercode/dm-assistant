@@ -11,7 +11,7 @@ description: "Implementation tasks for read-only vault orientation and inventory
 
 **Tests**: Pester acceptance tasks are included because the feature specifies test scenarios and measurable success criteria. Use only synthetic, disposable vaults and the test-only authorization provider.
 
-**Scope**: Inventory and proposals are read-only. This feature does not implement a profile writer or a generic-editor guard. The production script-backed authorization handoff remains unverified and fail-closed.
+**Scope**: Inventory and proposals are read-only. This feature does not implement a profile writer or a generic-editor guard. Historical references below to an always-blocked authorization handoff are superseded by Feature 003's caller-confirmation contract: the caller performs live MCP checks and PowerShell validates the root-scoped confirmation without independently authenticating MCP. Installed-client and production qualification remain unverified.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -123,14 +123,15 @@ description: "Implementation tasks for read-only vault orientation and inventory
 - [X] T036 [P] Perform the static skill inventory and source audit using `skills\README.md` and `specs\001-shared-vault-guidance\spec.md`: enumerate every immediate-child `skills\*\SKILL.md`, require a one-to-one inventory with no missing, extra, duplicate, or unclassified skills, and inspect every vault-facing skill for shared-reference loading, designated guidance, required dependencies, and authorization before note access.
 - [ ] T037 [P] Follow the local plugin-discovery procedure in `README.md` and `specs\006-vault-orientation-inventory\quickstart.md` after the plugin changes: from the repository root start a fresh `copilot --plugin-dir .` session, check `/skills list` and `/agent`, and separately run `copilot --plugin-dir . plugin list`. Confirm `vault-orientation` is listed, the plugin bundles no Copilot-specific agents, and `dm-assistant` appears under External Plugins (via `--plugin-dir`); other installed agents may still appear. If the CLI or interactive session is unavailable, record the blocker and leave the task incomplete. Do not treat session-scoped discovery as installed-client resource, runtime, or authorization validation.
 - [X] T038 [P] Run the focused synthetic acceptance suite with `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1 -Path tests\powershell\VaultOrientationInventory.Tests.ps1`, then the full Pester 6.2.0 suite with `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`; include the shared request, guidance, and fixture regressions and report any environment-dependent link skips rather than claiming they passed. **2026-11-11:** on Windows with PowerShell 7.7.0, focused: 44 passed, 0 failed, 1 skipped; full: 459 passed, 0 failed, 7 skipped. Skips require file symlink creation unavailable in this environment.
-- [ ] T039 Conduct the real-DM SC-005 walkthrough in `specs\006-vault-orientation-inventory\quickstart.md` after the proposal workflow and focused tests are ready: five real DMs independently review the same synthetic proposal with at least six mappings, including at least two `observed` and two `inferred`, against a separate answer key. Pass only if at least four of the five each correctly classify every mapping and all five can decline with no vault changes verified by before/after snapshots; record anonymized individual and aggregate outcomes, proposal identity, and environment alongside the walkthrough in `specs\006-vault-orientation-inventory\quickstart.md` without campaign content, and leave this task incomplete if participants are unavailable.
+- [X] T039 **Deferred to [#13](https://github.com/sylvercode/dm-assistant/issues/13); SC-005 not run or passed.** Conduct the real-DM SC-005 walkthrough in `specs\006-vault-orientation-inventory\quickstart.md`: five real DMs independently review the same synthetic proposal with at least six mappings, including at least two `observed` and two `inferred`, against a separate answer key. Pass only if at least four of the five each correctly classify every mapping and all five can decline with no vault changes verified by before/after snapshots. Record anonymized individual and aggregate outcomes, proposal identity, and environment in the quickstart without campaign content.
 - [X] T040 Update `README.md` and `docs\powershell-runtime-support.md` with the implemented behavior and actual validation evidence, distinguishing synthetic authorization, session-scoped local discovery, any outstanding five-DM review, unverified installed-client behavior, and the still-blocked production authorization handoff.
 
 T037 remains incomplete: `/skills list` found `vault-orientation` and `/agent`
 found no custom agents, but `copilot --plugin-dir . plugin list` showed
 `dm-assistant` under Installed plugins rather than the expected External
-Plugins grouping. T039 remains incomplete because no five real DM reviewers
-performed SC-005.
+Plugins grouping. T039 is checked to record its deferral to
+[#13](https://github.com/sylvercode/dm-assistant/issues/13), not a pass.
+Feature acceptance still requires the five-DM walkthrough to meet SC-005.
 
 ---
 

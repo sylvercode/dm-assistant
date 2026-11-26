@@ -49,7 +49,7 @@ requirements; this table describes each field's role.
 | `vaultRoot` | Explicit absolute path to the user-designated vault. It must not be inferred from the plugin location or process current directory, and exact-vault authorization is established separately. |
 | `campaignGroup` | Explicit campaign/group context, or explicit `null` for a value the operation does not use, consistent with the one-campaign/group-per-vault assumption. |
 | `targets[]` | Explicit vault-relative note or configuration references, in the operation's deterministic order. |
-| `arguments` | Operation-specific data, including the requested content effect. Clearly requested local edits to one named note may proceed without redundant approval unless they change actual-play records or established continuity; broader, destructive, restructuring, multi-note, or continuity-changing work requires approval of its exact preview in a later message. |
+| `arguments` | Operation-specific data, including the requested content effect. Clearly requested local edits to one named note may proceed without redundant approval unless they change actual-play records or established continuity; broader, destructive, restructuring, multi-note, or continuity-changing work requires explicit DM approval after its exact preview is shown. |
 | `mode` | `inspect` (read-only), `preview` (compute proposed changes without writing), or `apply` (write only the requested targets under the safeguards). |
 | `approvedPreviewId` | Identifies the exact, still-current approved preview when the preview-and-confirm rule applies; it cannot authorize different targets or changes. |
 | `reviewedVersions` | With `approvedPreviewId`, the ordered per-target `observedVersion`, `replacementVersion`, and `conversionDecision` values from the approved preview, one entry per target. |
@@ -93,6 +93,16 @@ vault.
 Each dependency must be ready and separately authorized before campaign-note
 access. `unknown` is not success. Do not resolve a campaign link to establish
 authorization.
+
+As revised on 2026-11-17, live MCP evidence belongs to the calling skill.
+Requests carry an explicit `callerPreflight` object with exactly `vaultRoot`
+(absolute string), `dependenciesReady` (Boolean), and `vaultAuthorized`
+(Boolean). PowerShell validates the object's shape and exact-root scope and
+consumes these caller confirmations; it does not authenticate the MCP session.
+The object is operation-local, copied during normalization, bound into preview
+digests, and rechecked at the writer boundary. The caller may reuse successful
+live checks for the same vault in the same session until an invalidating change,
+failure, or lost evidence; runtime rechecks cannot detect live MCP changes.
 
 ### Guidance and campaign context
 
@@ -221,7 +231,7 @@ Only the exact approved preview may be applied. Approval does not authorize
 later edits or different targets. Any material change in target version,
 dependency version, content, or proposed effect invalidates the preview and
 requires a new review
-and, where required, approval in a later message. Clearly requested local
+and, where required, explicit DM approval after it is shown. Clearly requested local
 edits confined to one named note do not need redundant approval unless they
 change actual-play records or established continuity, but still require
 conflict checks and safe replacement.
@@ -311,8 +321,8 @@ campaign content, and send no usage or diagnostic telemetry off-device.
 7. **Staleness:** check that the profile and referenced inputs remain the
    validated versions before dependent use. On change, stop and revalidate;
    never mix old and new inputs or silently retry.
-8. **Approval and continuity:** require explicit approval in a later message
-   for the exact preview when scope is multi-note, destructive,
+8. **Approval and continuity:** require explicit DM approval after showing
+   the exact preview when scope is multi-note, destructive,
    restructuring, or changes actual-play records or established continuity.
    Preserve unrelated note content; do not silently resolve contradictions
    or rewrite run adventure plans.

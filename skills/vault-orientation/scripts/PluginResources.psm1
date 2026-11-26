@@ -114,7 +114,7 @@ function Get-DmProfileSchemaResource {
 
     $testJson = Get-Command -Name 'Test-Json' -CommandType Cmdlet -ErrorAction SilentlyContinue
     if ($null -eq $testJson -or -not $testJson.Parameters.ContainsKey('Schema')) {
-        return (& $block 'PREREQUISITE_MISSING' 'validator-missing' 'The JSON Schema Draft 2020-12 validator is unavailable; no profile setting was used.' 'Use the supported PowerShell runtime documented in docs/powershell-runtime-support.md, then retry.')
+        return (& $block 'PREREQUISITE_MISSING' 'validator-missing' 'The JSON Schema Draft 2020-12 validator is unavailable; no profile setting was used.' 'Use the supported PowerShell runtime with the built-in Test-Json -Schema command, then retry.')
     }
     try {
         $accepts = Test-Json -Json '{"version":1}' -Schema $text -ErrorAction SilentlyContinue

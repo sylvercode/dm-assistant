@@ -1,16 +1,20 @@
 # Plugin Architecture
 
 DM Assistant uses Agent Plugins 1.0. The repository root is the installable
-plugin directory. The repository includes a portable vault-orientation skill
-and its bundled shared reference, schema, and PowerShell runtime modules.
+plugin directory. The repository includes portable vault-orientation and
+article-authoring skills. Vault orientation bundles the shared reference,
+schema, and PowerShell runtime modules; article authoring bundles its
+entry point and templates.
 The Obsidian Link Resolver is an externally installed dependency; its
 user-specific Copilot CLI configuration and authorized vault roots stay
 outside the plugin. Feature 001 verified Resolver 2.1.0, both required tools,
 and exact-vault authorization through `get_server_info` in an isolated
 Copilot CLI installed-client setup using disposable vaults. That client
-evidence does not verify a handoff to the PowerShell runtime. Local PowerShell
-tests use synthetic vaults and test-only authorization; script-backed
-campaign-vault access remains fail-closed. Installed-client verification of
+evidence predates the revised caller-confirmation contract. Copilot owns live
+MCP readiness and exact-vault checks and supplies explicit, vault-scoped
+`callerPreflight`; PowerShell enforces filesystem and write safeguards without
+independently authenticating MCP. Local PowerShell tests use synthetic vaults.
+Installed-client verification of
 that runtime and cross-platform verification remain outstanding. The
 orientation skill must fail closed whenever exact-vault authorization cannot
 be established.
@@ -22,6 +26,10 @@ dm-assistant/
 |-- plugin.json
 |-- skills/
 |   |-- README.md
+|   |-- article-authoring/
+|   |   |-- SKILL.md
+|   |   |-- scripts/
+|   |   `-- templates/
 |   `-- vault-orientation/
 |       |-- SKILL.md
 |       |-- VAULT-REFERENCE.md
@@ -32,29 +40,30 @@ dm-assistant/
 |-- tests/
 |   `-- powershell/
 |-- com.github.copilot/
-|   `-- agents/
-|       `-- README.md
+|   `-- agents/  (reserved for <name>.agent.md files)
 |-- docs/
 |   `-- architecture.md
 |-- README.md
 `-- LICENSE
 ```
 
-The component directory READMEs describe where to add future content. They are
-not plugin components.
+The skill inventory at `skills/README.md` is contributor documentation, not a
+plugin component. Keep contributor documentation outside Copilot discovery
+directories; Markdown files under `com.github.copilot/agents/` are parsed as
+agent definitions.
 
 ## Component Boundaries
 
 | Component | Location | Responsibility |
 | --- | --- | --- |
 | Manifest | `plugin.json` | Plugin identity, version, and distribution metadata. |
-| Portable skills | `skills/<skill-name>/SKILL.md` | Task-specific workflows and any bundled templates or scripts. Each skill must be an immediate child of `skills/`. The current vault-orientation skill bundles `VAULT-REFERENCE.md`. |
-| Copilot agents | `com.github.copilot/agents/<name>.agent.md` | Copilot-specific assistant profiles and orchestration. |
+| Portable skills | `skills/<skill-name>/SKILL.md` | Task-specific workflows and any bundled templates or scripts. Each skill must be an immediate child of `skills/`. Vault orientation owns `VAULT-REFERENCE.md`; article authoring activates it for shared safeguards. |
+| Copilot agents | `com.github.copilot/agents/<name>.agent.md` | Copilot-specific assistant profiles and orchestration. Keep only agent definitions in this discovery directory. |
 | Skill inventory | `skills/README.md` | Declares every immediate-child skill directory containing `SKILL.md` and classifies each as vault-facing or non-vault-facing. It is contributor documentation, not a plugin component. |
 | MCP integration (future) | `mcp.json` | Register actual tool servers using the Agent Plugins MCP schema. |
 | Copilot hooks (future) | `com.github.copilot/hooks/hooks.json` | Lifecycle automation when a concrete need exists. |
 | Vault configuration schema | `skills/vault-orientation/assets/dmassist.schema.json` | Canonical JSON Schema for the proposed normalized version-1 vault profile, packaged with its consuming skill and located by the skill's PowerShell resource lookup independently of the working directory. |
-| Runtime modules | `skills/vault-orientation/scripts/` | Explicit requests, prerequisite and authorization gates, installed resources, profile validation, inspection, previews, and per-note atomic writes. Production access remains fail-closed. |
+| Runtime modules | `skills/vault-orientation/scripts/` | Explicit requests, runtime prerequisites, caller-confirmed MCP checks, filesystem boundaries, installed resources, profile validation, inspection, previews, and per-note atomic writes. Missing caller confirmation blocks access. |
 | Packaged dependency inventory | `skills/vault-orientation/assets/runtime-dependencies.json` | Runtime projection of Feature 001's authoritative dependency inventory; update both together, never infer authorization from readiness. |
 | Acceptance harness | `tests/powershell/` | Synthetic tests and explicit test-only authorization injection; never loaded or discovered by production modules or skills. |
 
@@ -96,11 +105,9 @@ is authoritative for this preflight.
 
 Exact-root authorization does not by itself confine Resolver reads. Resolver
 2.1.0 can follow a file symlink outside an authorized root while reading a
-heading or block target. Before calling `resolve_obsidian_link`, require an
-upstream release whose documented or verified behavior canonicalizes every
-resolved target and rejects targets outside the selected root, including
-symlinks. No such release has been verified here; link resolution must remain
-blocked until that security property is confirmed. Pass the exact matched
+heading or block target. Target-containment qualification is deferred to the
+vault owner; external targets may be intentional. This is not a preflight or
+T029 gate and does not relax PowerShell filesystem containment. Pass the exact matched
 root as `vault_root` whenever multiple roots are configured.
 
 ## Verification Evidence Boundaries
@@ -113,13 +120,17 @@ and disposable vaults; it does not prove the PowerShell modules can consume
 the active session's authorization signal.
 
 The local PowerShell acceptance suite validates runtime behavior against
-synthetic vaults. Its test-only authorization provider is not production
-authorization evidence. The production runtime cannot currently verify the
-active Resolver session's version, exposed tools, or exact-vault signal, so
-script-backed vault access must remain fail-closed before profile, guidance,
-or campaign-note reads. Do not treat source inspection, synthetic tests, or
-a copied package fixture as installed-client validation. Installed-client
-runtime handoff and supported-platform verification remain outstanding.
+synthetic vaults. Copilot must actually check the active Resolver session
+before supplying `{ vaultRoot, dependenciesReady, vaultAuthorized }` through
+`callerPreflight` on runtime requests. Standalone callers own this precondition
+too. These are caller assertions, not independently authenticated credentials;
+the runtime checks their shape and exact-root scope and rejects missing or
+negative confirmation. The caller may reuse successful live checks in the
+same session for the same vault until an invalidating change or failure;
+PowerShell rechecks the supplied confirmation, canonical boundary,
+input freshness, and approval. Do not treat synthetic tests, test providers,
+or a copied package as installed-client validation. End-to-end client and
+supported-platform verification remain outstanding.
 
 The README describes intended vault conventions. Any skill that reads,
 interprets, creates, or changes campaign material is vault-facing and must be
@@ -203,7 +214,7 @@ open questions, and acceptance scenarios.
    installed-client checks verified cross-skill resource lookup, Resolver
    2.1.0 readiness, and exact-vault authorization through `get_server_info`;
    its agent-run acceptance scenarios pass. This does not verify the
-   PowerShell authorization handoff. The informal human DM walkthrough
+   revised caller-confirmation flow. The informal human DM walkthrough
    (SC-004) is still outstanding. Keep
    `skills/README.md` as the authoritative inventory and statically audit its
    exact match to skill files and each vault-facing skill's preflight.
@@ -219,9 +230,9 @@ open questions, and acceptance scenarios.
    Windows remains a candidate; macOS/Linux are unsupported and unverified.
 4. **Enable script-backed vault orientation.** Inspection and configuration
    loading are locally tested with synthetic vaults; these tests do not
-   establish production authorization. Verify a trusted active-session
-   authorization handoff and installed-client execution before enabling
-   script-backed campaign-note access. Until then, keep it fail-closed.
+   establish installed-client behavior. Verify the caller-managed MCP checks
+   and installed-client execution before claiming production qualification.
+   Missing caller confirmation must remain fail-closed.
    Before enabling writes, also resolve the single-note actual-play and
    continuity classification gap tracked by Feature 003 T048. Keep discovery
    read-only and report ambiguity rather than restructuring files.

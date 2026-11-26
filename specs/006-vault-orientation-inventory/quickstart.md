@@ -36,9 +36,10 @@ the original request, without echoing the skipped path.
 - The test harness's authorization provider and dependency-readiness overrides
   are **test-only** mocks. They allow isolated tests to exercise code behind
   preflight; they do not prove production authorization, create an authorized
-  real vault, or belong in the installed plugin. Without a trusted
-  active-session exact-vault authorization handoff, production script-backed
-  access must remain fail-closed before profile, guidance, or note reads.
+  real vault, or belong in the installed plugin. The caller must complete live
+  dependency and exact-vault authorization checks before supplying its
+  root-scoped `callerPreflight` confirmation; PowerShell does not authenticate
+  MCP independently.
 - The declared Resolver dependency and exact-vault authorization checks still
   apply, but the Resolver is not needed for inventory traversal or containment.
   Do not call link-resolution operations as part of these checks.
@@ -98,8 +99,9 @@ Inside that session, check discovery:
 /agent
 ```
 
-The `vault-orientation` skill should be listed and no Copilot-specific agents
-are currently included. In a separate shell, check the plugin listing:
+Both `vault-orientation` and `article-authoring` should be listed; no
+Copilot-specific agents are currently included. In a separate shell, check
+the plugin listing:
 
 ```powershell
 copilot --plugin-dir . plugin list
@@ -144,7 +146,8 @@ envelope and an explicitly established absolute root from the synthetic
 fixture, not the plugin directory. Set `contractVersion` to `"1"`, supply a
 caller-generated `requestId`, and require exactly
 `operation: vault.orientation.inventory`, `mode: inspect`,
-`campaignGroup: { campaign: null, group: null }`, and `targets: []`.
+`campaignGroup: { campaign: null, group: null }`, and `targets: []`. Supply
+`callerPreflight` only after completing the live checks for that exact root.
 The required `arguments` object accepts only these case-sensitive fields:
 
 | Argument | Proposed value and acceptance checks |
@@ -388,8 +391,8 @@ implemented or tested as part of Feature 006.
 containment gates pass, `note.replace-text` can target an existing
 `.dmassist.yaml` because it has no Markdown-extension check. A single ordinary
 target does not require the approval fields, and the proposed YAML replacement
-is not validated against the profile schema. Production script-backed
-authorization nevertheless remains fail-closed. Feature 006 and its caller
+is not validated against the profile schema. Caller confirmation does not
+enforce this profile-specific policy. Feature 006 and its caller
 must not use that generic edit or direct writes for profile changes; this is a
 workflow rule, **not** a runtime-wide guard. Separately scoped remediation is
 needed before claiming other generic callers cannot bypass the policy. Do not
@@ -397,11 +400,11 @@ make an acceptance test expect the current generic editor to reject this
 target. The [contract's limitation](contracts/vault-orientation-inventory.md#future-only-profile-write-and-consent-boundary)
 records the source evidence.
 
-## SC-005 human walkthrough: outstanding
+## SC-005 human walkthrough: deferred
 
-No Feature 006 walkthrough is recorded. This check requires **five real DMs**,
-not simulated agents, and remains outstanding until conducted after the
-proposal workflow exists:
+The walkthrough is deferred to [#13](https://github.com/sylvercode/dm-assistant/issues/13).
+T039 is checked to record the deferral; SC-005 has not been run or passed.
+This check requires **five real DMs**, not simulated agents:
 
 1. Prepare one invented synthetic fixture and the same fully determined
    proposal for all five participants. It must contain at least six mappings,
@@ -425,8 +428,10 @@ proposal workflow exists:
 The implementation exists locally, but Feature 006 acceptance remains
 incomplete until the focused tests and full suite pass, local discovery and
 the static source audit pass, and the five-DM walkthrough meets SC-005. The
-static audit found one skill with a one-to-one inventory match and verified
-its pre-note gates. Interactive discovery found `vault-orientation` and no
+merged static source audit matches both vault-facing skills one-to-one with
+`skills/README.md`: article authoring activates vault orientation and uses
+its shared reference and pre-note sequence. Earlier interactive discovery
+found `vault-orientation` and no
 Copilot-specific agents, but the separate plugin listing did not show
 `dm-assistant` under the documented **External Plugins (via --plugin-dir)**
 grouping, so local discovery remains incomplete.
@@ -435,9 +440,9 @@ On 2026-11-11, under Windows, PowerShell 7.7.0, and Pester 6.2.0, the
 focused suite passed 44 tests, failed 0, and skipped 1; the full suite passed
 459, failed 0, and skipped 7. File-symlink cases were skipped because this
 environment requires Windows Developer Mode or elevation to create them.
-The five-DM review has not been performed.
+The five-DM review is deferred to [#13](https://github.com/sylvercode/dm-assistant/issues/13)
+and has not been performed.
 Synthetic fixtures and mocked authorization do not establish production
 access, installed-client behavior, or support for untested operating systems.
-The production authorization handoff remains a separate fail-closed
-prerequisite; a successful local test must not be presented as real-vault
-authorization.
+The caller must perform the live checks; a successful local test or an
+unverified confirmation must not be presented as real-vault authorization.

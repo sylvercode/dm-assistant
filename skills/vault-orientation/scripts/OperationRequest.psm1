@@ -8,12 +8,12 @@ Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultPathValidati
 # plugin directory, notes, profile, or environment, and it never resolves the
 # vault root (that happens after the authorization gate).
 
-$script:DmRequestFields = @('contractVersion', 'requestId', 'operation', 'vaultRoot', 'campaignGroup', 'mode', 'arguments', 'targets',
+$script:DmRequestFields = @('contractVersion', 'requestId', 'operation', 'vaultRoot', 'campaignGroup', 'mode', 'arguments', 'targets', 'callerPreflight', 'authoringInputs',
     'approvedPreviewId', 'reviewedVersions', 'reviewedDependencyVersions', 'declinedReviewId')
 $script:DmRequiredRequestFields = @('contractVersion', 'requestId', 'operation', 'vaultRoot', 'campaignGroup', 'mode', 'arguments', 'targets')
 $script:DmModes = @('inspect', 'preview', 'apply')
 $script:DmArgumentTypes = @('string', 'boolean', 'integer', 'stringArray', 'mappingDecisions')
-$script:DmChangeKinds = @('read', 'edit', 'delete', 'reorganize', 'unclassified')
+$script:DmChangeKinds = @('read', 'edit', 'create', 'delete', 'reorganize', 'unclassified')
 $script:DmConversionDecisions = @('preserve')
 $script:DmDigestPattern = '^sha256:[0-9a-f]{64}$'
 $script:DmOperationNamePattern = '^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$'
@@ -185,6 +185,8 @@ function Register-DmOperation {
     designated local guidance rather than a mapping-independent lookup.
     .PARAMETER RequiresCampaignGroup
     Requires explicit campaign/group context before campaign-note access.
+    .PARAMETER PageLocalSafe
+    Allows only a non-fact-changing single-target create to use the page-local approval exception.
     .PARAMETER Force
     Replaces an existing non-built-in registration; built-ins remain protected.
     #>
@@ -201,6 +203,7 @@ function Register-DmOperation {
         [string]$Description = '',
         [switch]$RequiresMappings,
         [switch]$RequiresCampaignGroup,
+        [switch]$PageLocalSafe,
         [switch]$Force
     )
     if ($Name -cnotmatch $script:DmOperationNamePattern) { throw [System.ArgumentException]::new('Operation names must be lowercase dotted identifiers.') }
@@ -211,6 +214,9 @@ function Register-DmOperation {
     if ($writes -and $null -eq $Builder) { throw [System.ArgumentException]::new('An operation with preview or apply mode requires a builder.') }
     if ([string]::IsNullOrEmpty($ChangeKind)) { $ChangeKind = $(if ($writes) { 'unclassified' } else { 'read' }) }
     if ($ChangeKind -cnotin $script:DmChangeKinds) { throw [System.ArgumentException]::new("Unknown change kind '$ChangeKind'.") }
+    if ($PageLocalSafe -and ($ChangeKind -cne 'create' -or $FactChanging)) {
+        throw [System.ArgumentException]::new('PageLocalSafe is valid only for create operations that do not change established campaign facts.')
+    }
     if ($MaxTargets -lt $MinTargets) { throw [System.ArgumentException]::new('MaxTargets must be at least MinTargets.') }
     if ($script:DmOperations.Contains($Name)) {
         if ($script:DmOperations[$Name].builtIn) { throw [System.InvalidOperationException]::new("Built-in operation '$Name' cannot be replaced.") }
@@ -229,6 +235,7 @@ function Register-DmOperation {
         builder               = $Builder
         requiresMappings      = [bool]$RequiresMappings
         requiresCampaignGroup = [bool]$RequiresCampaignGroup
+        pageLocalSafe         = [bool]$PageLocalSafe
         builtIn               = $false
     }
     $script:DmOperations.Add($Name, $registration)
@@ -309,7 +316,8 @@ function Test-DmOperationRequest {
     {campaign; group}, mode, arguments (ordered, schema order), targets
     (string[]), approvedPreviewId, reviewedVersions
     ({path; observedVersion; replacementVersion; conversionDecision}[]),
-    reviewedDependencyVersions ({identity; version}[]), declinedReviewId.
+    reviewedDependencyVersions ({identity; version}[]), declinedReviewId,
+    callerPreflight ({vaultRoot; dependenciesReady; vaultAuthorized}).
     Absent optional values are $null.
     .PARAMETER Request
     Untrusted request dictionary or custom object to validate against the
@@ -367,6 +375,32 @@ function Test-DmOperationRequest {
     $vaultRoot = $f['vaultRoot'].value
     if ($f['vaultRoot'].present -and -not (Test-DmVaultRootShape -Value $vaultRoot)) {
         $problems.Add('vaultRoot must be an explicit absolute path; it is never expanded or inferred.')
+    }
+
+    $callerPreflight = $null
+    if ($f['callerPreflight'].present -and $null -ne $f['callerPreflight'].value) {
+        $raw = $f['callerPreflight'].value
+        $root = Get-DmExactField -Object $raw -Name 'vaultRoot'
+        $ready = Get-DmExactField -Object $raw -Name 'dependenciesReady'
+        $authorized = Get-DmExactField -Object $raw -Name 'vaultAuthorized'
+        $names = @(Get-DmFieldName -Object $raw)
+        $rootValue = $root.value
+        if ($IsWindows -and $rootValue -is [string]) {
+            if ($rootValue.StartsWith('\\?\UNC\', [System.StringComparison]::OrdinalIgnoreCase)) { $rootValue = '\\' + $rootValue.Substring(8) }
+            elseif ($rootValue.StartsWith('\\?\', [System.StringComparison]::OrdinalIgnoreCase)) { $rootValue = $rootValue.Substring(4) }
+        }
+        if (-not (Test-DmObjectValue -Value $raw) -or $names.Count -ne 3 -or
+            -not (Test-DmVaultRootShape -Value $rootValue) -or
+            $ready.value -isnot [bool] -or $authorized.value -isnot [bool]) {
+            $problems.Add('callerPreflight must contain exactly an absolute vaultRoot and Boolean dependenciesReady and vaultAuthorized confirmations.')
+        }
+        else {
+            $callerPreflight = [pscustomobject][ordered]@{
+                vaultRoot = [string]$rootValue
+                dependenciesReady = $ready.value
+                vaultAuthorized = $authorized.value
+            }
+        }
     }
 
     $campaignGroup = $null
@@ -551,6 +585,78 @@ function Test-DmOperationRequest {
         }
     }
 
+    $authoringInputs = $null
+    $authoringInputsField = $f['authoringInputs']
+    $isArticleCreate = $null -ne $registration -and $registration.name -cin @('note.create-article', 'note.create-article-fact-change')
+    if ($isArticleCreate) {
+        if (-not $authoringInputsField.present -or -not (Test-DmListValue -Value $authoringInputsField.value) -or
+            @($authoringInputsField.value).Count -lt 1) {
+            $problems.Add('Article creation requires authoringInputs for the destination and its existing parent when it is not the vault root.')
+        }
+        else {
+            $entries = [System.Collections.Generic.List[object]]::new()
+            $identities = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            $index = 0
+            foreach ($entry in $authoringInputsField.value) {
+                $ok = Test-DmObjectValue -Value $entry
+                if ($ok) {
+                    $names = @(Get-DmFieldName -Object $entry)
+                    $identity = Get-DmExactField -Object $entry -Name 'identity'
+                    $path = Get-DmExactField -Object $entry -Name 'path'
+                    $version = Get-DmExactField -Object $entry -Name 'version'
+                    $canonicalPath = Get-DmExactField -Object $entry -Name 'canonicalPath'
+                    $pathCheck = if ($path.value -is [string]) { Test-DmVaultRelativePath -Path $path.value } else { $null }
+                    $allowedVersion = $version.value -is [string] -and (
+                        $version.value -ceq 'directory' -or (Test-DmVersionValue -Value $version.value)
+                    )
+                    $unknownNames = @($names | Where-Object { $_ -cnotin @('identity', 'path', 'version', 'canonicalPath') })
+                    $canonicalValid = -not $canonicalPath.present -or (
+                        $canonicalPath.value -is [string] -and [System.IO.Path]::IsPathFullyQualified([string]$canonicalPath.value)
+                    )
+                    $ok = $unknownNames.Count -eq 0 -and @($names).Count -ge 3 -and @($names).Count -le 4 -and
+                        $canonicalValid -and $identity.present -and (Test-DmPlainText -Value $identity.value -MaxLength 128) -and
+                        $path.present -and $null -ne $pathCheck -and $pathCheck.isValid -and $version.present -and $allowedVersion
+                    if ($ok -and -not $identities.Add([string]$identity.value)) { $ok = $false }
+                    if ($ok) {
+                        $entryValue = [ordered]@{
+                            identity = [string]$identity.value
+                            path = [string]$path.value
+                            version = [string]$version.value
+                        }
+                        if ($canonicalPath.present) { $entryValue['canonicalPath'] = [string]$canonicalPath.value }
+                        $entries.Add([pscustomobject]$entryValue)
+                    }
+                }
+                if (-not $ok) { $problems.Add("authoringInputs[$index] must carry one unique identity, a valid vault-relative path, and a valid version.") }
+                $index++
+            }
+
+            $destinationEntries = @($entries | Where-Object { $_.identity -ceq 'destination' })
+            $parentEntries = @($entries | Where-Object { $_.identity -ceq 'destination-parent' })
+            if ($destinationEntries.Count -ne 1) {
+                $problems.Add('authoringInputs must identify exactly one destination.')
+            }
+            elseif ($targets.Count -eq 1) {
+                $targetPath = [string]$targets[0]
+                $separator = $targetPath.LastIndexOf('/')
+                $parentPath = if ($separator -lt 0) { '' } else { $targetPath.Substring(0, $separator) }
+                $parentValid = if ([string]::IsNullOrEmpty($parentPath)) {
+                    $parentEntries.Count -eq 0
+                }
+                else {
+                    $parentEntries.Count -eq 1 -and $parentEntries[0].path -ceq $parentPath -and $parentEntries[0].version -ceq 'directory'
+                }
+                if ($destinationEntries[0].path -cne $targetPath -or $destinationEntries[0].version -cne 'absent' -or -not $parentValid) {
+                    $problems.Add('authoringInputs must bind the absent target and its existing parent, when not the vault root, to the sole requested destination.')
+                }
+            }
+            $authoringInputs = [object[]]$entries.ToArray()
+        }
+    }
+    elseif ($authoringInputsField.present) {
+        $problems.Add('authoringInputs is valid only for article-creation operations.')
+    }
+
     $approved = $f['approvedPreviewId']
     $reviewed = $f['reviewedVersions']
     $reviewedDeps = $f['reviewedDependencyVersions']
@@ -630,7 +736,7 @@ function Test-DmOperationRequest {
         $declinedReviewId = $declined.value
     }
 
-    $normalized = [pscustomobject][ordered]@{
+    $normalizedFields = [ordered]@{
         contractVersion            = $contractVersion
         requestId                  = $requestId
         operation                  = $operationName
@@ -643,7 +749,12 @@ function Test-DmOperationRequest {
         reviewedVersions           = $reviewedVersions
         reviewedDependencyVersions = $reviewedDependencyVersions
         declinedReviewId           = $declinedReviewId
+        callerPreflight            = $callerPreflight
     }
+    if ($authoringInputsField.present) {
+        $normalizedFields.Insert(8, 'authoringInputs', $authoringInputs)
+    }
+    $normalized = [pscustomobject]$normalizedFields
     & $finish $normalized
 }
 
@@ -657,6 +768,13 @@ function Register-DmBuiltInOperation {
     param([hashtable]$Parameters)
     $registration = Register-DmOperation @Parameters
     $registration.builtIn = $true
+}
+
+$articleContentBuilder = {
+    param($CurrentText, $Arguments, $TargetPath)
+    $null = $CurrentText
+    $null = $TargetPath
+    [string]$Arguments['content']
 }
 
 Register-DmBuiltInOperation -Parameters @{
@@ -703,6 +821,39 @@ Register-DmBuiltInOperation -Parameters @{
         $null = $TargetPath
         ([string]$CurrentText).Replace([string]$Arguments['oldText'], [string]$Arguments['newText'])
     }
+}
+
+Register-DmBuiltInOperation -Parameters @{
+    Name             = 'note.create-article'
+    Description      = 'Creates one new article at its explicitly supplied vault-relative destination.'
+    Modes            = @('preview', 'apply')
+    FactChanging     = $false
+    AllowedArguments = [ordered]@{
+        content = @{ type = 'string'; required = $true; allowEmpty = $false }
+    }
+    ChangeKind       = 'create'
+    MinTargets       = 1
+    MaxTargets       = 1
+    RequiresMappings = $true
+    RequiresCampaignGroup = $true
+    PageLocalSafe    = $true
+    Builder          = $articleContentBuilder
+}
+
+Register-DmBuiltInOperation -Parameters @{
+    Name             = 'note.create-article-fact-change'
+    Description      = 'Creates one new article whose content changes established campaign facts; requires exact preview approval.'
+    Modes            = @('preview', 'apply')
+    FactChanging     = $true
+    AllowedArguments = [ordered]@{
+        content = @{ type = 'string'; required = $true; allowEmpty = $false }
+    }
+    ChangeKind       = 'create'
+    MinTargets       = 1
+    MaxTargets       = 1
+    RequiresMappings = $true
+    RequiresCampaignGroup = $true
+    Builder          = $articleContentBuilder
 }
 
 Export-ModuleMember -Function Register-DmOperation, Unregister-DmOperation, Get-DmOperation, Test-DmOperationRequest

@@ -142,6 +142,29 @@ Describe 'Installed plugin schema resource' {
         }
     }
 
+    Describe 'Standalone vault context module' {
+        It 'enforces article campaign and group requirements in a fresh process without a separate operation module import' {
+            $install = New-TestInstalledCopy -Name 'standalone-context'
+            $modulePath = Join-Path $install 'skills\vault-orientation\scripts\VaultConfiguration.psm1'
+            $command = @'
+$ErrorActionPreference = 'Stop'
+Import-Module -Name '__MODULE__'
+$preflight = @{
+    passed = $true
+    operation = 'note.create-article'
+    request = @{ operation = 'note.create-article'; campaignGroup = $null }
+    targets = @('Test Location.md')
+}
+$result = Get-DmPreNoteContext -Preflight $preflight
+"$($result.passed)|$($result.result.completionCode)"
+'@
+            $command = $command.Replace('__MODULE__', $modulePath.Replace("'", "''"))
+            $output = & (Get-Process -Id $PID).Path -NoProfile -NonInteractive -Command $command
+            $LASTEXITCODE | Should -Be 0
+            $output | Should -BeExactly 'False|INVALID_REQUEST'
+        }
+    }
+
     Describe 'Missing or incompatible installed resource' {
         It 'returns RESOURCE_MISSING before profile use when the packaged schema is absent' {
             $install = New-TestInstalledCopy -Name 'missing'

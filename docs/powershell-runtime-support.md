@@ -8,18 +8,24 @@ Installing the plugin and discovering its skills never requires PowerShell.
 No workflow installs or upgrades PowerShell or any module.
 
 Feature 001 uses Resolver 2.1.0's note-content-free `get_server_info` response
-to check exact-vault authorization in the active client session. The
-PowerShell runtime cannot yet verify a trusted handoff from that session, so
-script-backed vault access remains blocked before reading a profile, guidance,
-or campaign note. An unconfirmed dependency returns `PREREQUISITE_MISSING`;
-if readiness is established but authorization is not, the runtime returns
-`VAULT_AUTHORIZATION_UNPROVEN`. A supported environment below does not imply
-that script-backed campaign-vault access works.
+to check exact-vault authorization in the active client session. As of
+2026-11-17 the calling skill owns these checks and supplies an explicit
+`callerPreflight` object with the checked absolute `vaultRoot` and Boolean
+`dependenciesReady` and `vaultAuthorized` values. PowerShell checks that
+confirmation and its root scope, not the live MCP session. Missing/negative
+readiness returns `PREREQUISITE_MISSING`; unconfirmed or wrong-vault
+authorization returns `VAULT_AUTHORIZATION_UNPROVEN`. Runtime, canonical
+filesystem boundaries, freshness, and write safeguards remain enforced.
 
 The packaged dependency inventory requires Resolver 2.1.0 or later with both
-`resolve_obsidian_link` and `get_server_info`. The production PowerShell probe
-cannot confirm the running server's version or active-session tools, and it
-does not treat a configured server as proof of readiness or authorization.
+`resolve_obsidian_link` and `get_server_info`. Copilot checks these live before
+supplying confirmation and may reuse the result within the same active session
+for the same vault until an invalidating change, failure, or lost evidence.
+An unnoticed change may go undetected.
+PowerShell no longer launches a separate CLI configuration probe. A caller
+confirmation is not independent authorization proof; standalone callers own
+the same precondition. Resolver symlink-target containment qualification is
+deferred to the vault owner, not a release gate. PowerShell containment is unchanged.
 
 ## Selection
 
@@ -34,8 +40,9 @@ does not treat a configured server as proof of readiness or authorization.
 
 The runtime prerequisite check in
 `skills/vault-orientation/scripts/RuntimePreflight.psm1` enforces the minimum
-stable PowerShell version, operating system, and exact module versions, and returns
-`PREREQUISITE_MISSING` without installing or upgrading anything.
+stable PowerShell version, operating system, and exact module versions,
+and returns `PREREQUISITE_MISSING` without installing or upgrading anything.
+Passing this prerequisite check does not qualify a newer runtime for production.
 
 ## Support matrix
 
@@ -45,8 +52,9 @@ atomic-replace, encoding, and authorization behavior.
 
 | Operating system | PowerShell | Add-ons | Status |
 | --- | --- | --- | --- |
-| Windows | Stable 7.6.9 or later, Core | `powershell-yaml` 0.4.12 | Accepted by the runtime gate; production script-backed vault access remains blocked. Only individually recorded versions and checks have been validated; file-symlink cases, installed-client checks, and the runtime authorization handoff remain unverified. |
-| Windows | Below 7.6.9, prerelease, or non-Core | Any | Rejected by the runtime gate |
+| Windows | 7.6.9 | `powershell-yaml` 0.4.12 | Candidate, not production-qualified. Local path-boundary, atomic-replace, and encoding cases pass; file-symlink cases and installed-client checks remain outstanding. MCP checks are caller-managed. |
+| Windows | Stable 7.6.9 or later, other than 7.6.9 | `powershell-yaml` 0.4.12 | Passes the runtime version gate; platform and installed-client qualification remain unverified. |
+| Windows | Earlier, prerelease, or non-Core version | Any | Rejected by the runtime version gate. |
 | macOS | Any | Any | Unsupported (unverified) |
 | Linux | Any | Any | Unsupported (unverified) |
 
@@ -57,7 +65,8 @@ workflow only checks them.
 
 1. Install stable PowerShell 7.6.9 or later by following Microsoft's
    [Installing PowerShell on Windows](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)
-   guidance.
+   guidance. Newer versions pass the prerequisite gate but are not automatically
+   qualified for production.
 2. In `pwsh`, install the exact YAML reader version for the current user:
    `Install-Module -Name powershell-yaml -RequiredVersion 0.4.12 -Scope CurrentUser`.
 3. Confirm with `$PSVersionTable.PSVersion` and
@@ -274,6 +283,15 @@ Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
   performed. The runtime handoff and single-note classification remain
   outstanding before production script-backed writes.
 
+### Caller-confirmation revision, 2026-11-17
+
+On PowerShell 7.7.0 with Pester 6.2.0, the full acceptance suite reported
+404 passed, 0 failed, and 5 skipped (Windows file-symlink privilege requirements).
+New cases cover explicit caller-confirmed production preflight and article
+creation without the authorization test provider, including blocked/malformed/
+wrong-vault confirmations and safe-writer rechecks. These are synthetic
+runtime checks, not installed-client MCP or cross-platform verification.
+
 ## Feature 006 inventory and profile proposals
 
 The read-only inventory is implemented in
@@ -281,9 +299,9 @@ The read-only inventory is implemented in
 through explicit import followed by `Invoke-DmInventory -Request $request`.
 Registration validates the operation but does not dispatch it; there is no
 installed command or transport for inventory. The caller must independently
-complete the shared-reference and exact-vault preflight. Synthetic test
-authorization verifies local logic only and does not enable production
-script-backed vault access.
+complete the shared-reference and exact-vault preflight and supply
+`callerPreflight`. The runtime validates the caller's confirmation, not the
+live MCP session. Synthetic test authorization verifies local logic only.
 
 Inventory reports eligible directory and Markdown names, evidence-backed
 candidate mappings, and current ambiguity alternatives. It is names-only when
@@ -317,15 +335,16 @@ target an existing `.dmassist.yaml` after its own preflight and containment
 gates. A single ordinary-target edit need not have a preview, and replacement
 YAML is not validated against the profile schema. This feature does not add a
 runtime-wide guard; callers must not use that generic operation or direct
-writes to apply proposals. Production script-backed access still fails closed
-because the active-session authorization handoff is unverified.
+writes to apply proposals. The caller must complete the live MCP preflight;
+PowerShell does not independently verify it.
 
 ### Remaining acceptance work
 
-- **Feature 006 static audit (T036):** One immediate-child skill,
-  `skills/vault-orientation/SKILL.md`, matches the sole inventory entry.
-  Inspection confirmed the shared-reference, designated-guidance, required
-  dependency, and exact-vault authorization gates precede note access.
+- **Feature 006 static audit (T036):** Both immediate-child skills,
+  `vault-orientation` and `article-authoring`, match the vault-facing inventory
+  in `skills/README.md`. The latter activates the former and its shared
+  reference; their source requires the guidance, dependency, and exact-vault
+  authorization gates before note access. This is not a client execution.
 - **Feature 006 local discovery (T037):** In the fresh
   `copilot --plugin-dir .` session, `/skills list` showed `vault-orientation`
   and `/agent` found no custom agents. The separate
@@ -340,11 +359,17 @@ because the active-session authorization handoff is unverified.
   An earlier run under the then-exact version gate returned
   `PREREQUISITE_MISSING` for PowerShell 7.7.0; the gate now accepts stable
   PowerShell 7.6.9 or later.
-- **Feature 006 human review (T039):** The five-DM SC-005 walkthrough has not
-  been performed, so no usability result is claimed.
-- Neither synthetic authorization nor local discovery establishes
-  installed-client or production authorization support. The production
-  PowerShell authorization handoff remains unverified and fail-closed.
+- **Merged Features 005/006:** With synthetic vaults, the focused inventory
+  suite passed 50 tests and skipped 1; the full Pester 6.2.0 suite passed
+  523 and skipped 7. These include caller-confirmation gates without the
+  test authorization provider and creation followed by inventory in the
+  same disposable vault. Skipped file-symlink cases remain unverified.
+- **Feature 006 human review (T039):** The five-DM SC-005 walkthrough is
+  deferred to [#13](https://github.com/sylvercode/dm-assistant/issues/13) and
+  has not been performed, so no usability result is claimed.
+The dated evidence above describes the earlier runtime. Its always-blocked
+authorization handoff was replaced on 2026-11-17 by the documented caller
+precondition; historical results do not validate the revised installed-client flow.
 - **T045:** No five-DM usability walkthrough has been performed. SC-006's
   anonymized pass rate is not available; automated result-contract checks do
   not substitute for this review.
@@ -352,8 +377,9 @@ because the active-session authorization handoff is unverified.
   discovery without PowerShell have not been performed. The disposable copied
   package checks above are not client installation evidence. No supported
   production platform combination is claimed.
-- **T047:** The runtime has no verified way to consume the active session's
-  Resolver readiness and exact-vault authorization evidence.
+- **T047:** Validate the revised caller-confirmation contract in an installed
+  client; independent runtime authentication of the MCP session is no longer
+  required.
 - **T048:** Before enabling production writes, reconcile single-note operation
   classification with Feature 001's approval requirement for actual-play and
   continuity changes.
@@ -362,13 +388,15 @@ because the active-session authorization handoff is unverified.
 
 The registry in `skills/vault-orientation/scripts/OperationRequest.psm1`
 defines these built-in request operations. They use the common request/result
-contract; they are not shell commands and production vault access remains
-blocked by prerequisite/authorization checks.
+contract; they are not shell commands. Missing or negative caller
+confirmations block access, but are not independently authenticated.
 
 | Operation | Modes | Arguments | Target outcomes and scope |
 | --- | --- | --- | --- |
 | `notes.inspect` | `inspect` | Empty object | One or more explicit targets; reports existence, type, and byte fingerprint without returning note content or changing established facts. |
-| `note.replace-text` | `preview`, `apply` | Required non-empty string `oldText`; required string `newText` (may be empty) | Replaces every ordinal occurrence in one or more explicit existing notes; unchanged targets stay unchanged. Registered as a local text edit, not a workflow for changing actual-play records or established campaign facts. The invoking skill must apply the broader preview/approval safeguards, including approval in a later message, to such work. |
+| `vault.orientation.inventory` | `inspect` | Selected and optional guidance arrays, proposal flag, mapping decisions | Read-only inventory and optional unapproved profile proposal; explicit module invocation required. |
+| `note.replace-text` | `preview`, `apply` | Required non-empty string `oldText`; required string `newText` (may be empty) | Replaces every ordinal occurrence in one or more explicit existing notes; unchanged targets stay unchanged. Registered as a local text edit, not a workflow for changing actual-play records or established campaign facts. The invoking skill must apply the broader preview/approval safeguards, including explicit DM approval after the preview, to such work. |
+| `note.create-article`, `note.create-article-fact-change` | `preview`, `apply` | Article content and versioned authoring inputs | Create one absent article without overwrite; fact-changing creation requires preview approval. |
 
 Unknown request fields and operation arguments are rejected. Multi-target
 changes require approval of the exact preview. Applying a change preserves

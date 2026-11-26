@@ -106,6 +106,19 @@ Describe 'RuntimePreflight production gate' {
             (Test-DmRuntimePrerequisite -Operation 'notes.inspect').passed | Should -BeTrue
         }
 
+        It 'reports the supported runtime locally when a prerequisite is missing' {
+            Mock -ModuleName RuntimePreflight -CommandName Get-DmRuntimeEnvironment -MockWith {
+                [pscustomobject]@{ powerShellVersion = [version]'7.4.0'; edition = 'Core'; operatingSystem = 'Windows' }
+            }
+            $gate = Test-DmRuntimePrerequisite -Operation 'notes.inspect' -Targets $targets
+            $gate.passed | Should -BeFalse
+            $gate.result.completionCode | Should -BeExactly 'PREREQUISITE_MISSING'
+            $gate.result.remainingWork[0] | Should -Match 'Windows'
+            $gate.result.remainingWork[0] | Should -Match 'stable PowerShell Core 7\.6\.9 or later'
+            $gate.result.remainingWork[0] | Should -Match 'powershell-yaml 0\.4\.12'
+            $gate.result.remainingWork[0] | Should -Not -Match 'https?://'
+        }
+
         It 'returns PREREQUISITE_MISSING for PowerShell <Version> (<Edition>)' -ForEach @(
             @{ Version = '7.3.12'; Edition = 'Core' }
             @{ Version = '7.4.0'; Edition = 'Core' }
@@ -193,12 +206,12 @@ Describe 'RuntimePreflight production gate' {
             @($outcome.result.errorDetails.details.requiredTools) | Should -Be @('resolve_obsidian_link', 'get_server_info')
             $outcome.result.errorDetails.message | Should -Match 'resolve_obsidian_link'
             $outcome.result.errorDetails.message | Should -Match 'get_server_info'
-            $outcome.result.remainingWork[0] | Should -Match 'handoff'
+            $outcome.result.remainingWork[0] | Should -Match 'callerPreflight'
             if ($State -eq 'unknown') { $outcome.result.remainingWork[0] | Should -Not -Match '^Install' }
             Should -Invoke -ModuleName DependencyPreflight -CommandName Get-DmVaultAuthorization -Times 0 -Exactly -Scope It
         }
 
-        It 'never reports the real readiness probe as ready, so real preflight blocks with PREREQUISITE_MISSING' {
+        It 'blocks without caller confirmation instead of probing another CLI session' {
             $inventory = @(Get-DmDependencyInventory)
             $probe = InModuleScope DependencyPreflight -Parameters @{ Dep = $inventory[0] } { param($Dep) Get-DmDependencyReadiness -Dependency $Dep }
             $probe.readinessState | Should -BeIn @('missing', 'unknown')
@@ -269,7 +282,7 @@ Describe 'RuntimePreflight production gate' {
         }
     }
 
-    Describe 'Production gate: exact-vault authorization (no authorization provider)' {
+    Describe 'Production gate: caller confirmation missing' {
         It 'reports the production authorization handoff as unknown' {
             $inventory = @(Get-DmDependencyInventory)
             $auth = InModuleScope DependencyPreflight -Parameters @{ Dep = $inventory[0]; Root = $fixture.Root } {
@@ -283,8 +296,72 @@ Describe 'RuntimePreflight production gate' {
             $outcome = Invoke-WithLockedVault -Fixture $fixture -Action { Invoke-DmPreflight -Request $request }
             Assert-BlockedResult -Outcome $outcome -Code 'VAULT_AUTHORIZATION_UNPROVEN' -Targets $targets
             $outcome.result.errorDetails.message | Should -Not -Match ([regex]::Escape($fixture.Root))
-            $outcome.result.errorDetails.message | Should -Match 'PowerShell runtime'
-            $outcome.result.remainingWork[0] | Should -Match 'active session Resolver'
+            $outcome.result.errorDetails.message | Should -Match 'caller'
+            $outcome.result.remainingWork[0] | Should -Match 'get_server_info in the active session'
+        }
+
+        Describe 'Production path: explicit caller preflight (no mocks or test provider)' {
+            BeforeEach {
+                $request.callerPreflight = [ordered]@{
+                    vaultRoot = $fixture.Root
+                    dependenciesReady = $true
+                    vaultAuthorized = $true
+                }
+            }
+
+            It 'accepts caller-confirmed checks from any working directory without reading vault files' {
+                foreach ($directory in @($TestDrive, $fixture.OutsidePath)) {
+                    Push-Location -LiteralPath $directory
+                    try {
+                        $outcome = Invoke-WithLockedVault -Fixture $fixture -Action { Invoke-DmPreflight -Request $request }
+                        $outcome.passed | Should -BeTrue
+                        $outcome.boundary.canonicalRoot | Should -BeExactly $fixture.Root
+                        $outcome.evidence.detail | Should -Contain 'Caller confirmation; PowerShell does not independently verify MCP authorization.'
+                    }
+                    finally { Pop-Location }
+                }
+            }
+
+            It 'normalizes extended Windows roots and trailing separators for the caller confirmation' {
+                $request.callerPreflight.vaultRoot = '\\?\' + $fixture.Root.ToUpperInvariant() + '\'
+                (Invoke-DmPreflight -Request $request).passed | Should -BeTrue
+            }
+
+            It 'blocks a negative <Field> confirmation' -ForEach @(
+                @{ Field = 'dependenciesReady'; Code = 'PREREQUISITE_MISSING' }
+                @{ Field = 'vaultAuthorized'; Code = 'VAULT_AUTHORIZATION_UNPROVEN' }
+            ) {
+                $request.callerPreflight[$Field] = $false
+                Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code $Code -Targets $targets
+            }
+
+            It 'does not reuse a confirmation for a parent, child, or different root: <Kind>' -ForEach @(
+                @{ Kind = 'parent' }, @{ Kind = 'child' }, @{ Kind = 'other' }
+            ) {
+                $request.callerPreflight.vaultRoot = switch ($Kind) {
+                    parent { $fixture.ParentPath }
+                    child { Join-Path $fixture.Root 'Lore' }
+                    other { $fixture.OutsidePath }
+                }
+                Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code 'VAULT_AUTHORIZATION_UNPROVEN' -Targets $targets
+            }
+
+            It 'rejects malformed caller confirmation: <Case>' -ForEach @(
+                @{ Case = 'scalar'; Value = $true }
+                @{ Case = 'string boolean'; Value = @{ vaultRoot = 'C:\fixture'; dependenciesReady = 'true'; vaultAuthorized = $true } }
+                @{ Case = 'missing field'; Value = @{ vaultRoot = 'C:\fixture'; dependenciesReady = $true } }
+                @{ Case = 'relative root'; Value = @{ vaultRoot = 'fixture'; dependenciesReady = $true; vaultAuthorized = $true } }
+                @{ Case = 'unknown field'; Value = @{ vaultRoot = 'C:\fixture'; dependenciesReady = $true; vaultAuthorized = $true; token = 'x' } }
+            ) {
+                $request.callerPreflight = $Value
+                Assert-BlockedResult -Outcome (Invoke-DmPreflight -Request $request) -Code 'INVALID_REQUEST' -Targets $targets
+            }
+
+            It 'copies confirmation fields so later caller mutations do not alter the normalized request' {
+                $outcome = Invoke-DmPreflight -Request $request
+                $request.callerPreflight.vaultAuthorized = $false
+                $outcome.request.callerPreflight.vaultAuthorized | Should -BeTrue
+            }
         }
 
         It 'is repeatable across runs and working directories' {

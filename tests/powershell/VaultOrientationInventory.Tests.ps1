@@ -71,6 +71,84 @@ BeforeAll {
     $script:InventoryFileLinkSkipReason = 'Creating file symbolic links requires Windows Developer Mode or elevation in this environment.'
 }
 
+Describe 'Caller-confirmed inventory without an authorization test provider' {
+    BeforeEach {
+        $fixture = New-TestVaultFixture -ParentPath $TestDrive
+        $request = New-TestInventoryRequest -VaultRoot $fixture.Root
+        $request.callerPreflight = [ordered]@{
+            vaultRoot = $fixture.Root
+            dependenciesReady = $true
+            vaultAuthorized = $true
+        }
+    }
+
+    AfterEach { Remove-TestVaultFixture -Fixture $fixture }
+
+    It 'accepts matching caller confirmation and produces an inventory' {
+        $outcome = Invoke-DmInventory -Request $request
+        $outcome.result.completionCode | Should -BeExactly 'OK'
+        $outcome.inventoryReport.operation | Should -BeExactly 'vault.orientation.inventory'
+    }
+
+    It 'inventories an article created through the shipped authoring workflow' {
+        Set-TestGuidanceFile -VaultRoot $fixture.Root -Path '.dmassist-guidance.md' -Text 'Use synthetic conventions.'
+        $article = [ordered]@{
+            vaultRoot = $fixture.Root
+            callerPreflight = $request.callerPreflight
+            campaignGroup = @{ campaign = 'Test'; group = 'Test' }
+            articleType = 'character'
+            destination = 'New Character.md'
+            operation = 'note.create-article'
+        }
+        $entryPoint = Join-Path (Get-TestRepositoryRoot) 'skills\article-authoring\scripts\Invoke-DmArticleAuthoring.ps1'
+        function Invoke-IntegrationArticleStage($Action, $InputRequest) {
+            $json = ConvertTo-Json -InputObject $InputRequest -Depth 10 -Compress
+            $output = $json | & (Get-Process -Id $PID).Path -NoProfile -File $entryPoint -Action $Action
+            $LASTEXITCODE | Should -Be 0
+            $output | ConvertFrom-Json
+        }
+        $prepared = Invoke-IntegrationArticleStage prepare $article
+        $prepared.guidance.text | Should -BeExactly 'Use synthetic conventions.'
+        $article.preparationId = $prepared.preparationId
+        $article.content = $prepared.template.text.Replace('<!-- fill-in: required Character name -->', 'Ash Fen')
+        $preview = Invoke-IntegrationArticleStage preview $article
+        $preview.result.completionCode | Should -BeExactly 'OK'
+        $article.previewId = $preview.preview.previewId
+        (Invoke-IntegrationArticleStage apply $article).result.completionCode | Should -BeExactly 'OK'
+
+        $outcome = Invoke-DmInventory -Request $request
+        $outcome.result.completionCode | Should -BeExactly 'OK'
+        @($outcome.inventoryReport.entries | ForEach-Object { $_.path }) | Should -Contain 'New Character.md'
+    }
+
+    It 'blocks <scenario> before profile, guidance, or note reads' -TestCases @(
+        @{ scenario = 'missing confirmation'; change = 'missing'; code = 'PREREQUISITE_MISSING' }
+        @{ scenario = 'negative readiness'; change = 'readiness'; code = 'PREREQUISITE_MISSING' }
+        @{ scenario = 'negative authorization'; change = 'authorization'; code = 'VAULT_AUTHORIZATION_UNPROVEN' }
+        @{ scenario = 'wrong-root authorization'; change = 'root'; code = 'VAULT_AUTHORIZATION_UNPROVEN' }
+    ) {
+        param($change, $code)
+        switch ($change) {
+            'missing' { $request.Remove('callerPreflight') }
+            'readiness' { $request.callerPreflight.dependenciesReady = $false }
+            'authorization' { $request.callerPreflight.vaultAuthorized = $false }
+            'root' { $request.callerPreflight.vaultRoot = $fixture.OutsidePath }
+        }
+        Mock -ModuleName VaultConfiguration -CommandName Read-DmVaultProfile -MockWith {
+            throw 'Profile read before caller preflight passed.'
+        }
+        Mock -ModuleName VaultInventory -CommandName Read-DmVaultTargetBytes -MockWith {
+            throw 'Guidance or note read before caller preflight passed.'
+        }
+
+        $outcome = Invoke-DmInventory -Request $request
+        $outcome.result.completionCode | Should -BeExactly $code
+        $outcome.inventoryReport | Should -BeNull
+        Should -Invoke -ModuleName VaultConfiguration -CommandName Read-DmVaultProfile -Times 0 -Exactly -Scope It
+        Should -Invoke -ModuleName VaultInventory -CommandName Read-DmVaultTargetBytes -Times 0 -Exactly -Scope It
+    }
+}
+
 Describe 'Read-only vault orientation and inventory' {
     BeforeEach {
         Set-TestDependencyReadiness -State ready

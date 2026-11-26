@@ -24,11 +24,7 @@ establishes it. Do not claim support for syntax that cannot be verified.
   Titles and collapse markers are presentation choices. A callout, hidden
   section, or collapsed section is not access control.
 
-Source references for maintenance: [Aliases](https://obsidian.md/help/aliases),
-[Tags](https://obsidian.md/help/tags), [Internal
-links](https://obsidian.md/help/links), and
-[Callouts](https://obsidian.md/help/callouts). Runtime use of these defaults
-does not require network access or fetching those pages.
+Runtime use of these defaults does not require network access.
 
 ## Vault and guidance boundaries
 
@@ -82,12 +78,21 @@ authorize publishing or sharing vault content.
 - A clearly requested page-local edit may proceed without redundant approval
   when its scope and effect are clear.
 - Before a broad, destructive, restructuring, or continuity-changing edit,
-  present a scoped preview, make no changes, and end the turn. Edits that span
+  present a scoped preview and make no changes before approval. Edits that span
   several notes, delete, move, or merge notes, or alter actual-play records or
-  established continuity belong in this category. The original request does
-  not approve the preview; apply only that preview after the DM explicitly
-  approves it in a later message. If its scope or context changes, pause and
-  obtain direction again.
+  established continuity belong in this category. Show the complete proposed
+  content or changes and targets, not only a summary. Request explicit DM
+  approval of the exact preview with the native `ask_user` question tool when
+  available, including the complete preview in the question if it can be
+  presented completely. If it cannot, stop without applying and provide the
+  complete preview for review in a later message.
+  The original request, tool permission approval, silence, defaults, and
+  autonomous guesses are not approval. If a human response cannot be
+  established, stop without applying and request approval in a later DM
+  message. A decline or cancellation must not apply the change. If inputs or
+  scope become stale or conflict, stop and ask the DM how to proceed; do not
+  automatically retry. After the DM directs a retry, revalidate and obtain a
+  new preview and approval.
 - Preserve user edits and unrelated content. Git history does not authorize
   overwriting or discarding current content.
 - Approval does not waive the vault, guidance, knowledge, continuity, or

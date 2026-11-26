@@ -1,10 +1,10 @@
 # Vault Orientation and Inventory Operation Contract
 
-**Status: Design proposal; not implemented behavior.**
+**Status: Locally implemented, with installed-client and production qualification
+unverified.** Profile writing remains a proposal.
 
 This feature-specific contract proposes a read-only orientation and inventory
-operation. It does not claim that the installed skill or PowerShell runtime
-currently performs this operation. Feature 003 owns the shared runtime request
+operation. Feature 003 owns the shared runtime request
 and result envelopes, transport-neutral mechanics, and completion-code
 taxonomy. This contract reuses those definitions and adds only the operation
 name, its arguments, inventory behavior, and its payload. Feature 002 remains
@@ -17,12 +17,12 @@ exact-vault authorization, the shared reference, and all pre-note policy.
 | Property | Contract |
 | --- | --- |
 | Stable operation name | `vault.orientation.inventory` |
-| Proposed entry point | `Invoke-DmInventory -Request $request`, exported by `skills/vault-orientation/scripts/VaultInventory.psm1`. The caller imports and calls it explicitly. The operation registry supplies validation metadata; it is not a dispatcher. Neither the registration nor this module exists yet. |
+| Entry point | `Invoke-DmInventory -Request $request`, exported by `skills/vault-orientation/scripts/VaultInventory.psm1`. The caller imports and calls it explicitly. The operation registry supplies validation metadata; it is not a dispatcher. |
 | Supported mode | `inspect` only. The entry point rejects any other operation or mode. |
 | Writes and targets | None. `targets` is the required empty array `[]`; the operation never creates, edits, renames, moves, or deletes files. |
 | Registration | `FactChanging=false`, `ChangeKind=read`, `MinTargets=0`, `MaxTargets=0`, `RequiresMappings=false`, and `RequiresCampaignGroup=false`. This permits names-only orientation without local guidance; it does not permit reading note contents without guidance or relying on an unresolved mapping. |
 | Campaign/group | `campaignGroup` is required with both `campaign` and `group` explicitly `null`. Neither is inferred from notes. |
-| Resolver use | Do not use Resolver for traversal, containment checks, or inventory. Follow Feature 001/003 authorization preflight, including its note-content-free `get_server_info` check where applicable. Do not call a Resolver operation that accesses or resolves a target unless containment of every target it could access has independently been verified. |
+| Resolver use | Do not use Resolver for traversal, containment checks, or inventory. Follow Feature 001/003 authorization preflight, including its note-content-free `get_server_info` check. Resolver symlink-target qualification is delegated to the vault owner; PowerShell containment remains mandatory. |
 
 ### Request and operation-specific arguments
 
@@ -50,11 +50,9 @@ fields; malformed values; and more than one decision for the same
 Compare IDs case-sensitively and reject control characters. An invalid
 lexical path is `PATH_INVALID`. Existing Feature 003 scalar validation
 remains in force; when shape and path errors coexist, its `INVALID_REQUEST`
-precedence applies. Its current argument validator accepts only
-scalars: a future implementation must extend the registered argument
-validation to these arrays and exact records without weakening existing
-string, Boolean, or integer validation. Do not encode arrays as strings or
-bypass the shared request validator.
+precedence applies. The shared validator supports these arrays and exact
+records without weakening existing scalar validation. Do not encode arrays
+as strings or bypass the shared request validator.
 
 Validate paths under the existing Feature 002/003 lexical rules, including
 slash-separated relative components and the platform's filename restrictions;
@@ -76,9 +74,9 @@ every decision against a fresh scan as described below.
 ### Concrete invocation
 
 This is a syntactically valid PowerShell example using synthetic Windows
-paths. It describes the proposed interface, not a command that is available
-today; the synthetic plugin and vault must not be mistaken for an installed
-package or an authorized real vault.
+paths; the synthetic plugin and vault must not be mistaken for an installed
+package or an authorized real vault. The caller must actually complete the
+live checks before supplying `callerPreflight`.
 
 ```powershell
 $request = [ordered]@{
@@ -86,6 +84,11 @@ $request = [ordered]@{
     requestId = 'synthetic-inventory-001'
     operation = 'vault.orientation.inventory'
     vaultRoot = 'C:\Synthetic Vaults\Oakvale'
+    callerPreflight = [ordered]@{
+        vaultRoot = 'C:\Synthetic Vaults\Oakvale'
+        dependenciesReady = $true
+        vaultAuthorized = $true
+    }
     campaignGroup = [ordered]@{ campaign = $null; group = $null }
     mode = 'inspect'
     arguments = [ordered]@{
@@ -115,7 +118,8 @@ report. It must not choose an alternative by array position or infer approval.
    independently before using campaign observations. A script reporting a
    loaded reference is not proof the assistant loaded it. Collect only the
    DM's explicit guidance selections, optionality, proposal request, and any
-   mapping decisions. Construct the Feature 003 request, import the proposed
+   mapping decisions. Supply the completed live checks in `callerPreflight`.
+   Construct the Feature 003 request, import the
    module, and call `Invoke-DmInventory` explicitly. Registration alone does
    not invoke it; the runtime must still perform its own fail-closed checks.
 2. **Entry point and preflight:** Reject a different operation or mode without
@@ -209,13 +213,12 @@ requested work, override the shared safeguards, select a mapping without DM
 direction, or authorize a write. IDs are references for revalidation, not
 capabilities or consent.
 
-**Production fail-closed limitation:** Feature 003's trusted handoff for
-verifying the active Resolver session's exact-vault authorization has not been
-verified for the PowerShell runtime. Until that handoff is implemented and
-verified, production runtime access remains blocked before profile, guidance,
-or campaign-note reads. A test-only authorization provider is not production
-authorization evidence. Resolver availability, a supplied path, or a
-successful link resolution cannot substitute for the handoff.
+**Caller/runtime boundary:** The caller performs the live dependency and
+exact-vault checks and supplies their root-scoped confirmation. PowerShell
+checks the confirmation and filesystem boundary, but does not independently
+authenticate MCP. Missing or negative confirmations block access. A test-only
+authorization provider, Resolver availability, a supplied path, or a
+successful link resolution is not production authorization evidence.
 
 ## Inventory boundary and traversal
 
@@ -258,9 +261,8 @@ affected operation with the applicable existing path/read error. Recheck
 containment immediately before each access. Do not use Resolver to establish
 filesystem containment. The note-content-free `get_server_info` authorization
 check is governed by Feature 001 and is not a containment check; it does not
-permit campaign-note access by itself. Do not call a Resolver operation that
-accesses or resolves a target unless that target's containment is
-independently verified, including symlink behavior. This inventory operation
+permit campaign-note access by itself. Resolver symlink-target qualification
+is delegated to the vault owner as described by Feature 001. This inventory operation
 has no need to call `resolve_obsidian_link`. Do not recursively traverse
 directory links; a link entry may be reported by name, but its descendants
 are not enumerated. For an inventory file link, require both the visible name
@@ -465,7 +467,7 @@ failures.
 | --- | --- |
 | `VAULT_TARGET_INVALID` | Explicit vault root is missing, ambiguous, inaccessible, or invalid. |
 | `PREREQUISITE_MISSING` | A declared dependency or required runtime prerequisite is missing or unsupported. |
-| `VAULT_AUTHORIZATION_UNPROVEN` | Exact-vault authorization or its trusted runtime handoff is absent, unavailable, or inconclusive. No profile or note access is permitted. |
+| `VAULT_AUTHORIZATION_UNPROVEN` | Caller confirmation of exact-vault authorization is absent, negative, or for another root. No profile or note access is permitted. |
 | `INVALID_REQUEST` | Required Feature 003 values or operation arguments are absent, malformed, unknown, duplicated as prohibited, or invalid for the operation. |
 | `PATH_INVALID` | A supplied relative guidance path violates lexical path rules. |
 | `PATH_OUTSIDE_VAULT` | A traversal or resolved link escapes the root, or containment cannot be proven. |
@@ -511,8 +513,8 @@ validation of the replacement. See the
 [replacement preparation](../../../skills/vault-orientation/scripts/ChangePreview.psm1#L411-L439),
 [apply approval check](../../../skills/vault-orientation/scripts/ApplyNoteChanges.psm1#L288-L295),
 and [generic writer](../../../skills/vault-orientation/scripts/SafeNoteWriter.psm1#L347-L375).
-Production script-backed vault access nevertheless remains fail-closed until
-the trusted active-session authorization handoff is verified.
+The caller-confirmation contract does not independently authenticate the
+active MCP session or enforce this profile-specific policy.
 
 The explicit scope decision is to **document this existing limitation only**:
 Feature 006 does not plan or implement a generic-writer guard or a profile
@@ -554,8 +556,6 @@ profile-specific preview/apply operation**, limited to the exact root
    claiming the target was unchanged. No vault folder or campaign note is
    changed.
 
-Production authorization remains fail-closed until the trusted active-session
-handoff is verified. This contract is not evidence that inventory, proposal
-generation, the future profile operation, or installed-client behavior is
-implemented or validated; Features 001/002/003 remain authoritative for their
-respective boundaries.
+This contract is not evidence of installed-client or production qualification,
+nor of a profile-write implementation. Features 001/002/003 remain authoritative
+for their respective boundaries.

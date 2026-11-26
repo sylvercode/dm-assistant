@@ -4,12 +4,26 @@
 
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/powershell-runtime-contract.md`, and `quickstart.md`
 
-**Tests**: Acceptance validation is required by FR-015 and the quickstart. Use synthetic, disposable vault fixtures only; never use a real campaign vault. Tests run in the two tiers defined in `plan.md` (Technical Context → Testing):
+**Contract revision (2026-11-17):** Copilot now owns live MCP checks and supplies
+vault-scoped `callerPreflight`. The runtime validates confirmation scope and
+filesystem/write safeguards, not an independently authenticated MCP handoff.
+Earlier completed task descriptions below record the original design; their
+trusted-bridge requirement is superseded by contract section 3 and revised
+T047. Installed-client and platform qualification remain separate.
 
-- **Production-gate tests** run the real preflight with no authorization provider. Unconfirmed readiness returns `PREREQUISITE_MISSING`; with readiness simulated as ready, they observe `VAULT_AUTHORIZATION_UNPROVEN` before profile, guidance, or note access and before any write. T005, the production-gate case in T028, and the T010 and T046 runs exercise the T008 gate this way.
-- **Downstream tests** (path containment, inspection, profile parsing/schema/filesystem, preview, safe write, conflict, interruption, partial completion) reach their behavior only through a test-only authorization provider that the harness injects through an explicit parameter. It is confined to `tests/powershell/`, is never discoverable by production code or any skill, and never proves that the runtime can verify Feature 001's signal.
+**Tests**: Use synthetic disposable fixtures, never a campaign vault.
 
-**Organization**: Tasks are grouped by user story so the runtime can be delivered in safe, independently validated increments. Runtime modules and a synthetic harness now exist; production authorization and release qualification remain blocked or unverified.
+- **Production-path tests** cover accepted caller confirmation without mocks,
+  missing/negative/malformed/wrong-vault confirmations, working-directory
+  independence, article creation, and writer-boundary rechecks.
+- **Downstream tests** may still inject test-only readiness/authorization
+  providers for focused filesystem, profile, approval, and failure cases.
+  Production modules never discover or load these providers; neither tier
+  establishes actual installed-client MCP checks.
+
+**Organization**: Tasks are grouped by user story. Runtime modules and synthetic
+coverage exist; end-to-end installed-client and release qualification remain
+unverified.
 
 ## Phase 1: Setup
 
@@ -50,7 +64,7 @@
   source inspection does not complete the required installation and discovery
   run without PowerShell; that evidence remains outstanding with T046.
 
-- [ ] T047 [US1] Design, implement, and verify a trusted handoff in `skills/vault-orientation/scripts/DependencyPreflight.psm1` from the active client session to the PowerShell runtime for Resolver readiness and `get_server_info` exact-vault authorization. Validate the compatible server version, both required tools, and a normalized exact configured root; reject missing, malformed, mismatched, stale, or untrusted evidence before profile, guidance, or note access. Add synthetic and installed-client coverage without accepting arbitrary request, environment, profile, or configuration assertions as authorization. Keep the existing gates fail-closed until the handoff is verified.
+- [ ] T047 [US1] Revised 2026-11-17: validate the caller-managed preflight flow in an installed client. Copilot checks live Resolver version/tools and the normalized exact `get_server_info` root, then supplies vault-scoped `callerPreflight` to PowerShell. The runtime validates confirmation shape/scope and filesystem/write safety, not independently authenticated MCP evidence. Synthetic implementation coverage exists; installed-client verification remains pending. Earlier task descriptions and test evidence about a mandatory trusted bridge describe the superseded design, not an additional release gate.
 
 **Checkpoint**: Runtime/dependency failures block safely; exact-vault authorization remains fail-closed until the runtime handoff is verified.
 

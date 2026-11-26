@@ -135,7 +135,7 @@ cannot be classified confidently as one of these outcomes, treat it as
    unconfirmed, `get_server_info` fails or has no usable vault list, or no
    exact root match exists, fail closed. Explain the unmet prerequisite and
    stop before campaign-note access or changes.
-6. A changed resolver setting or unknown freshness makes the active session's
+6. A known or suspected change to resolver settings makes the active session's
    settings unconfirmed. Require a fresh session and repeat readiness and
    authorization checks before note access.
 7. Before a resolver call, require verified target-containment protection,

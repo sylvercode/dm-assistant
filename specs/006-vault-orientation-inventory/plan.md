@@ -4,6 +4,12 @@
 
 **Input**: Feature specification from `specs/006-vault-orientation-inventory/spec.md`
 
+**Integration update:** Historical references below to an always-blocked
+authorization handoff are superseded by Feature 003's caller-confirmation
+contract: the caller performs live MCP checks, while PowerShell checks the
+root-scoped confirmation and filesystem safeguards without authenticating MCP.
+Installed-client and production qualification remain unverified.
+
 ## Summary
 
 Add a read-only vault inventory operation to the existing `vault-orientation`

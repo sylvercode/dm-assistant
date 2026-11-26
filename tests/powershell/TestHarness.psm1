@@ -21,11 +21,12 @@ function Get-TestScriptsRoot {
 }
 
 function Import-TestProductionModule {
-    # Imports production modules from the skill folder with -Force so each test file starts clean.
+    # Keep one operation registry shared by modules imported earlier in the run.
     [CmdletBinding()]
     param([Parameter(Mandatory)][string[]]$Name)
     foreach ($moduleName in $Name) {
-        Import-Module -Name (Join-Path -Path (Get-TestScriptsRoot) -ChildPath "$moduleName.psm1") -Force -Global
+        $reload = $moduleName -ne 'OperationRequest'
+        Import-Module -Name (Join-Path -Path (Get-TestScriptsRoot) -ChildPath "$moduleName.psm1") -Force:$reload -Global
     }
 }
 

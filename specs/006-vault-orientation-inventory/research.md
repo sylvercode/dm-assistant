@@ -1,5 +1,12 @@
 # Research: Read-Only Vault Orientation and Inventory
 
+**Integration update:** This records historical decisions. References below to
+an always-blocked authorization handoff are superseded by Feature 003's
+caller-confirmation contract: the caller performs live MCP checks, while
+PowerShell checks the root-scoped confirmation and filesystem safeguards
+without independently authenticating MCP. Production qualification remains
+unverified.
+
 ## Runtime and integration pattern
 
 **Decision:** Extend the existing PowerShell vault-orientation runtime with a

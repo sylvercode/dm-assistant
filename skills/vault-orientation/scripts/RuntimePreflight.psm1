@@ -8,7 +8,7 @@ Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultBoundary.psm
 
 # Runtime prerequisite check and the ordered preflight entry point
 # (contract section 3): runtime -> request shape -> dependency readiness ->
-# exact-vault authorization -> canonical vault root. Every gate runs before any
+# caller-confirmed exact-vault authorization -> canonical vault root. Every gate runs before any
 # profile, guidance, or note access. Nothing here installs or updates anything
 # or reads vault file content; only after authorization does root resolution
 # read folder metadata along the selected root path.
@@ -18,7 +18,6 @@ $script:DmSupportedRuntime = [pscustomobject][ordered]@{
     powerShellVersion = [version]'7.6.9'
     edition           = 'Core'
     modules           = @([pscustomobject][ordered]@{ name = 'powershell-yaml'; version = '0.4.12' })
-    documentation     = 'docs/powershell-runtime-support.md'
 }
 
 function Get-DmRuntimeSupportMatrix {
@@ -38,7 +37,6 @@ function Get-DmRuntimeSupportMatrix {
                     version = [string]$_.version
                 }
             })
-        documentation     = [string]$script:DmSupportedRuntime.documentation
     }
 }
 
@@ -113,8 +111,9 @@ function Test-DmRuntimePrerequisite {
     $evidence = [System.Collections.Generic.List[object]]::new()
     $block = {
         param([string]$Message, [System.Collections.IDictionary]$Detail)
+        $modules = @($support.modules | ForEach-Object { "$($_.name) $($_.version)" }) -join ', '
         $result = New-DmBlockedResult -Operation $Operation -CompletionCode 'PREREQUISITE_MISSING' -Targets $Targets -Message $Message `
-            -RemainingWork @("Provision the supported runtime yourself as described in $($support.documentation), then retry.") -Detail $Detail
+            -RemainingWork @("Provision the required runtime yourself: $($support.operatingSystems -join ', '), stable PowerShell $($support.edition) $($support.powerShellVersion) or later, and $modules; then retry.") -Detail $Detail
         New-DmGateOutcome -Gate $gate -Passed $false -Result $result -Evidence $evidence.ToArray()
     }
 
@@ -219,18 +218,19 @@ function Get-DmRequestTarget {
 function Invoke-DmPreflight {
     <#
     .SYNOPSIS
-    Runs ordered prerequisite, request, dependency, authorization, and root gates.
+    Runs runtime, request, caller-confirmation, and filesystem-root gates.
     .DESCRIPTION
     Ordered preflight for one operation request (hashtable or pscustomobject):
     runtime prerequisites -> request shape (OperationRequest; INVALID_REQUEST,
     then PATH_INVALID for lexically invalid targets) -> dependency readiness ->
-    exact-vault authorization -> canonical vault-root resolution
+    caller-confirmed exact-vault authorization -> canonical vault-root resolution
     (VAULT_TARGET_INVALID). Returns [pscustomobject]@{ passed; result;
     evidence; operation; vaultRoot; targets; request; boundary }. When passed
-    is $false, result is the contract result to return and nothing was read
+    is $false, result is the contract result to return and no vault content was read
     from or written to the vault. When passed is $true, result is $null,
     request is the normalized request, boundary is the VaultBoundary root
     boundary, and the caller may continue with profile and guidance loading.
+    MCP checks are the caller's precondition, not independently verified here.
     .PARAMETER Request
     Explicit operation request as a dictionary or custom object; invalid input
     is returned as a blocked result.
@@ -283,11 +283,11 @@ function Invoke-DmPreflight {
     }
     $normalized = $shape.request
 
-    $readiness = Test-DmDependencyReadiness -Operation $operation -Targets $targets
+    $readiness = Test-DmDependencyReadiness -Operation $operation -Targets $targets -CallerPreflight $normalized.callerPreflight
     $evidence.AddRange([object[]]$readiness.evidence)
     if (-not $readiness.passed) { return (& $finish $false $readiness.result) }
 
-    $authorization = Test-DmVaultAuthorization -Operation $operation -VaultRoot $vaultRoot -Targets $targets
+    $authorization = Test-DmVaultAuthorization -Operation $operation -VaultRoot $vaultRoot -Targets $targets -CallerPreflight $normalized.callerPreflight
     $evidence.AddRange([object[]]$authorization.evidence)
     if (-not $authorization.passed) { return (& $finish $false $authorization.result) }
 
