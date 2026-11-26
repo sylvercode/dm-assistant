@@ -142,14 +142,19 @@ templates:
             path = $Fixture.DestinationRelativePath
             resolution = $destination.resolution
             observedVersion = $destination.observedVersion
-            replacementBytes = [System.Text.UTF8Encoding]::new($false).GetBytes("# Must not be written`n")
+            replacementBytes = [System.Text.UTF8Encoding]::new($false).GetBytes("# Replacement article`n")
         }
     }
 
     function New-TestArticleWriteRequest {
         param([Parameter(Mandatory)]$Fixture)
         New-TestOperationRequest -VaultRoot $Fixture.Root -Operation 'note.replace-text' -Mode 'apply' `
-            -Targets @($Fixture.DestinationRelativePath) -Arguments ([ordered]@{ oldText = 'Original'; newText = 'Changed' })
+            -Targets @($Fixture.DestinationRelativePath) -Arguments ([ordered]@{ oldText = 'Original'; newText = 'Changed' }) `
+            -Extra @{ callerPreflight = [ordered]@{
+                    vaultRoot = $Fixture.Root
+                    dependenciesReady = $true
+                    vaultAuthorized = $true
+                } }
     }
 
     function Assert-TestArticleAuthoringStale {
@@ -157,7 +162,8 @@ templates:
             [Parameter(Mandatory)]$Fixture,
             [Parameter(Mandatory)][object[]]$ExpectedInputs,
             $Request = $(New-TestArticleWriteRequest -Fixture $Fixture),
-            $Target
+            $Target,
+            [string]$ExpectedCode = 'TARGET_CONFLICT'
         )
         $before = @(Get-TestVaultSnapshot -Path $Fixture.Root)
         $expectedDependencies = Get-DmCurrentChangeDependencyVersions -Boundary $Fixture.Boundary -Profile $null
@@ -166,7 +172,7 @@ templates:
             -ExpectedDependencies $expectedDependencies -ExpectedInputTargets $ExpectedInputs -Request $Request
 
         $result.ok | Should -BeFalse
-        $result.code | Should -BeIn @('TARGET_CONFLICT', 'VAULT_AUTHORIZATION_UNPROVEN', 'PREREQUISITE_MISSING', 'READ_FAILED', 'PATH_OUTSIDE_VAULT')
+        $result.code | Should -BeExactly $ExpectedCode
         @(Get-TestVaultSnapshot -Path $Fixture.Root) | Should -Be $before
     }
 }
@@ -254,6 +260,7 @@ Describe 'Article-authoring source package layout (not installed-client resource
         BeforeEach {
             $script:ArticleFixture = New-TestArticleFreshnessFixture
             Enable-TestAuthorizationProvider -VaultRoot $script:ArticleFixture.Root
+            Set-TestDependencyReadiness -State ready
         }
         AfterEach {
             if ($null -ne $script:ArticleFixture) {
@@ -295,7 +302,8 @@ Describe 'Article-authoring source package layout (not installed-client resource
             $request = New-TestArticleWriteRequest -Fixture $script:ArticleFixture
             $request.vaultRoot = $script:ArticleFixture.OutsidePath
 
-            Assert-TestArticleAuthoringStale -Fixture $script:ArticleFixture -ExpectedInputs $expected -Request $request
+            Assert-TestArticleAuthoringStale -Fixture $script:ArticleFixture -ExpectedInputs $expected -Request $request `
+                -ExpectedCode 'VAULT_AUTHORIZATION_UNPROVEN'
         }
 
         It 'rechecks boundary evidence again immediately before replacement' {
@@ -312,6 +320,7 @@ Describe 'Article-authoring source package layout (not installed-client resource
             }
 
             Assert-TestArticleAuthoringStale -Fixture $script:ArticleFixture -ExpectedInputs $expected
+            Should -Invoke -ModuleName SafeNoteWriter -CommandName Test-DmSafeWritePreflight -Times 2 -Exactly -Scope It
         }
 
         It 'fails closed when consumed inputs are not paired with an authorization request' {
@@ -373,18 +382,48 @@ Describe 'Article-authoring source package layout (not installed-client resource
 
         It 'rejects an input that changes after the first recheck and before replacement' {
             $expected = New-TestArticleAuthoringSnapshot -Fixture $script:ArticleFixture
+            $target = New-TestArticleWriteTarget -Fixture $script:ArticleFixture -ExpectedInputs $expected
+            $dependencies = Get-DmCurrentChangeDependencyVersions -Boundary $script:ArticleFixture.Boundary -Profile $null
+            $originalDestination = [IO.File]::ReadAllBytes($script:ArticleFixture.DestinationPath)
+            $originalCheck = & (Get-Module SafeNoteWriter) { (Get-Command Test-DmExpectedInputTargets).ScriptBlock }
+            $templatePath = $script:ArticleFixture.TemplatePath
             $script:FreshnessRecheckCount = 0
             Mock -ModuleName SafeNoteWriter -CommandName Test-DmExpectedInputTargets -MockWith {
                 $script:FreshnessRecheckCount++
+                $check = & $originalCheck -Boundary $Boundary -Inputs $Inputs -WriteResolution $WriteResolution
                 if ($script:FreshnessRecheckCount -eq 1) {
-                    [pscustomobject][ordered]@{ matches = $true; changedIdentities = @() }
+                    [IO.File]::AppendAllText($templatePath, "Changed between checks.`n")
                 }
-                else {
-                    [pscustomobject][ordered]@{ matches = $false; changedIdentities = @('selected-template') }
-                }
+                $check
             }
 
-            Assert-TestArticleAuthoringStale -Fixture $script:ArticleFixture -ExpectedInputs $expected
+            $result = Invoke-DmSafeNoteWrite -Boundary $script:ArticleFixture.Boundary -Target $target `
+                -ExpectedDependencies $dependencies -ExpectedInputTargets $expected `
+                -Request (New-TestArticleWriteRequest -Fixture $script:ArticleFixture)
+
+            $result.ok | Should -BeFalse
+            $result.code | Should -BeExactly 'TARGET_CONFLICT'
+            [IO.File]::ReadAllBytes($script:ArticleFixture.DestinationPath) | Should -Be $originalDestination
+            @(Get-ChildItem -LiteralPath $script:ArticleFixture.DestinationParent -Filter '.dmassist-*.tmp' -Force).Count | Should -Be 0
+            Should -Invoke -ModuleName SafeNoteWriter -CommandName Test-DmExpectedInputTargets -Times 2 -Exactly -Scope It
+        }
+
+        It 'writes unchanged inputs after both freshness rechecks' {
+            $expected = New-TestArticleAuthoringSnapshot -Fixture $script:ArticleFixture
+            $target = New-TestArticleWriteTarget -Fixture $script:ArticleFixture -ExpectedInputs $expected
+            $dependencies = Get-DmCurrentChangeDependencyVersions -Boundary $script:ArticleFixture.Boundary -Profile $null
+            $originalCheck = & (Get-Module SafeNoteWriter) { (Get-Command Test-DmExpectedInputTargets).ScriptBlock }
+            Mock -ModuleName SafeNoteWriter -CommandName Test-DmExpectedInputTargets -MockWith {
+                & $originalCheck -Boundary $Boundary -Inputs $Inputs -WriteResolution $WriteResolution
+            }
+
+            $result = Invoke-DmSafeNoteWrite -Boundary $script:ArticleFixture.Boundary -Target $target `
+                -ExpectedDependencies $dependencies -ExpectedInputTargets $expected `
+                -Request (New-TestArticleWriteRequest -Fixture $script:ArticleFixture)
+
+            $result.ok | Should -BeTrue
+            [IO.File]::ReadAllText($script:ArticleFixture.DestinationPath) | Should -BeExactly "# Replacement article`n"
+            Should -Invoke -ModuleName SafeNoteWriter -CommandName Test-DmExpectedInputTargets -Times 2 -Exactly -Scope It
         }
     }
 }
