@@ -224,16 +224,19 @@ DM.
 
 The exact-root check does not contain Resolver reads. Resolver 2.1.0 can
 follow file symlinks outside an authorized root when reading heading or block
-targets. Before any `resolve_obsidian_link` call, require an upstream release
-whose documented or verified behavior canonicalizes every resolved target
-and rejects targets outside the selected root, including symlinks. If that
-security property cannot be confirmed, do not call the resolver. The required
+targets. Qualification of this behavior is deferred to the vault owner, who
+may intentionally configure external targets. It is not a readiness or
+authoring gate and does not relax PowerShell filesystem containment. Copilot
+performs the live MCP checks and supplies vault-scoped `callerPreflight` to
+scripts; PowerShell checks that caller precondition, not the live MCP session.
+The required
 pre-note order is: establish the vault; verify dependencies and exact-root
 authorization; load shared and designated local guidance; establish the
 campaign/group and player-facing gates; only then access campaign notes or
-invoke link resolution. If settings changed after session startup, or their
-freshness cannot be confirmed, stop and repeat the complete preflight in a
-fresh session.
+invoke link resolution. A successful check may be reused for the same vault in
+the same active session under the runtime contract. If Resolver settings or
+authorized roots are known or suspected to have changed after session startup,
+stop and repeat the complete preflight in a fresh session.
 
 ## Campaign and information boundaries
 

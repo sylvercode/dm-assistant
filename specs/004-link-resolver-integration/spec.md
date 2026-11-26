@@ -96,7 +96,7 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 - **FR-008**: If resolver settings change after the current client session starts, a vault-facing skill MUST treat that session's settings as unconfirmed, request a fresh session and verification, and stop before campaign-note access.
 - **FR-009**: This feature MUST NOT introduce integrations beyond the required link-resolution service. Any additional hook, agent, or service MUST remain a separate proposal until a concrete workflow gap and its acceptance criteria are documented.
 - **FR-010**: Feature 001's dependency contract MUST be the authoritative source for the service's supported compatibility, required capabilities, readiness, authorization, and unavailable behavior. Every vault-facing skill MUST follow that same contract before campaign-note access.
-- **FR-011**: Before calling `resolve_obsidian_link`, a skill MUST require an upstream release whose documented or verified behavior canonicalizes every resolved target and rejects targets outside the exact selected authorized root, including file symlinks. It MUST pass the exact root that matched the established vault as `vault_root`. Exact-root authorization alone MUST NOT be treated as target containment. If either the containment guarantee or matched-root argument cannot be confirmed, the skill MUST stop before the Resolver call.
+- **FR-011** (revised 2026-11-17): The skill MUST pass the exact matched root as `vault_root` to `resolve_obsidian_link`. Resolver symlink-target containment qualification is deferred to the vault owner, not a readiness or T029 gate; external targets may be intentional. Exact-root authorization is not proof of target containment, and external results MUST NOT expand PowerShell filesystem access or authorize unrelated reads.
 
 ### Key Entities
 
@@ -113,7 +113,7 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 - **SC-003**: In each of the six blocked scenarios—service unavailable, a required tool unavailable, compatibility or version unconfirmed, `get_server_info` failed or returned no usable vault list, no exact authorized-root match, and stale resolver settings in the active session—the skill explains the unmet prerequisite and stops before any campaign-note read or change.
 - **SC-004**: In each of the five link-resolution outcomes—resolved, unresolved, missing subtarget, ambiguous, and error—the skill reports the correct outcome and never guesses a destination.
 - **SC-005**: This feature introduces zero additional integrations; any later integration is considered only with a separately documented workflow gap and acceptance criteria.
-- **SC-006**: In 100% of resolution attempts, the skill passes the exact matched root as `vault_root` and makes no Resolver call unless upstream target-containment behavior, including symlink handling, is verified.
+- **SC-006**: In 100% of resolution attempts, the skill passes the exact matched root as `vault_root`. Deferred upstream symlink qualification is reported separately from MCP readiness and PowerShell filesystem containment.
 
 ## Assumptions
 
@@ -121,5 +121,5 @@ As a Dungeon Master, I can avoid unnecessary integrations and keep future additi
 - The Obsidian Link Resolver is the required external link-resolution service. Feature 001's [dependency inventory](../001-shared-vault-guidance/spec.md#expected-runtime-dependencies-initial-non-exhaustive) is the authoritative source for its current minimum compatible release and required capabilities.
 - Issue #7 names `2.0.0` as its minimum, but the current Feature 001 contract requires `2.1.0` or later for exact-vault authorization; this current contract is the applicable baseline.
 - One or more authorized vault roots may be configured by the DM. Only an exact match for the vault established for the current task authorizes that task.
-- Resolver readiness does not establish a trusted handoff to the PowerShell runtime; script-backed vault access remains blocked until that handoff is separately verified.
+- Copilot performs live MCP checks and supplies explicit vault-scoped `callerPreflight` on script requests. PowerShell does not independently authenticate the active MCP session; standalone callers own the same precondition.
 - Shared-campaign support and dynamic template expressions remain out of scope until separately specified.

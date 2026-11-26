@@ -1,6 +1,6 @@
 {
   "inventoryVersion": 2,
-  "source": "Mirrors the authoritative Feature 001 inventory: specs/001-shared-vault-guidance/spec.md, section Expected Runtime Dependencies. Update both together; an acceptance test fails if they diverge.",
+  "source": "Packaged runtime dependency inventory for vault-facing skills.",
   "dependencies": [
     {
       "dependencyId": "obsidian-link-resolver",
@@ -13,12 +13,12 @@
         "resolve_obsidian_link",
         "get_server_info"
       ],
-      "requiredSecurityProperties": [
-        "Before link resolution, verify that the upstream release canonicalizes every resolved target and rejects targets outside the selected authorized root, including file symlinks."
+      "deferredChecks": [
+        "Resolver symlink-target containment qualification is deferred to the vault owner, not a readiness, authoring, or release gate. Owners may intentionally configure external targets. PowerShell filesystem containment remains mandatory."
       ],
       "knownLimitations": [
         "Resolver 2.1.0 can follow file symlinks outside an authorized root when reading heading or block targets.",
-        "This repository has not verified an upstream release that satisfies the required target-containment property."
+        "This repository has not verified upstream symlink-target containment; do not describe an exact-root match as proof that all Resolver reads stay inside the vault."
       ]
     }
   ]

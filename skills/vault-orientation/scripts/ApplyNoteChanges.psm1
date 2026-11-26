@@ -112,6 +112,12 @@ function Test-DmApprovedTargetVersions {
         if ($null -ne $resolution.code) {
             return [pscustomobject][ordered]@{ passed = $false; code = [string]$resolution.code; index = $i; message = 'A reviewed target no longer resolves inside the selected vault.' }
         }
+        if ($Preflight.request.operation -cin @('note.create-article', 'note.create-article-fact-change')) {
+            if ($resolution.status -cne 'missing' -or [string]$ReviewedVersions[$i].observedVersion -cne 'absent') {
+                return [pscustomobject][ordered]@{ passed = $false; code = 'TARGET_CONFLICT'; index = $i; message = 'A reviewed article destination is no longer absent.' }
+            }
+            continue
+        }
         if (-not $resolution.exists -or $resolution.itemType -cne 'file') {
             return [pscustomobject][ordered]@{ passed = $false; code = 'TARGET_CONFLICT'; index = $i; message = 'A reviewed target is no longer an existing note file.' }
         }
@@ -188,6 +194,10 @@ function Invoke-DmApplyNoteChanges {
     Optional approved or previously observed dependency-version snapshot.
     .PARAMETER Profile
     Validated profile used for dependency revalidation, or null when absent.
+    .PARAMETER ExpectedInputTargets
+    Read-only inputs consumed while preparing the ordered changes.
+    .PARAMETER Request
+    Normalized request whose authorization and boundary are rechecked before writes.
     #>
     [CmdletBinding()]
     param(
@@ -195,7 +205,9 @@ function Invoke-DmApplyNoteChanges {
         [Parameter(Mandatory)][object[]]$Targets,
         [Parameter(Mandatory)][string]$Operation,
         [AllowNull()][object[]]$ExpectedDependencies,
-        [AllowNull()]$Profile
+        [AllowNull()]$Profile,
+        [AllowNull()][object[]]$ExpectedInputTargets,
+        [AllowNull()]$Request
     )
 
     $changed = [System.Collections.Generic.List[object]]::new()
@@ -213,6 +225,10 @@ function Invoke-DmApplyNoteChanges {
             if ($PSBoundParameters.ContainsKey('ExpectedDependencies') -and $null -ne $ExpectedDependencies) {
                 $writerArguments.ExpectedDependencies = $ExpectedDependencies
             }
+            if ($PSBoundParameters.ContainsKey('ExpectedInputTargets') -and $null -ne $ExpectedInputTargets) {
+                $writerArguments.ExpectedInputTargets = $ExpectedInputTargets
+            }
+            if ($null -ne $Request) { $writerArguments.Request = $Request }
             $write = Invoke-DmSafeNoteWrite @writerArguments
         }
         catch [System.Management.Automation.PipelineStoppedException] {
@@ -285,8 +301,8 @@ function Invoke-DmApply {
         }
 
         $registration = Get-DmOperation -Name $operation
-        $requiresApproval = $null -eq $registration -or $registration.factChanging -or
-            $registration.changeKind -cne 'edit' -or $targets.Count -gt 1
+        $requiresApproval = $null -eq $registration -or
+            [bool](Get-DmChangeClassification -Registration $registration -TargetCount $targets.Count).requiresApproval
         if ($requiresApproval -and [string]::IsNullOrWhiteSpace([string]$preflight.request.approvedPreviewId)) {
             $result = New-DmApplyBlockedResult -Operation $operation -Code 'CONFIRMATION_REQUIRED' -Targets $targets `
                 -RemainingWork @('Review the exact preview and submit its previewId and reviewed versions to apply.') `
@@ -296,6 +312,15 @@ function Invoke-DmApply {
 
         $runtimeVersion = $null
         if (-not [string]::IsNullOrWhiteSpace([string]$preflight.request.approvedPreviewId)) {
+            if ($operation -cin @('note.create-article', 'note.create-article-fact-change')) {
+                $canonicalInputCheck = Get-DmArticleAuthoringInputTargets -Preflight $preflight
+                if (-not $canonicalInputCheck.ok) {
+                    $result = New-DmApplyBlockedResult -Operation $operation -Code ([string]$canonicalInputCheck.code) -Targets $targets `
+                        -RemainingWork @('Revalidate the destination and consumed article inputs, then preview the change again.') `
+                        -Message ([string]$canonicalInputCheck.message)
+                    return [pscustomobject][ordered]@{ result = $result; applied = @() }
+                }
+            }
             try { $runtimeVersion = Get-DmRuntimeVersion }
             catch {
                 $result = New-DmApplyBlockedResult -Operation $operation -Code 'CONFIRMATION_REQUIRED' -Targets $targets `
@@ -370,7 +395,8 @@ function Invoke-DmApply {
         }
 
         $result = Invoke-DmApplyNoteChanges -Boundary $preflight.boundary -Targets ([object[]]$changePlan.plan) -Operation $operation `
-            -ExpectedDependencies ([object[]]$changePlan.dependencies) -Profile $context.profile
+            -ExpectedDependencies ([object[]]$changePlan.dependencies) -Profile $context.profile `
+            -ExpectedInputTargets ([object[]]$changePlan.expectedInputTargets) -Request $Request
         $planByPath = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::Ordinal)
         foreach ($entry in $changePlan.plan) { $planByPath[[string]$entry.path] = $entry }
         $applied = [System.Collections.Generic.List[object]]::new()

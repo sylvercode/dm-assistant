@@ -159,6 +159,20 @@ function Get-DmRuntimeVersion {
         $identity = 'skills/vault-orientation/scripts/' + $name
         $entries.Add([pscustomobject][ordered]@{ identity = $identity; version = 'sha256:' + (Get-DmSha256Hex -Bytes ([System.IO.File]::ReadAllBytes($path))) })
     }
+    $repositoryRoot = [System.IO.Path]::GetDirectoryName(
+        [System.IO.Path]::GetDirectoryName(
+            [System.IO.Path]::GetDirectoryName($PSScriptRoot)
+        )
+    )
+    $articleTemplateDirectory = [System.IO.Path]::Combine($repositoryRoot, 'skills', 'article-authoring', 'templates')
+    foreach ($path in [System.IO.Directory]::GetFiles($articleTemplateDirectory, '*.md', [System.IO.SearchOption]::TopDirectoryOnly)) {
+        $name = [System.IO.Path]::GetFileName($path)
+        $identity = 'skills/article-authoring/templates/' + $name
+        $entries.Add([pscustomobject][ordered]@{
+            identity = $identity
+            version = 'sha256:' + (Get-DmSha256Hex -Bytes ([System.IO.File]::ReadAllBytes($path)))
+        })
+    }
     $entries.Add((Get-DmDependencyInventoryVersion))
     $orderedEntries = [object[]]$entries.ToArray()
     [Array]::Sort($orderedEntries, [System.Comparison[object]]{
@@ -212,7 +226,7 @@ function Get-DmPreviewDigest {
     foreach ($dependency in $ReviewedDependencyVersions) {
         $dependencies.Add([pscustomobject][ordered]@{ identity = [string]$dependency.identity; version = [string]$dependency.version })
     }
-    $digestInput = [pscustomobject][ordered]@{
+    $digestFields = [ordered]@{
         contractVersion = [string]$Request.contractVersion
         runtimeVersion = $RuntimeVersion
         operation = [string]$Request.operation
@@ -223,6 +237,13 @@ function Get-DmPreviewDigest {
         reviewedVersions = $digestTargetVersions.ToArray()
         reviewedDependencyVersions = $dependencies.ToArray()
     }
+    if ($Request.PSObject.Properties['authoringInputs']) {
+        $digestFields.Insert(7, 'authoringInputs', $Request.authoringInputs)
+    }
+    if ($Request.PSObject.Properties['callerPreflight']) {
+        $digestFields['callerPreflight'] = $Request.callerPreflight
+    }
+    $digestInput = [pscustomobject]$digestFields
     $canonical = ConvertTo-DmJcsJson -Value $digestInput
     'sha256:' + (Get-DmSha256Hex -Bytes ([System.Text.UTF8Encoding]::new($false, $true).GetBytes($canonical)))
 }
@@ -290,17 +311,112 @@ function Get-DmChangeClassification {
     Number of requested targets; multiple targets require approval.
     #>
     param([Parameter(Mandatory)]$Registration, [Parameter(Mandatory)][int]$TargetCount)
-    $requiresApproval = $Registration.factChanging -or $Registration.changeKind -cne 'edit' -or $TargetCount -gt 1
+    $pageLocalCreate = $Registration.changeKind -ceq 'create' -and [bool]$Registration.pageLocalSafe -and $TargetCount -eq 1
+    $requiresApproval = -not $pageLocalCreate -and ($Registration.factChanging -or $Registration.changeKind -cne 'edit' -or $TargetCount -gt 1)
     [pscustomobject][ordered]@{
         requiresApproval = [bool]$requiresApproval
         proposedOperation = switch ([string]$Registration.changeKind) {
             'edit' { 'replace content' }
+            'create' { 'create article' }
             'delete' { 'delete' }
             'reorganize' { 'reorganize' }
             'read' { 'read' }
             default { 'unclassified change' }
         }
     }
+}
+
+function Get-DmArticleAuthoringInputTargets {
+    <#
+    .SYNOPSIS
+    Resolves and fingerprints every authoring input carried by an article request.
+    .PARAMETER Preflight
+    Successful preflight outcome containing the boundary and normalized request.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)]$Preflight)
+
+    $request = $Preflight.request
+    $targets = [System.Collections.Generic.List[object]]::new()
+    foreach ($inputEntry in @($request.authoringInputs)) {
+        $resolution = Resolve-DmVaultTarget -Boundary $Preflight.boundary -Path ([string]$inputEntry.path)
+        if ($null -ne $resolution.code) {
+            return [pscustomobject][ordered]@{
+                ok = $false
+                code = [string]$resolution.code
+                inputs = @()
+                message = 'A consumed authoring input is outside the verified vault boundary.'
+            }
+        }
+        if ($inputEntry.PSObject.Properties['canonicalPath']) {
+            $comparison = [System.StringComparison]$Preflight.boundary.comparison
+            if (-not [string]::Equals([string]$resolution.resolvedPath, [string]$inputEntry.canonicalPath, $comparison)) {
+                return [pscustomobject][ordered]@{
+                    ok = $false
+                    code = 'TARGET_CONFLICT'
+                    inputs = @()
+                    message = 'A consumed destination or parent resolves to a changed canonical path.'
+                }
+            }
+        }
+
+        $actualVersion = $null
+        switch ([string]$inputEntry.identity) {
+            'destination' {
+                if ($resolution.status -cne 'missing') {
+                    return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; inputs = @(); message = 'The requested article destination is already occupied.' }
+                }
+                $actualVersion = 'absent'
+            }
+            'destination-parent' {
+                if ($resolution.status -cne 'resolved' -or $resolution.itemType -cne 'directory') {
+                    return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; inputs = @(); message = 'The article destination parent is missing or is not a directory.' }
+                }
+                $actualVersion = 'directory'
+            }
+            default {
+                if ($resolution.status -cne 'resolved' -or $resolution.itemType -cne 'file') {
+                    return [pscustomobject][ordered]@{ ok = $false; code = 'REFERENCE_UNAVAILABLE'; inputs = @(); message = 'A consumed authoring input is missing or is not a file.' }
+                }
+                $snapshot = Read-DmVaultTargetBytes -Boundary $Preflight.boundary -Resolution $resolution
+                if (-not $snapshot.ok) {
+                    return [pscustomobject][ordered]@{ ok = $false; code = [string]$snapshot.code; inputs = @(); message = 'A consumed authoring input could not be read safely.' }
+                }
+                $actualVersion = [string]$snapshot.version
+            }
+        }
+
+        if ([string]$actualVersion -cne [string]$inputEntry.version) {
+            return [pscustomobject][ordered]@{
+                ok = $false
+                code = 'TARGET_CONFLICT'
+                inputs = @()
+                message = 'A consumed authoring input changed; validate the inputs and preview the article creation again.'
+            }
+        }
+        $targets.Add([pscustomobject][ordered]@{
+            identity = [string]$inputEntry.identity
+            resolution = $resolution
+            observedVersion = [string]$actualVersion
+            canonicalPath = [string]$resolution.resolvedPath
+        })
+    }
+
+    $canonicalRequestInputs = [System.Collections.Generic.List[object]]::new()
+    foreach ($target in @($targets.ToArray())) {
+        $original = @($request.authoringInputs | Where-Object {
+            [string]$_.identity -ceq [string]$target.identity
+        }) | Select-Object -First 1
+        $canonicalRequestInputs.Add([pscustomobject][ordered]@{
+            identity = [string]$target.identity
+            path = [string]$original.path
+            version = [string]$target.observedVersion
+            canonicalPath = [string]$target.canonicalPath
+        })
+    }
+    $request.authoringInputs = [object[]]$canonicalRequestInputs.ToArray()
+
+    [pscustomobject][ordered]@{ ok = $true; code = $null; inputs = [object[]]$targets.ToArray(); message = '' }
 }
 
 function Get-DmChangePlan {
@@ -363,7 +479,80 @@ function Get-DmChangePlan {
         return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; result = $result; plan = @() }
     }
 
+    $authoringInputs = @()
+    $isArticleCreate = $operation -cin @('note.create-article', 'note.create-article-fact-change')
+    if ($isArticleCreate) {
+        $inputCheck = Get-DmArticleAuthoringInputTargets -Preflight $Preflight
+        if (-not $inputCheck.ok) {
+            $result = New-DmChangeEntryResult -Operation $operation -State Blocked -Code ([string]$inputCheck.code) -Targets $targets `
+                -UnchangedTargets $targets -RemainingWork @('Revalidate all article inputs and the destination, then preview again.') `
+                -Message ([string]$inputCheck.message)
+            return [pscustomobject][ordered]@{ ok = $false; code = [string]$inputCheck.code; result = $result; plan = @() }
+        }
+        $authoringInputs = @($inputCheck.inputs)
+    }
+
     $resolutions = [System.Collections.Generic.List[object]]::new()
+    if ($isArticleCreate) {
+        $destination = Resolve-DmVaultTarget -Boundary $Preflight.boundary -Path $targets[0]
+        if ($null -ne $destination.code -or $destination.status -cne 'missing' -or
+            [System.IO.Path]::GetExtension([string]$destination.path) -cne '.md') {
+            $code = if ($null -ne $destination.code) { [string]$destination.code } elseif ($destination.status -ceq 'resolved') { 'TARGET_CONFLICT' } else { 'PATH_INVALID' }
+            $message = if ($code -ceq 'TARGET_CONFLICT') { 'The requested article destination is already occupied.' } else { 'The article destination must be one absent vault-relative Markdown path.' }
+            $result = New-DmChangeEntryResult -Operation $operation -State Blocked -Code $code -Targets $targets `
+                -UnchangedTargets $targets -RemainingWork @('Choose one explicit Markdown destination with an existing parent, then preview again.') -Message $message
+            return [pscustomobject][ordered]@{ ok = $false; code = $code; result = $result; plan = @() }
+        }
+        $parentPath = [System.IO.Path]::GetDirectoryName([string]$destination.path.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
+        $parent = $null
+        if (-not [string]::IsNullOrWhiteSpace($parentPath)) {
+            $parentPath = $parentPath.Replace([System.IO.Path]::DirectorySeparatorChar, '/')
+            $parent = Resolve-DmVaultTarget -Boundary $Preflight.boundary -Path $parentPath
+            if ($parent.status -cne 'resolved' -or $parent.itemType -cne 'directory') {
+                $result = New-DmChangeEntryResult -Operation $operation -State Blocked -Code 'TARGET_CONFLICT' -Targets $targets `
+                    -UnchangedTargets $targets -RemainingWork @('Choose a destination whose parent directory already exists, then preview again.') `
+                    -Message 'The article destination parent is missing or is not a directory.'
+                return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; result = $result; plan = @() }
+            }
+        }
+        $content = [string]$request.arguments['content']
+        $prepared = ConvertTo-DmPreparedNote -OriginalBytes ([byte[]]@()) -ReplacementText $content
+        if (-not $prepared.ok) {
+            $result = New-DmChangeEntryResult -Operation $operation -State Blocked -Code ([string]$prepared.code) -Targets $targets `
+                -UnchangedTargets $targets -RemainingWork @('Provide content representable as supported UTF-8, then preview again.') `
+                -Message ([string]$prepared.message)
+            return [pscustomobject][ordered]@{ ok = $false; code = [string]$prepared.code; result = $result; plan = @() }
+        }
+        $resolutions.Add($destination)
+        $plan = [object[]]@([pscustomobject][ordered]@{
+            path = $targets[0]
+            resolution = $destination
+            parentResolution = $parent
+            observedVersion = 'absent'
+            replacementVersion = Get-DmByteFingerprint -Bytes ([byte[]]$prepared.bytes)
+            conversionDecision = 'preserve'
+            replacementBytes = [byte[]]$prepared.bytes
+            unchanged = $false
+            createOnly = $true
+            expectedInputTargets = [object[]]$authoringInputs
+            proposedOperation = 'create article'
+        })
+        $runtimeVersion = $null
+        try { $runtimeVersion = Get-DmRuntimeVersion }
+        catch {
+            $result = New-DmChangeEntryResult -Operation $operation -State Blocked -Code 'OPERATION_FAILED' -Targets $targets `
+                -RemainingWork @('Repair the installed runtime manifest or module files, then retry.') -Message 'The installed runtime version could not be fingerprinted.'
+            return [pscustomobject][ordered]@{ ok = $false; code = 'OPERATION_FAILED'; result = $result; plan = @() }
+        }
+        $classification = Get-DmChangeClassification -Registration $registration -TargetCount $targets.Count
+        [pscustomobject][ordered]@{
+            ok = $true; code = $null; result = $null; request = $request; registration = $registration
+            requiresApproval = [bool]$classification.requiresApproval; plan = $plan; dependencies = [object[]]$dependencies
+            runtimeVersion = [string]$runtimeVersion; expectedInputTargets = [object[]]$authoringInputs
+        }
+        return
+    }
+
     for ($i = 0; $i -lt $targets.Count; $i++) {
         $resolution = Resolve-DmVaultTarget -Boundary $Preflight.boundary -Path $targets[$i]
         if ($null -ne $resolution.code -or -not $resolution.exists -or $resolution.itemType -cne 'file') {
@@ -500,6 +689,7 @@ function Get-DmChangePlan {
         plan = [object[]]$plan.ToArray()
         dependencies = [object[]]$dependencies
         runtimeVersion = [string]$runtimeVersion
+        expectedInputTargets = @()
     }
 }
 
@@ -578,4 +768,4 @@ function Invoke-DmPreview {
     }
 }
 
-Export-ModuleMember -Function ConvertTo-DmJcsJson, Get-DmRuntimeVersion, Get-DmPreviewDigest, Get-DmChangePlan, New-DmChangeEntryResult, Invoke-DmPreview
+Export-ModuleMember -Function ConvertTo-DmJcsJson, Get-DmRuntimeVersion, Get-DmPreviewDigest, Get-DmChangeClassification, Get-DmArticleAuthoringInputTargets, Get-DmChangePlan, New-DmChangeEntryResult, Invoke-DmPreview
