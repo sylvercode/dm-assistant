@@ -11,6 +11,7 @@ dependency inventory here.
 | Skill | Classification | Preflight |
 | --- | --- | --- |
 | [vault-orientation](vault-orientation/SKILL.md) | Vault-facing | Loads its bundled [`VAULT-REFERENCE.md`](vault-orientation/VAULT-REFERENCE.md), any DM-designated local guidance, and verifies the authoritative required-dependency inventory and exact-vault authorization before campaign-note access. |
+| [article-authoring](article-authoring/SKILL.md) | Vault-facing | Requires shared-reference loading and declared-dependency checks before campaign-note access; see [vault-orientation](vault-orientation/SKILL.md) for shared safeguards. |
 
 Add every future skill here when its immediate-child directory contains a
 `SKILL.md`. Classify it as vault-facing if it reads, interprets, creates, or

@@ -2,11 +2,8 @@ Set-StrictMode -Version Latest
 
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'RuntimeContract.psm1')
 
-# Feature 001 dependency-readiness adapter and exact-vault authorization
-# handoff. Readiness and authorization are separate checks: a ready
-# dependency never implies that the exact vault is authorized.
-
-$script:DmProbeTimeoutMilliseconds = 20000
+# MCP checks belong to the calling skill. These gates consume its explicit
+# confirmations; they do not independently authenticate an active MCP session.
 $script:DmReadinessStates = @('ready', 'missing', 'incompatible', 'unknown')
 
 function Get-DmDependencyInventoryPath {
@@ -96,19 +93,18 @@ function Get-DmDependencyInventory {
 function Get-DmDependencyReadiness {
     <#
     .SYNOPSIS
-    Probes whether a declared dependency is configured in Copilot CLI.
+    Consumes the caller's confirmation that every declared dependency is ready.
     .DESCRIPTION
-    Internal production readiness probe. Confirms only whether the dependency
-    is configured in Copilot CLI, using a constant argument list and a fixed
-    working directory inside the plugin. The probe output is discarded because
-    it may contain vault paths. A script cannot observe the server version or
-    the tools exposed to the active session, so a configured server is
-    'unknown', never 'ready'.
+    The calling skill must check the live version and tools against the
+    installed inventory before supplying this confirmation. No CLI subprocess
+    or MCP configuration lookup is used.
     .PARAMETER Dependency
     Inventory entry containing dependencyId, type, and compatibility requirements.
+    .PARAMETER CallerPreflight
+    Normalized caller confirmation, not an independently verified credential.
     #>
     [CmdletBinding()]
-    param([Parameter(Mandatory)]$Dependency)
+    param([Parameter(Mandatory)]$Dependency, [AllowNull()]$CallerPreflight)
     $id = [string]$Dependency.dependencyId
     $new = {
         param([string]$State, [string]$Evidence)
@@ -117,68 +113,62 @@ function Get-DmDependencyReadiness {
     if ($id -cnotmatch '^[a-z0-9][a-z0-9-]{0,63}$' -or $Dependency.type -cne 'mcp-server') {
         return (& $new 'unknown' 'Unsupported inventory entry; readiness cannot be checked.')
     }
-    $copilot = Get-Command -Name 'copilot' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($null -eq $copilot) {
-        return (& $new 'missing' 'Copilot CLI was not found, so the MCP server configuration cannot be checked.')
+    if ($null -eq $CallerPreflight) {
+        return (& $new 'unknown' 'The calling skill has not supplied its live dependency-check confirmation.')
     }
-    $process = $null
-    try {
-        $startInfo = [System.Diagnostics.ProcessStartInfo]::new($copilot.Source)
-        foreach ($argument in @('mcp', 'get', $id)) { $startInfo.ArgumentList.Add($argument) }
-        $startInfo.UseShellExecute = $false
-        $startInfo.RedirectStandardOutput = $true
-        $startInfo.RedirectStandardError = $true
-        $startInfo.RedirectStandardInput = $true
-        $startInfo.CreateNoWindow = $true
-        $startInfo.WorkingDirectory = $PSScriptRoot
-        $process = [System.Diagnostics.Process]::Start($startInfo)
-        $process.StandardInput.Close()
-        $stdout = $process.StandardOutput.ReadToEndAsync()
-        $stderr = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit($script:DmProbeTimeoutMilliseconds)) {
-            try { $process.Kill($true) } catch { $null = $_ }
-            return (& $new 'unknown' 'The Copilot CLI MCP configuration check timed out.')
-        }
-        $process.WaitForExit()
-        $null = $stdout.Result, $stderr.Result
-        if ($process.ExitCode -ne 0) {
-            return (& $new 'unknown' 'The MCP configuration could not be confirmed under the dependency name; the configured server may use a different name.')
-        }
-        return (& $new 'unknown' 'The MCP server is configured, but its version and tool exposure must be confirmed in the active Copilot CLI session.')
+    if (-not $CallerPreflight.dependenciesReady) {
+        return (& $new 'unknown' 'The calling skill did not confirm that all required dependencies are ready.')
     }
-    catch {
-        return (& $new 'unknown' 'The Copilot CLI MCP configuration check could not run.')
+    & $new 'ready' 'Caller-confirmed live dependency checks; not independently verified by PowerShell.'
+}
+
+function ConvertTo-DmComparableVaultRoot {
+    <#
+    .SYNOPSIS
+    Normalizes a caller-supplied root for lexical comparison without vault access.
+    .PARAMETER Path
+    Validated absolute root, possibly using the Windows extended-path prefix.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+    if ($IsWindows) {
+        if ($Path.StartsWith('\\?\UNC\', [System.StringComparison]::OrdinalIgnoreCase)) { $Path = '\\' + $Path.Substring(8) }
+        elseif ($Path.StartsWith('\\?\', [System.StringComparison]::OrdinalIgnoreCase)) { $Path = $Path.Substring(4) }
     }
-    finally {
-        if ($null -ne $process) { $process.Dispose() }
-    }
+    [System.IO.Path]::GetFullPath($Path).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
 }
 
 function Get-DmVaultAuthorization {
     <#
     .SYNOPSIS
-    Reports the production exact-vault authorization handoff state.
+    Consumes the caller's exact-vault authorization confirmation.
     .DESCRIPTION
-    Internal exact-vault authorization handoff. Feature 001 defines the
-    note-content-free get_server_info signal, but this runtime cannot verify
-    the active session's response. Production therefore reports 'unknown'.
-    It accepts no assertion from request fields, paths, environment variables,
-    configuration, or the profile, and reads nothing from the vault.
+    The caller checks get_server_info in the active MCP session. This function
+    only binds its explicit confirmation to the selected root, without vault
+    access or independent MCP verification.
     .PARAMETER Dependency
     Declared dependency for which authorization is required.
     .PARAMETER VaultRoot
     Explicit vault root to authorize; the path alone is never authorization.
+    .PARAMETER CallerPreflight
+    Normalized, vault-scoped confirmation supplied by the calling skill.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$Dependency,
-        [Parameter(Mandatory)][AllowEmptyString()][string]$VaultRoot
+        [Parameter(Mandatory)][AllowEmptyString()][string]$VaultRoot,
+        [AllowNull()]$CallerPreflight
     )
-    $null = $VaultRoot
+    $state = 'unknown'
+    if ($null -ne $CallerPreflight) {
+        $comparison = if ($IsWindows) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+        $sameRoot = [string]::Equals((ConvertTo-DmComparableVaultRoot -Path $VaultRoot),
+            (ConvertTo-DmComparableVaultRoot -Path $CallerPreflight.vaultRoot), $comparison)
+        $state = if ($sameRoot -and $CallerPreflight.vaultAuthorized) { 'authorized' } else { 'not authorized' }
+    }
     [pscustomobject][ordered]@{
         dependencyId            = [string]$Dependency.dependencyId
-        vaultAuthorizationState = 'unknown'
-        evidence                = 'The runtime cannot verify the active session Resolver authorization response.'
+        vaultAuthorizationState = $state
+        evidence                = 'Caller-confirmed exact-vault check; not independently verified by PowerShell.'
     }
 }
 
@@ -195,11 +185,14 @@ function Test-DmDependencyReadiness {
     Operation identifier included in a blocked result.
     .PARAMETER Targets
     Requested vault-relative targets reported as not attempted on failure.
+    .PARAMETER CallerPreflight
+    Normalized caller confirmation of live MCP checks.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Operation,
-        [AllowEmptyCollection()][string[]]$Targets = @()
+        [AllowEmptyCollection()][string[]]$Targets = @(),
+        [AllowNull()]$CallerPreflight
     )
     $gate = 'dependency-readiness'
     try {
@@ -224,7 +217,7 @@ function Test-DmDependencyReadiness {
         $state = 'unknown'
         $detail = 'Readiness check failed.'
         try {
-            $probe = Get-DmDependencyReadiness -Dependency $dependency
+            $probe = Get-DmDependencyReadiness -Dependency $dependency -CallerPreflight $CallerPreflight
             if ($null -ne $probe -and $probe.PSObject.Properties['readinessState'] -and [string]$probe.readinessState -cin $script:DmReadinessStates) {
                 $state = [string]$probe.readinessState
                 if ($probe.PSObject.Properties['evidence'] -and (Test-DmSafeText -Text ([string]$probe.evidence))) { $detail = [string]$probe.evidence }
@@ -242,10 +235,10 @@ function Test-DmDependencyReadiness {
                 default { "Readiness of required dependency $requirement could not be confirmed. $detail Unknown readiness is not success." }
             }
             $remaining = if ($state -ceq 'unknown') {
-                "Check $requirement in the active Copilot CLI session. Script-backed work remains blocked until a trusted runtime readiness and authorization handoff is available."
+                "The calling skill must check $requirement in the active session and supply callerPreflight. PowerShell does not independently verify MCP readiness."
             }
             else {
-                "Install and configure $requirement in Copilot CLI yourself. Script-backed work remains blocked until a trusted runtime readiness and authorization handoff is available."
+                "Make $requirement available, then repeat the calling skill's live checks and supply callerPreflight."
             }
             $result = New-DmBlockedResult -Operation $Operation -CompletionCode 'PREREQUISITE_MISSING' -Targets $Targets -Message $message `
                 -RemainingWork @($remaining) `
@@ -259,9 +252,9 @@ function Test-DmDependencyReadiness {
 function Test-DmVaultAuthorization {
     <#
     .SYNOPSIS
-    Requires verified exact-vault authorization for every declared dependency.
+    Requires caller-confirmed exact-vault authorization for every declared dependency.
     .DESCRIPTION
-    Exact-vault authorization handoff for every declared dependency. Returns a
+    Caller-confirmed exact-vault authorization for every declared dependency. Returns a
     gate outcome; anything other than 'authorized' for every dependency blocks
     with VAULT_AUTHORIZATION_UNPROVEN before any profile, guidance, or note
     access. Never reads the vault.
@@ -271,12 +264,15 @@ function Test-DmVaultAuthorization {
     Explicit vault root for the authorization handoff.
     .PARAMETER Targets
     Requested vault-relative targets reported as not attempted if blocked.
+    .PARAMETER CallerPreflight
+    Normalized caller confirmation bound to the selected vault.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyString()][string]$Operation,
         [Parameter(Mandatory)][AllowEmptyString()][string]$VaultRoot,
-        [AllowEmptyCollection()][string[]]$Targets = @()
+        [AllowEmptyCollection()][string[]]$Targets = @(),
+        [AllowNull()]$CallerPreflight
     )
     $gate = 'vault-authorization'
     $evidence = [System.Collections.Generic.List[object]]::new()
@@ -289,7 +285,7 @@ function Test-DmVaultAuthorization {
         $id = [string]$dependency.dependencyId
         $state = 'unknown'
         try {
-            $answer = Get-DmVaultAuthorization -Dependency $dependency -VaultRoot $VaultRoot
+            $answer = Get-DmVaultAuthorization -Dependency $dependency -VaultRoot $VaultRoot -CallerPreflight $CallerPreflight
             if ($null -ne $answer -and $answer.PSObject.Properties['vaultAuthorizationState'] -and [string]$answer.vaultAuthorizationState -cin @('authorized', 'not authorized', 'unknown')) {
                 $state = [string]$answer.vaultAuthorizationState
             }
@@ -297,7 +293,7 @@ function Test-DmVaultAuthorization {
         catch {
             $state = 'unknown'
         }
-        $evidence.Add((New-DmEvidence -Gate $gate -Subject $id -State $state))
+        $evidence.Add((New-DmEvidence -Gate $gate -Subject $id -State $state -Detail 'Caller confirmation; PowerShell does not independently verify MCP authorization.'))
         if ($state -cne 'authorized') {
             $blocked = $true
             $blockedId = $id
@@ -308,8 +304,8 @@ function Test-DmVaultAuthorization {
     if ($blocked) {
         $detail = [ordered]@{ dependencyId = $blockedId; vaultAuthorizationState = $blockedState }
         $result = New-DmBlockedResult -Operation $Operation -CompletionCode 'VAULT_AUTHORIZATION_UNPROVEN' -Targets $Targets `
-            -Message 'Exact-vault authorization could not be verified by the PowerShell runtime, so no profile, guidance, or campaign note was read and nothing was written.' `
-            -RemainingWork @('A verified handoff from the active session Resolver is required before script-backed vault access. Read-only assistance that does not need the vault remains available.') `
+            -Message 'The caller did not confirm authorization for this exact vault, so no profile, guidance, or campaign note was read and nothing was written.' `
+            -RemainingWork @('The calling skill must check get_server_info in the active session and supply callerPreflight for this exact vault. This is a caller precondition, not independent PowerShell authorization.') `
             -Detail $detail
         return (New-DmGateOutcome -Gate $gate -Passed $false -Result $result -Evidence $evidence.ToArray())
     }

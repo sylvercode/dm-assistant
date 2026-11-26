@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'RuntimeContract.psm1')
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'OperationRequest.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultPathValidation.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultBoundary.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PluginResources.psm1')

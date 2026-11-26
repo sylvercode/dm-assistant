@@ -131,7 +131,7 @@ commit, push, or discard user changes without authorization.
 Small, clearly requested edits local to a page may be applied without separate
 approval or a mandatory preview unless they alter actual-play records or
 established continuity. Major changes require a scoped preview followed by DM
-approval in a later message: for example, multi-note edits, restructuring,
+approval after the preview: for example, multi-note edits, restructuring,
 deletion, campaign resets, or continuity changes. Impact matters more than
 file count; a one-page change to an actual-play record still requires approval.
 

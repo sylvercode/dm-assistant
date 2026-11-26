@@ -5,6 +5,7 @@ Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'DependencyPreflig
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultBoundary.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'VaultConfiguration.psm1')
 Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'PluginResources.psm1')
+Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'RuntimePreflight.psm1')
 
 function Get-DmFileAccessFingerprint {
     <#
@@ -101,6 +102,100 @@ function Test-DmChangeDependencyVersions {
         }
     }
     [pscustomobject][ordered]@{ matches = ($changed.Count -eq 0); changedIdentities = [string[]]$changed.ToArray() }
+}
+
+function Test-DmExpectedInputTargets {
+    <#
+    .SYNOPSIS
+    Revalidates the exact files and paths consumed while preparing a write.
+    .PARAMETER Boundary
+    Canonical authorized vault boundary for input rechecks.
+    .PARAMETER Inputs
+    Input records containing identity, resolution, and observedVersion.
+    .PARAMETER WriteResolution
+    Destination resolution used for the pending write.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Boundary,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Inputs,
+        [Parameter(Mandatory)]$WriteResolution
+    )
+
+    $changed = [System.Collections.Generic.List[string]]::new()
+    $destinations = @($Inputs | Where-Object { [string]$_.identity -ceq 'destination' })
+    if ($destinations.Count -ne 1 -or [string]$destinations[0].resolution.path -cne [string]$WriteResolution.path) {
+        return [pscustomobject][ordered]@{ matches = $false; changedIdentities = @('destination') }
+    }
+
+    foreach ($inputTarget in $Inputs) {
+        $identity = [string]$inputTarget.identity
+        $resolution = $inputTarget.resolution
+        if ([string]::IsNullOrWhiteSpace($identity) -or $null -eq $resolution -or
+            -not $inputTarget.PSObject.Properties['observedVersion']) {
+            return [pscustomobject][ordered]@{ matches = $false; changedIdentities = @('input-set') }
+        }
+
+        $boundaryCheck = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $resolution
+        if (-not $boundaryCheck.confirmed) {
+            $changed.Add($identity)
+            continue
+        }
+
+        switch ([string]$resolution.status) {
+            'resolved' {
+                if ($resolution.itemType -ceq 'file') {
+                    $current = Read-DmVaultTargetBytes -Boundary $Boundary -Resolution $boundaryCheck.resolution
+                    if (-not $current.ok -or [string]$current.version -cne [string]$inputTarget.observedVersion) {
+                        $changed.Add($identity)
+                    }
+                }
+                elseif ($resolution.itemType -cne 'directory' -or [string]$inputTarget.observedVersion -cne 'directory') {
+                    $changed.Add($identity)
+                }
+            }
+            'missing' {
+                if ([string]$inputTarget.observedVersion -cne 'absent') { $changed.Add($identity) }
+            }
+            default { $changed.Add($identity) }
+        }
+    }
+
+    [pscustomobject][ordered]@{ matches = ($changed.Count -eq 0); changedIdentities = [string[]]$changed.ToArray() }
+}
+
+function Test-DmSafeWritePreflight {
+    <#
+    .SYNOPSIS
+    Rechecks caller confirmation and the filesystem boundary before a write.
+    .PARAMETER Boundary
+    Previously established canonical vault boundary.
+    .PARAMETER Request
+    Original operation request used to establish the boundary.
+    The calling skill may reuse its verified session-scoped MCP checks subject
+    to their invalidation conditions; this function cannot detect live changes.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Boundary,
+        [Parameter(Mandatory)]$Request
+    )
+
+    $preflight = Invoke-DmPreflight -Request $Request
+    if (-not $preflight.passed) {
+        return [pscustomobject][ordered]@{
+            passed = $false
+            code = [string]$preflight.result.completionCode
+        }
+    }
+
+    $comparison = [System.StringComparison]$Boundary.comparison
+    $sameRoot = [string]::Equals([string]$preflight.boundary.canonicalRoot, [string]$Boundary.canonicalRoot, $comparison) -and
+        [string]::Equals([string]$preflight.boundary.selectedRoot, [string]$Boundary.selectedRoot, $comparison)
+    [pscustomobject][ordered]@{
+        passed = $sameRoot
+        code = if ($sameRoot) { $null } else { 'TARGET_CONFLICT' }
+    }
 }
 
 function ConvertFrom-DmNoteBytes {
@@ -236,6 +331,10 @@ function Invoke-DmAtomicReplace {
     Ordered dependency-version snapshot to recheck immediately before replacement.
     .PARAMETER Profile
     Validated profile for dependency checks, or null when absent.
+    .PARAMETER ExpectedInputTargets
+    Read-only input files or paths consumed while preparing the target.
+    .PARAMETER Request
+    Original request to reauthorize and re-resolve before writing.
     #>
     [CmdletBinding()]
     param(
@@ -244,7 +343,9 @@ function Invoke-DmAtomicReplace {
         [Parameter(Mandatory)][AllowEmptyCollection()][byte[]]$Bytes,
         [Parameter(Mandatory)][string]$ExpectedVersion,
         [Parameter(Mandatory)][object[]]$ExpectedDependencies,
-        [AllowNull()]$Profile
+        [AllowNull()]$Profile,
+        [AllowNull()][object[]]$ExpectedInputTargets,
+        [AllowNull()]$Request
     )
 
     $stagePath = $null
@@ -266,6 +367,19 @@ function Invoke-DmAtomicReplace {
         }
         if ([string]$current.version -cne $ExpectedVersion) {
             return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'The target changed before staging.' }
+        }
+        if ($null -ne $Request) {
+            $preflightCheck = Test-DmSafeWritePreflight -Boundary $Boundary -Request $Request
+            if (-not $preflightCheck.passed) {
+                $code = if ([string]::IsNullOrWhiteSpace([string]$preflightCheck.code)) { 'TARGET_CONFLICT' } else { [string]$preflightCheck.code }
+                return [pscustomobject][ordered]@{ ok = $false; code = $code; message = 'Authorization or vault-boundary evidence changed before staging.' }
+            }
+        }
+        if ($null -ne $ExpectedInputTargets -and $ExpectedInputTargets.Count -gt 0) {
+            $inputCheck = Test-DmExpectedInputTargets -Boundary $Boundary -Inputs $ExpectedInputTargets -WriteResolution $Resolution
+            if (-not $inputCheck.matches) {
+                return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A consumed authoring input changed; the prepared work is stale and must be revalidated before retrying.' }
+            }
         }
         $targetSecurity = Get-DmFileAccessFingerprint -Path ([string]$boundaryCheck.resolution.resolvedPath)
         $stagePath = [System.IO.Path]::Combine($directory, ".dmassist-$([guid]::NewGuid().ToString('N')).tmp")
@@ -299,6 +413,19 @@ function Invoke-DmAtomicReplace {
         $dependencyCheck = Test-DmChangeDependencyVersions -Current $freshDependencies -Expected $ExpectedDependencies
         if (-not $dependencyCheck.matches) {
             return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A profile, reference, or installed resource changed before replacement.' }
+        }
+        if ($null -ne $Request) {
+            $preflightCheck = Test-DmSafeWritePreflight -Boundary $Boundary -Request $Request
+            if (-not $preflightCheck.passed) {
+                $code = if ([string]::IsNullOrWhiteSpace([string]$preflightCheck.code)) { 'TARGET_CONFLICT' } else { [string]$preflightCheck.code }
+                return [pscustomobject][ordered]@{ ok = $false; code = $code; message = 'Authorization or vault-boundary evidence changed before replacement.' }
+            }
+        }
+        if ($null -ne $ExpectedInputTargets -and $ExpectedInputTargets.Count -gt 0) {
+            $inputCheck = Test-DmExpectedInputTargets -Boundary $Boundary -Inputs $ExpectedInputTargets -WriteResolution $Resolution
+            if (-not $inputCheck.matches) {
+                return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A consumed authoring input changed; the prepared work is stale and must be revalidated before retrying.' }
+            }
         }
 
         $finalBoundary = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $boundaryCheck.resolution
@@ -344,6 +471,141 @@ function Invoke-DmAtomicReplace {
     }
 }
 
+function Invoke-DmAtomicCreate {
+    <#
+    .SYNOPSIS
+    Stages and atomically creates one previously absent article.
+    .DESCRIPTION
+    Writes a protected same-directory stage file, revalidates the explicit
+    target and all consumed inputs, and moves without overwrite.
+    .PARAMETER Boundary
+    Canonical authorized vault boundary used for immediate rechecks.
+    .PARAMETER Resolution
+    Previously resolved missing destination.
+    .PARAMETER ParentResolution
+    Previously resolved existing destination parent directory.
+    .PARAMETER Bytes
+    Complete UTF-8 article bytes to stage.
+    .PARAMETER ExpectedDependencies
+    Ordered dependency-version snapshot to recheck before creation.
+    .PARAMETER Profile
+    Validated profile for dependency checks, or null when absent.
+    .PARAMETER ExpectedInputTargets
+    Read-only inputs, absent destination, and parent consumed while preparing.
+    .PARAMETER Request
+    Original request to reauthorize and re-resolve before writing.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Boundary,
+        [Parameter(Mandatory)]$Resolution,
+        [AllowNull()]$ParentResolution,
+        [Parameter(Mandatory)][AllowEmptyCollection()][byte[]]$Bytes,
+        [Parameter(Mandatory)][object[]]$ExpectedDependencies,
+        [AllowNull()]$Profile,
+        [Parameter(Mandatory)][object[]]$ExpectedInputTargets,
+        [Parameter(Mandatory)]$Request
+    )
+
+    $stagePath = $null
+    $directoryLease = $null
+    try {
+        $targetCheck = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $Resolution
+        if (-not $targetCheck.confirmed -or $targetCheck.resolution.status -cne 'missing' -or
+            ($null -ne $ParentResolution -and
+                (-not (Confirm-DmVaultTarget -Boundary $Boundary -Resolution $ParentResolution).confirmed -or $ParentResolution.itemType -cne 'directory'))) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'The article destination or its parent changed before staging.' }
+        }
+
+        $directoryLease = Open-DmVaultDirectoryLease -Boundary $Boundary -Resolution $targetCheck.resolution
+        $preflightCheck = Test-DmSafeWritePreflight -Boundary $Boundary -Request $Request
+        if (-not $preflightCheck.passed) {
+            $code = if ([string]::IsNullOrWhiteSpace([string]$preflightCheck.code)) { 'TARGET_CONFLICT' } else { [string]$preflightCheck.code }
+            return [pscustomobject][ordered]@{ ok = $false; code = $code; message = 'Authorization or vault-boundary evidence changed before article creation.' }
+        }
+        $inputCheck = Test-DmExpectedInputTargets -Boundary $Boundary -Inputs $ExpectedInputTargets -WriteResolution $Resolution
+        if (-not $inputCheck.matches) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A consumed authoring input changed; validate the inputs and preview the article creation again.' }
+        }
+
+        try { $freshDependencies = Get-DmCurrentChangeDependencyVersions -Boundary $Boundary -Profile $Profile }
+        catch {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A profile, reference, or installed resource could not be revalidated before article creation.' }
+        }
+        $dependencyCheck = Test-DmChangeDependencyVersions -Current $freshDependencies -Expected $ExpectedDependencies
+        if (-not $dependencyCheck.matches) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A profile, reference, or installed resource changed before article creation.' }
+        }
+
+        $directory = [System.IO.Path]::GetDirectoryName([string]$targetCheck.resolution.resolvedPath)
+        $stagePath = [System.IO.Path]::Combine($directory, ".dmassist-$([guid]::NewGuid().ToString('N')).tmp")
+        $stageHandle = [DmAssistant.IO.DirectoryLease]::CreateProtectedStage($stagePath)
+        $stream = [System.IO.FileStream]::new($stageHandle, [System.IO.FileAccess]::Write, 4096, $false)
+        try {
+            $stream.Write($Bytes, 0, $Bytes.Length)
+            $stream.Flush($true)
+        }
+        finally { $stream.Dispose() }
+
+        $stageSecurity = [System.IO.FileSystemAclExtensions]::GetAccessControl(
+            [System.IO.FileInfo]::new($stagePath),
+            [System.Security.AccessControl.AccessControlSections]::Access
+        )
+        $stageSecurity.SetAccessRuleProtection($false, $false)
+        [System.IO.FileSystemAclExtensions]::SetAccessControl([System.IO.FileInfo]::new($stagePath), $stageSecurity)
+
+        $targetCheck = Confirm-DmVaultTarget -Boundary $Boundary -Resolution $Resolution
+        if (-not $targetCheck.confirmed -or $targetCheck.resolution.status -cne 'missing' -or
+            ($null -ne $ParentResolution -and
+                (-not (Confirm-DmVaultTarget -Boundary $Boundary -Resolution $ParentResolution).confirmed -or $ParentResolution.itemType -cne 'directory'))) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'The article destination or its parent changed immediately before creation.' }
+        }
+        try { $freshDependencies = Get-DmCurrentChangeDependencyVersions -Boundary $Boundary -Profile $Profile }
+        catch {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A profile, reference, or installed resource could not be revalidated immediately before article creation.' }
+        }
+        $dependencyCheck = Test-DmChangeDependencyVersions -Current $freshDependencies -Expected $ExpectedDependencies
+        if (-not $dependencyCheck.matches) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A profile, reference, or installed resource changed immediately before article creation.' }
+        }
+        $preflightCheck = Test-DmSafeWritePreflight -Boundary $Boundary -Request $Request
+        if (-not $preflightCheck.passed) {
+            $code = if ([string]::IsNullOrWhiteSpace([string]$preflightCheck.code)) { 'TARGET_CONFLICT' } else { [string]$preflightCheck.code }
+            return [pscustomobject][ordered]@{ ok = $false; code = $code; message = 'Authorization or vault-boundary evidence changed immediately before article creation.' }
+        }
+        $inputCheck = Test-DmExpectedInputTargets -Boundary $Boundary -Inputs $ExpectedInputTargets -WriteResolution $Resolution
+        if (-not $inputCheck.matches) {
+            return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'A consumed authoring input changed; validate the inputs and preview the article creation again.' }
+        }
+
+        try { [System.IO.File]::Move($stagePath, [string]$targetCheck.resolution.resolvedPath, $false) }
+        catch [System.IO.IOException] {
+            $latest = Resolve-DmVaultTarget -Boundary $Boundary -Path ([string]$Resolution.path)
+            if ($latest.status -ceq 'resolved') {
+                return [pscustomobject][ordered]@{ ok = $false; code = 'TARGET_CONFLICT'; message = 'The article destination was created by another process; no existing file was replaced.' }
+            }
+            throw
+        }
+        $stagePath = $null
+        [pscustomobject][ordered]@{ ok = $true; code = $null; message = '' }
+    }
+    catch [System.Management.Automation.PipelineStoppedException] {
+        [pscustomobject][ordered]@{ ok = $false; code = 'INTERRUPTED'; message = 'The operation was interrupted before the article was created.' }
+    }
+    catch [System.OperationCanceledException] {
+        [pscustomobject][ordered]@{ ok = $false; code = 'INTERRUPTED'; message = 'The operation was interrupted before the article was created.' }
+    }
+    catch {
+        [pscustomobject][ordered]@{ ok = $false; code = 'WRITE_FAILED'; message = 'The article could not be safely staged or created.' }
+    }
+    finally {
+        if ($null -ne $stagePath) {
+            try { [System.IO.File]::Delete($stagePath) } catch { $null = $_ }
+        }
+        if ($null -ne $directoryLease) { $directoryLease.Dispose() }
+    }
+}
+
 function Invoke-DmSafeNoteWrite {
     <#
     .SYNOPSIS
@@ -356,17 +618,30 @@ function Invoke-DmSafeNoteWrite {
     Optional dependency snapshot; when omitted, the current versions are read.
     .PARAMETER Profile
     Validated profile for dependency revalidation, or null when absent.
+    .PARAMETER ExpectedInputTargets
+    Read-only input files or paths consumed while preparing the target.
+    .PARAMETER Request
+    Original request to reauthorize and re-resolve before writing.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$Boundary,
         [Parameter(Mandatory)]$Target,
         [AllowNull()][object[]]$ExpectedDependencies,
-        [AllowNull()]$Profile
+        [AllowNull()]$Profile,
+        [AllowNull()][object[]]$ExpectedInputTargets,
+        [AllowNull()]$Request
     )
 
     $expectedVersion = [string]$Target.observedVersion
     $replacementBytes = [byte[]]$Target.replacementBytes
+    if ($null -ne $ExpectedInputTargets -and $ExpectedInputTargets.Count -gt 0 -and $null -eq $Request) {
+        return [pscustomobject][ordered]@{
+            ok = $false
+            code = 'TARGET_CONFLICT'
+            reason = 'Authorization and vault-boundary evidence must be revalidated with consumed authoring inputs.'
+        }
+    }
     if (-not $PSBoundParameters.ContainsKey('ExpectedDependencies') -or $null -eq $ExpectedDependencies) {
         try { $ExpectedDependencies = Get-DmCurrentChangeDependencyVersions -Boundary $Boundary -Profile $Profile }
         catch {
@@ -374,8 +649,21 @@ function Invoke-DmSafeNoteWrite {
         }
     }
 
-    $outcome = Invoke-DmAtomicReplace -Boundary $Boundary -Resolution $Target.resolution -Bytes $replacementBytes `
-        -ExpectedVersion $expectedVersion -ExpectedDependencies ([object[]]$ExpectedDependencies) -Profile $Profile
+    if ($Target.PSObject.Properties['createOnly'] -and [bool]$Target.createOnly) {
+        if ($null -eq $Request -or $null -eq $ExpectedInputTargets) {
+            return [pscustomobject][ordered]@{
+                ok = $false; code = 'INVALID_REQUEST'; reason = 'A create-only target requires its original request and consumed-input snapshot.'
+            }
+        }
+        $outcome = Invoke-DmAtomicCreate -Boundary $Boundary -Resolution $Target.resolution -ParentResolution $Target.parentResolution `
+            -Bytes $replacementBytes -ExpectedDependencies ([object[]]$ExpectedDependencies) -Profile $Profile `
+            -ExpectedInputTargets ([object[]]$ExpectedInputTargets) -Request $Request
+    }
+    else {
+        $outcome = Invoke-DmAtomicReplace -Boundary $Boundary -Resolution $Target.resolution -Bytes $replacementBytes `
+            -ExpectedVersion $expectedVersion -ExpectedDependencies ([object[]]$ExpectedDependencies) -Profile $Profile `
+            -ExpectedInputTargets $ExpectedInputTargets -Request $Request
+    }
     [pscustomobject][ordered]@{ ok = [bool]$outcome.ok; code = $outcome.code; reason = [string]$outcome.message }
 }
 

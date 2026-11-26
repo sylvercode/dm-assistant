@@ -16,7 +16,12 @@ description: "Implementation tasks for article authoring and template selection"
 
 **Purpose**: Reconcile the destination acceptance criterion with FR-017 before implementation.
 
-- [X] T001 Update User Story 4 acceptance scenario 5 in `specs/005-article-authoring/spec.md` to match FR-017: require one explicit DM-supplied vault-relative Markdown destination, state that Feature 002 section-folder/template mappings do not identify article paths, and require the workflow to ask rather than infer a destination.
+On 2026-11-21, the DM changed the destination requirement to also accept
+absolute paths within the selected vault. The article entry point normalizes
+these to vault-relative identities; the shared runtime still enforces its
+vault-relative path and filesystem containment rules.
+
+- [X] T001 Update User Story 4 acceptance scenario 5 in `specs/005-article-authoring/spec.md` to match FR-017: require one explicit DM-supplied in-vault Markdown destination, state that Feature 002 section-folder/template mappings do not identify article paths, and require the workflow to ask rather than infer a destination.
 
 ---
 
@@ -24,9 +29,9 @@ description: "Implementation tasks for article authoring and template selection"
 
 **Purpose**: Create the shared article-authoring skill entry point, register it, and route operations through existing safety contracts before any story work.
 
-- [ ] T002 [P] Create `skills/article-authoring/SKILL.md` with portable skill frontmatter, activation of `vault-orientation`, the required pre-note sequence from `skills/vault-orientation/SKILL.md`, installed-skill resource loading, and a one-article operation boundary; do not access vault-owned inputs before authorization, shared-reference, and guidance gates succeed.
-- [ ] T003 [P] Register `article-authoring` exactly once in `skills/README.md` as a vault-facing immediate-child skill, link to `skills/article-authoring/SKILL.md`, and require shared-reference and declared-dependency checks before campaign-note access.
-- [ ] T004 Route script-backed article creation through `skills/vault-orientation/scripts/RuntimePreflight.psm1`, `skills/vault-orientation/scripts/DependencyPreflight.psm1`, and `skills/vault-orientation/scripts/SafeNoteWriter.psm1`; preserve fail-closed exact-vault authorization and existing approval/write contracts, and do not add a test authorization provider or direct-write path.
+- [X] T002 [P] Create `skills/article-authoring/SKILL.md` with portable skill frontmatter, activation of `vault-orientation`, the required pre-note sequence from `skills/vault-orientation/SKILL.md`, installed-skill resource loading, and a one-article operation boundary; do not access vault-owned inputs before authorization, shared-reference, and guidance gates succeed.
+- [X] T003 [P] Register `article-authoring` exactly once in `skills/README.md` as a vault-facing immediate-child skill, link to `skills/article-authoring/SKILL.md`, and require shared-reference and declared-dependency checks before campaign-note access.
+- [X] T004 Route script-backed article creation through `skills/vault-orientation/scripts/RuntimePreflight.psm1`, `skills/vault-orientation/scripts/DependencyPreflight.psm1`, and `skills/vault-orientation/scripts/SafeNoteWriter.psm1`; preserve fail-closed exact-vault authorization and existing approval/write contracts, and do not add a test authorization provider or direct-write path. The skill documents this required route and blocks script-backed article writes until production authorization and a create-only safe-writer path are verified.
 
 **Checkpoint**: The skill is registered, delegates shared preflight to `vault-orientation`, and uses existing runtime gates without claiming production authorization is implemented.
 
@@ -40,21 +45,21 @@ description: "Implementation tasks for article authoring and template selection"
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Add package-layout tests in `tests/powershell/ArticleAuthoring.Tests.ps1` that assert the repository plugin package contains exactly one Markdown default for each built-in type (`adventure`, `character`, `handout`, `location`, `monster`, `party`, `persona`, `rule`, and `session`) under `skills/article-authoring/templates/`; do not treat this source-tree check as installed-client verification.
-- [ ] T006 [P] [US1] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` that request all nine built-in types from a working directory outside the plugin installation, exercise one valid profile-registered custom type, and assert the unified success/blocked response identifies type when known, source or why selection was not reached, destination or blocker, and no-creation confirmation when blocked.
+- [X] T005 [P] [US1] Add package-layout tests in `tests/powershell/ArticleAuthoring.Tests.ps1` that assert the repository plugin package contains exactly one Markdown default for each built-in type (`adventure`, `character`, `handout`, `location`, `monster`, `party`, `persona`, `rule`, and `session`) under `skills/article-authoring/templates/`; do not treat this source-tree check as installed-client verification.
+- [X] T006 [P] [US1] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` that request all nine built-in types from a working directory outside the plugin installation, exercise one valid profile-registered custom type, and assert the unified success/blocked response identifies type when known, source or why selection was not reached, destination or blocker, and no-creation confirmation when blocked.
 
 ### Implementation for User Story 1
 
-- [ ] T007 [P] [US1] Create the `adventure` default structure in `skills/article-authoring/templates/adventure.md` using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T008 [P] [US1] Create the `character` default structure in `skills/article-authoring/templates/character.md` using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T009 [P] [US1] Create the `handout` default structure in `skills/article-authoring/templates/handout.md` using static Markdown, player-facing content sections, and only the specified non-executable fill-in markers.
-- [ ] T010 [P] [US1] Create the `location` default structure in `skills/article-authoring/templates/location.md` using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T011 [P] [US1] Create the `monster` default structure in `skills/article-authoring/templates/monster.md` using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T012 [P] [US1] Create the `party` default structure in `skills/article-authoring/templates/party.md` using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T013 [P] [US1] Create the `persona` default structure in `skills/article-authoring/templates/persona.md` using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T014 [P] [US1] Create the `rule` default structure in `skills/article-authoring/templates/rule.md` using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T015 [P] [US1] Create the `session` default structure in `skills/article-authoring/templates/session.md` with separate preparation and actual-play sections, using static Markdown and only the specified non-executable fill-in markers.
-- [ ] T016 [US1] Implement source lookup, unsupported-type handling, and the unified outcome response in `skills/article-authoring/SKILL.md`: recognize exactly the nine built-in types; load defaults from the installed `article-authoring` skill resources independent of the current working directory; read the selected template before drafting; select a custom template only for a registered `templates.custom.<id>` whose ID matches `[a-z][a-z0-9_]*` and does not duplicate a built-in; and explain when no template is available without searching alternate locations, inventing content, or creating an article. On success, identify the requested type, selected source, and destination; when blocked, identify the type when known, selected source or that selection was not reached, the blocker, and confirm no article was created. For an approval-required outcome, identify that approval is needed and confirm no article has yet been created. Apply this response contract to preflight, template, required-input, safety, stale-input, destination, approval, and write outcomes. Depends on T002, T005, and T007–T015.
+- [X] T007 [P] [US1] Create the `adventure` default structure in `skills/article-authoring/templates/adventure.md` using static Markdown and only the specified non-executable fill-in markers.
+- [X] T008 [P] [US1] Create the `character` default structure in `skills/article-authoring/templates/character.md` using static Markdown and only the specified non-executable fill-in markers.
+- [X] T009 [P] [US1] Create the `handout` default structure in `skills/article-authoring/templates/handout.md` using static Markdown, player-facing content sections, and only the specified non-executable fill-in markers.
+- [X] T010 [P] [US1] Create the `location` default structure in `skills/article-authoring/templates/location.md` using static Markdown and only the specified non-executable fill-in markers.
+- [X] T011 [P] [US1] Create the `monster` default structure in `skills/article-authoring/templates/monster.md` using static Markdown and only the specified non-executable fill-in markers.
+- [X] T012 [P] [US1] Create the `party` default structure in `skills/article-authoring/templates/party.md` using static Markdown and only the specified non-executable fill-in markers.
+- [X] T013 [P] [US1] Create the `persona` default structure in `skills/article-authoring/templates/persona.md` using static Markdown and only the specified non-executable fill-in markers.
+- [X] T014 [P] [US1] Create the `rule` default structure in `skills/article-authoring/templates/rule.md` using static Markdown and only the specified non-executable fill-in markers.
+- [X] T015 [P] [US1] Create the `session` default structure in `skills/article-authoring/templates/session.md` with separate preparation and actual-play sections, using static Markdown and only the specified non-executable fill-in markers.
+- [X] T016 [US1] Implement source lookup, unsupported-type handling, and the unified outcome response in `skills/article-authoring/SKILL.md`: recognize exactly the nine built-in types; load defaults from the installed `article-authoring` skill resources independent of the current working directory; read the selected template before drafting; select a custom template only for a registered `templates.custom.<id>` whose ID matches `[a-z][a-z0-9_]*` and does not duplicate a built-in; and explain when no template is available without searching alternate locations, inventing content, or creating an article. On success, identify the requested type, selected source, and destination; when blocked, identify the type when known, selected source or that selection was not reached, the blocker, and confirm no article was created. For an approval-required outcome, identify that approval is needed and confirm no article has yet been created. Apply this response contract to preflight, template, required-input, safety, stale-input, destination, approval, and write outcomes. Depends on T002, T005, and T007–T015.
 
 **Checkpoint**: The repository package contains nine separate default resources; supported-client testing validates installed-resource lookup and custom-type behavior; unsupported types block without a substitute.
 
@@ -68,13 +73,13 @@ description: "Implementation tasks for article authoring and template selection"
 
 ### Tests for User Story 2
 
-- [ ] T017 [P] [US2] Add synthetic-vault freshness tests in `tests/powershell/ArticleAuthoring.Tests.ps1` for changes to each consumed profile/mapping, designated guidance, selected template, relevant context, authorization/boundary evidence, and destination identity/existence/parent state after validation and before writing; assert stale invalidation, required revalidation, and no write.
-- [ ] T018 [P] [US2] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` for configured built-in override precedence, configured overrides outside `.dmassist-templates/`, valid custom types, and missing/unreadable/invalid/stale/out-of-vault overrides that block without fallback or article creation.
+- [X] T017 [P] [US2] Add synthetic-vault freshness tests in `tests/powershell/ArticleAuthoring.Tests.ps1` for changes to each consumed profile/mapping, designated guidance, selected template, relevant context, authorization/boundary evidence, and destination identity/existence/parent state after validation and before writing; assert stale invalidation, required revalidation, and no write.
+- [X] T018 [P] [US2] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` for configured built-in override precedence, configured overrides outside `.dmassist-templates/`, valid custom types, and missing/unreadable/invalid/stale/out-of-vault overrides that block without fallback or article creation.
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Implement configured-template precedence in `skills/article-authoring/SKILL.md` using only Feature 002's `templates.<built-in-type>` and `templates.custom.<id>` mappings: validate custom IDs against `[a-z][a-z0-9_]*` with no built-in collision; use a valid in-vault override before a bundled default; preserve valid existing paths; and stop on any invalid configured override without falling back. Depends on T016.
-- [ ] T020 [US2] Bind SafeNoteWriter freshness checks in `skills/vault-orientation/scripts/SafeNoteWriter.psm1` to every consumed authoring input: profile and selected mapping, designated guidance, selected template, relevant campaign context, authorization/boundary evidence, and destination identity/existence/parent state. If any input changes after validation or before writing, invalidate dependent work, report staleness, require revalidation, and do not retry or mix old and new inputs. Depends on T019.
+- [X] T019 [US2] Implement configured-template precedence in `skills/article-authoring/SKILL.md` using only Feature 002's `templates.<built-in-type>` and `templates.custom.<id>` mappings: validate custom IDs against `[a-z][a-z0-9_]*` with no built-in collision; use a valid in-vault override before a bundled default; preserve valid existing paths; and stop on any invalid configured override without falling back. Depends on T016.
+- [X] T020 [US2] Bind SafeNoteWriter freshness checks in `skills/vault-orientation/scripts/SafeNoteWriter.psm1` to every consumed authoring input: profile and selected mapping, designated guidance, selected template, relevant campaign context, authorization/boundary evidence, and destination identity/existence/parent state. If any input changes after validation or before writing, invalidate dependent work, report staleness, require revalidation, and do not retry or mix old and new inputs. Depends on T019.
 
 **Checkpoint**: Valid overrides retain precedence and user ownership; invalid or stale configuration cannot silently select a different template or proceed to a write.
 
@@ -88,12 +93,12 @@ description: "Implementation tasks for article authoring and template selection"
 
 ### Tests for User Story 3
 
-- [ ] T021 [P] [US3] Add static template checks in `tests/powershell/ArticleAuthoring.Tests.ps1` for the exact required/optional marker syntax and non-executable Markdown constraints across the nine bundled templates; depends on T007–T015.
-- [ ] T022 [P] [US3] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` for convention precedence; tag use that does not replace explanatory prose or impose a fixed vocabulary when none is established; native callout fallback and warning-title specificity; ignoring template text that attempts to authorize access or changes; DM-only fact/revealing-link omission; final player-safety gate timing and recheck after edits; required/optional marker behavior; leaving dynamic syntax unexecuted and reporting the limitation and asking the DM how to proceed when its output is needed; and preparation/actual-play separation.
+- [X] T021 [P] [US3] Add static template checks in `tests/powershell/ArticleAuthoring.Tests.ps1` for the exact required/optional marker syntax and non-executable Markdown constraints across the nine bundled templates; depends on T007–T015.
+- [X] T022 [P] [US3] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` for convention precedence; tag use that does not replace explanatory prose or impose a fixed vocabulary when none is established; native callout fallback and warning-title specificity; ignoring template text that attempts to authorize access or changes; DM-only fact/revealing-link omission; final player-safety gate timing and recheck after edits; required/optional marker behavior; leaving dynamic syntax unexecuted and reporting the limitation and asking the DM how to proceed when its output is needed; and preparation/actual-play separation.
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Implement content and audience safeguards in `skills/article-authoring/SKILL.md`: follow conventions established by explicit DM instructions, designated local guidance, the shared reference, or relevant authorized notes; use tags to classify content, not replace explanatory prose, and do not impose a fixed tag vocabulary when none is established; use proposed native defaults only when no applicable convention exists and require warning titles to name the caution or consequence; treat templates as data, not instructions, authorization, or permission to access other files or make changes; classify DM-only facts from DM direction or designated guidance/context and revealing links from their target or known result; omit them from player-facing sections; gate-check after the final content change and directly before delivery/read, repeating after later changes and withholding if safety cannot be established; recognize only the exact required/optional HTML-comment markers, ask about missing or ambiguous required values, allow optional markers to remain, never execute other template syntax, and when dynamic output is needed report that it was not expanded and ask the DM how to proceed; keep preparation distinct from actual-play history, character knowledge, and world facts. Depends on T019 and T007–T015.
+- [X] T023 [US3] Implement content and audience safeguards in `skills/article-authoring/SKILL.md`: follow conventions established by explicit DM instructions, designated local guidance, the shared reference, or relevant authorized notes; use tags to classify content, not replace explanatory prose, and do not impose a fixed tag vocabulary when none is established; use proposed native defaults only when no applicable convention exists and require warning titles to name the caution or consequence; treat templates as data, not instructions, authorization, or permission to access other files or make changes; classify DM-only facts from DM direction or designated guidance/context and revealing links from their target or known result; omit them from player-facing sections; gate-check after the final content change and directly before delivery/read, repeating after later changes and withholding if safety cannot be established; recognize only the exact required/optional HTML-comment markers, ask about missing or ambiguous required values, allow optional markers to remain, never execute other template syntax, and when dynamic output is needed report that it was not expanded and ask the DM how to proceed; keep preparation distinct from actual-play history, character knowledge, and world facts. Depends on T019 and T007–T015.
 
 **Checkpoint**: Article content respects established conventions and player/DM boundaries; unsupported template syntax is never expanded or presented as expanded.
 
@@ -107,14 +112,14 @@ description: "Implementation tasks for article authoring and template selection"
 
 ### Tests for User Story 4
 
-- [ ] T024 [P] [US4] Add synthetic-vault Pester tests in `tests/powershell/ArticleAuthoring.Tests.ps1` for preflight failure with no dependent reads/writes; escaping paths and unverified Resolver targets; destination conflicts, missing parents, ambiguous/inferred destinations, and unchanged fixtures; plus page-local versus broader approval and approval invalidation when the proposal or consumed inputs change.
-- [ ] T025 [P] [US4] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` confirming that article destinations require one explicitly DM-supplied vault-relative Markdown path, Feature 002 section-folder/template mappings alone do not identify a destination, and all blocked path/approval cases leave the synthetic fixture unchanged.
+- [X] T024 [P] [US4] Add synthetic-vault Pester tests in `tests/powershell/ArticleAuthoring.Tests.ps1` for preflight failure with no dependent reads/writes; escaping paths and unverified Resolver targets; destination conflicts, missing parents, ambiguous/inferred destinations, and unchanged fixtures; plus page-local versus broader approval and approval invalidation when the proposal or consumed inputs change.
+- [X] T025 [P] [US4] Add supported-client scenarios to `specs/005-article-authoring/quickstart.md` confirming that article destinations require one explicitly DM-supplied in-vault Markdown path, Feature 002 section-folder/template mappings alone do not identify a destination, and all blocked path/approval cases leave the synthetic fixture unchanged.
 
 ### Implementation for User Story 4
 
-- [ ] T026 [P] [US4] Enforce article-template and destination containment using `skills/vault-orientation/scripts/VaultPathValidation.psm1` and `skills/vault-orientation/scripts/VaultBoundary.psm1`; reject absolute, traversal, and symlink-resolved paths outside the authorized root before reading or writing, and do not call `resolve_obsidian_link` until its target-containment gate is verified. Depends on Phase 2.
-- [ ] T027 [US4] Recheck destination identity and filesystem state in `skills/vault-orientation/scripts/SafeNoteWriter.psm1` immediately before applying an article: accept only one vault-relative Markdown path explicitly supplied by the DM; reject an existing target, missing parent, multiple plausible paths, or unknown destination. Never treat Feature 002 section-folder or template mappings as article destinations, overwrite or reformat existing content, create folders, guess an alternate path, or write after any required gate fails. Depends on T020 and T026.
-- [ ] T028 [US4] Apply the page-local exception and scoped approval flow through `skills/vault-orientation/scripts/ChangePreview.psm1` and `skills/vault-orientation/scripts/ApplyNoteChanges.psm1`: allow exactly one clear new article with no existing-note, actual-play, or continuity changes without separate DM approval; otherwise show a scoped preview, make no change before explicit approval, and bind approval to the current proposal and consumed inputs. Depends on T027.
+- [X] T026 [P] [US4] Enforce article-template and destination containment using `skills/vault-orientation/scripts/VaultPathValidation.psm1` and `skills/vault-orientation/scripts/VaultBoundary.psm1`; reject absolute template paths, outside-vault absolute destinations, traversal, and symlink-resolved paths outside the authorized root before script reads/writes. Resolver symlink-target qualification is deferred to the owner as of 2026-11-17, not an authoring gate. Depends on Phase 2.
+- [X] T027 [US4] Recheck destination identity and filesystem state in `skills/vault-orientation/scripts/SafeNoteWriter.psm1` immediately before applying an article: accept only one in-vault Markdown path explicitly supplied by the DM and normalized to a vault-relative identity; reject an existing target, missing parent, multiple plausible paths, or unknown destination. Never treat Feature 002 section-folder or template mappings as article destinations, overwrite or reformat existing content, create folders, guess an alternate path, or write after any required gate fails. Depends on T020 and T026.
+- [X] T028 [US4] Apply the page-local exception and scoped approval flow through `skills/vault-orientation/scripts/ChangePreview.psm1` and `skills/vault-orientation/scripts/ApplyNoteChanges.psm1`: allow exactly one clear new article with no existing-note, actual-play, or continuity changes without separate DM approval; otherwise show a scoped preview, make no change before explicit approval, and bind approval to the current proposal and consumed inputs. Depends on T027.
 
 **Checkpoint**: Unsafe access is blocked, existing content remains unchanged on conflicts or failures, and approval protects all changes outside the narrow page-local exception.
 
@@ -124,7 +129,18 @@ description: "Implementation tasks for article authoring and template selection"
 
 **Purpose**: Validate the complete skill inventory, repository acceptance suite, and local discovery guidance without claiming blocked production behavior.
 
-- [ ] T029 Verify the `article-authoring` entry and every immediate-child skill in `skills/README.md`, follow the local plugin installation guidance in `README.md`, run `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`, and execute the quickstart's supported-client scenarios when that client is available; report synthetic test evidence separately from installed-client behavior, production authorization, Resolver target containment, and cross-platform support. Depends on T016, T020, T023, and T024–T028.
+- [X] T029 Verify the `article-authoring` entry and every immediate-child skill in `skills/README.md`, follow the local plugin installation guidance in `README.md`, run `pwsh -NoProfile -File tests\powershell\Invoke-Tests.ps1`, and execute the quickstart's supported-client scenarios with disposable fixtures; report synthetic evidence separately from live caller MCP checks, caller-confirmation handling, installed-client behavior, and cross-platform support. Incremental CLI checks are recorded in the quickstart. Rerun client authoring scenarios with the revised `callerPreflight` contract; the unimplemented runtime/MCP bridge is no longer required. Resolver symlink qualification is deferred to the owner and does not block this task. Depends on T016, T020, T023, and T024–T028.
+
+  Final local verification on 2026-11-25: the immediate-child inventory is
+  confirmed, local plugin installation guidance was reviewed, and the complete
+  Pester suite passed with 417 tests passing and 5 file-symbolic-link tests
+  skipped for missing Windows Developer Mode/elevation. The installed-client
+  scenarios and cross-platform qualification exercised in this work are
+  accepted for T029 and recorded in [quickstart.md](quickstart.md). Residual
+  synthetic scenarios are deferred to issue #17; cross-client, production
+  authorization, and cross-platform qualification are deferred to issue #18.
+  Do not infer production authorization or complete platform coverage from
+  the passing suite.
 
 ---
 
@@ -219,7 +235,7 @@ Task: T026 Path containment in skills/vault-orientation/scripts/VaultPathValidat
 
 1. Complete Setup and Foundational phases, including explicit destination clarification and shared preflight/runtime wiring.
 2. Complete User Story 1 and validate all nine built-in resource files, installed-client working-directory behavior, and registered custom-type selection.
-3. Treat this as a design/skill MVP only: production article writes remain unavailable until trusted exact-vault authorization is verified.
+3. Require live exact-vault checks by the calling skill and explicit `callerPreflight` on script requests; do not claim installed-client or platform qualification from synthetic tests.
 
 ### Incremental Delivery
 
@@ -238,4 +254,5 @@ Task: T026 Path containment in skills/vault-orientation/scripts/VaultPathValidat
 - Feature 005 adds Pester tests for package/runtime-backed behavior and supported-client scenarios for skill decisions; neither may be reported as production authorization evidence.
 - The task list's source-resource tests do not establish installed-client behavior; the quickstart scenarios must be run separately when a supported client is available.
 - Existing synthetic tests do not establish production authorization or installed-client behavior.
-- The production authorization handoff and Resolver target-containment property remain release gates, not implementation assumptions.
+- Copilot owns live MCP checks; PowerShell consumes explicit vault-scoped caller confirmation and enforces filesystem/write safeguards, not independently authenticated MCP authorization.
+- Resolver symlink-target containment qualification and any future configurable external-target policy are deferred to the vault owner, not release gates. This does not relax PowerShell containment.

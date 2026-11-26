@@ -517,7 +517,7 @@ Describe 'Vault selection and inspection' {
                 $check.request.PSObject.Properties.Name | Should -Not -Contain 'allowEncodingConversion'
                 $check.request.arguments['newText'] | Should -BeExactly ''
                 @($check.request.PSObject.Properties.Name) | Should -Be @('contractVersion', 'requestId', 'operation', 'vaultRoot', 'campaignGroup', 'mode', 'arguments', 'targets',
-                    'approvedPreviewId', 'reviewedVersions', 'reviewedDependencyVersions', 'declinedReviewId')
+                    'approvedPreviewId', 'reviewedVersions', 'reviewedDependencyVersions', 'declinedReviewId', 'callerPreflight')
             }
 
             It 'rejects <Case>' -ForEach @(

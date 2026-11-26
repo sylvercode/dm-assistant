@@ -1,12 +1,14 @@
 # Article Authoring Contract
 
-**Status: Design contract — not evidence of an implemented article-authoring
-workflow.** This contract defines the intended user-facing behavior and
-boundaries for Feature 005. The feature specification is authoritative for
-requirements; Feature 001, 002, 003, and 004 contracts remain authoritative
-for their respective shared guidance, profile, runtime, and Resolver details.
-This document does not define new `.dmassist.yaml` fields, a Resolver JSON
-schema, or a new runtime request/result schema.
+**Status: Design and runtime contract — locally tested PowerShell creation
+support does not establish installed-client behavior, production
+authorization, or Resolver target containment.** This contract defines the
+intended user-facing behavior and boundaries for Feature 005. The feature
+specification is authoritative for requirements; Feature 001, 002, 003, and
+004 contracts remain authoritative for their respective shared guidance,
+profile, runtime, and Resolver details. This feature adds no
+`.dmassist.yaml` fields or Resolver JSON schema; its additive request and
+operation details are defined in the Feature 003 runtime contract.
 
 ## Scope and ownership
 
@@ -69,7 +71,7 @@ dependency readiness and exact-vault authorization; load the canonical shared
 reference; only then read the profile as needed to identify designated
 vault-local guidance; load that guidance and establish task context before
 campaign-note or template access. The orientation skill owns these gates,
-Resolver target-containment gating, and pause conditions; see
+caller-managed MCP checks and pause conditions; see
 `skills/vault-orientation/SKILL.md` and
 `specs/001-shared-vault-guidance/contracts/vault-guidance-loading.md`. Do not
 restate or skip those gates. A profile read at this point is limited to
@@ -89,10 +91,10 @@ Authoring-specific additions, applied only after that sequence succeeds:
    canonical authorized root and apply Feature 002/003 containment rules at
    each access. Do not treat a template's references as permission to inspect
    other files.
-4. **Gate link-dependent work.** Article work whose result depends on
-   `resolve_obsidian_link` stops until `vault-orientation`'s Resolver
-   target-containment gate is satisfied; Resolver readiness and authorization
-   still apply when the request needs no link resolution.
+4. **Keep Resolver and filesystem boundaries distinct.** Live Resolver readiness
+   and exact-root authorization remain required. Resolver symlink-containment
+   qualification is deferred to the owner, not an article gate. External link
+   results never expand PowerShell's permitted filesystem boundary.
 
 ## Static HTML-comment fill-in markers
 
@@ -139,7 +141,11 @@ and report the limitation.
 
 Before creating an article, resolve one clear destination in the authorized
 vault and confirm that it does not already contain an article. It is clear
-only when the DM explicitly supplies one vault-relative Markdown path.
+only when the DM explicitly supplies one Markdown path, either vault-relative
+or absolute within the selected vault. The authoring entry point converts an
+in-vault absolute path to its vault-relative identity before the shared
+runtime validates containment; absolute paths outside the selected root,
+traversal, and escaping links remain blocked.
 Feature 002 has no article-destination field: its section-folder and template
 mappings do not by themselves identify a note path. The path must resolve
 inside the authorized vault, its parent must already exist, and its target
@@ -154,8 +160,9 @@ selected mapping, designated guidance, selected template, relevant campaign
 context, authorization and boundary evidence, and destination identity,
 existence, and parent state. If an input changes after validation/read or
 before the write, invalidate dependent work, report the stale input, and
-require revalidation. Do not automatically retry with mixed old and new
-inputs or reuse approval for a changed proposal. Recheck containment and
+require revalidation. Stop and ask the DM how to proceed; do not automatically
+retry, even with freshly prepared inputs, or reuse approval for a changed
+proposal. After DM direction, restart at prepare. Recheck containment and
 target state immediately before writing, following Feature 003's safe-write
 contract.
 
@@ -168,6 +175,26 @@ explicit DM approval before application. Preview and approval are bound to
 the exact proposed changes and current inputs under Feature 003; approval
 does not authorize extra changes. Do not write until required approval is
 received.
+
+The shared PowerShell runtime provides `note.create-article` for one
+non-continuity-changing page-local creation and
+`note.create-article-fact-change` for a new article that records actual-play
+events or outcomes or changes established campaign facts. The latter is
+registered as fact-changing and requires an exact preview approval; request
+data cannot downgrade that classification. The runtime trusts the caller's
+operation choice and cannot classify arbitrary Markdown: choosing the
+page-local operation for actual-play content can bypass the approval gate.
+Both operations bind `authoringInputs` to the preview and revalidate the
+consumed files, absent destination, and existing parent before writing. They
+use the Feature 003 standard result structure and a same-directory staged,
+no-overwrite create. The new file inherits the destination parent's access
+rules. Root-level articles use the vault root as the existing parent.
+
+These are implemented local runtime capabilities. The calling skill performs
+live MCP checks and supplies the runtime contract's `callerPreflight` object
+on preview and apply requests. The runtime validates confirmation scope and
+filesystem safety, not the active MCP session. Missing or failed confirmation
+blocks access. Synthetic tests do not establish installed-client behavior.
 
 ## Audience and campaign-safety contract
 
@@ -213,8 +240,11 @@ one response, without exposing note contents in diagnostics:
   source, state that selection was not reached if no template was selected,
   and ask how the DM wants to proceed; do not create an article from an
   invented structure.
-- **Awaiting approval:** summarize the scope and destination in a preview,
+- **Awaiting approval:** show the complete proposed article and destination,
   state that no change has yet been applied, and wait for explicit approval.
+  Include the full draft in the native question when it can be presented
+  completely. If it cannot, stop without applying and provide the full draft
+  for review in a later message.
 
 These are user-facing descriptions, not a new machine-readable result
 envelope. Any runtime result fields, statuses, and error codes remain governed
@@ -247,20 +277,20 @@ Passing local tests demonstrates only the cases exercised with synthetic
 fixtures. The test-only authorization provider is not production
 authorization. Static source inspection, repository-local resource presence,
 or a successful Pester run does not establish installed-client discovery,
-resource lookup, trusted authorization handoff, or cross-platform support.
+resource lookup, live caller checks, or cross-platform support.
 Report those evidence categories separately.
 
 The following are explicit gates, not behavior this design claims is
 implemented:
 
-- **Production vault authorization:** script-backed vault access remains
-  blocked until a trusted active-session handoff can verify exact-vault
-  authorization. Profile data, Resolver availability, successful link
-  resolution, and test injection cannot satisfy this gate.
-- **Resolver target containment:** link-resolution use remains blocked until
-  an upstream release is verified to confine canonical targets, including
-  symlinks, to the selected authorized root. Resolver API compatibility alone
-  is insufficient.
+- **Caller-managed vault authorization:** Copilot checks live version/tools
+  and the exact vault via `get_server_info`, then supplies `callerPreflight`.
+  This confirmation is an explicit caller precondition, not independent
+  PowerShell authorization. Profile data, availability, successful resolution,
+  and test injection do not replace the live skill checks.
+- **Deferred Resolver qualification:** upstream symlink-target containment is
+  the owner's responsibility and not a release gate. PowerShell's filesystem
+  containment remains mandatory for all template, article, and input paths.
 - **Installed-client validation:** validate skill/resource discovery,
   working-directory-independent bundled template loading, and the applicable
   preflight in the supported Copilot CLI client before claiming those

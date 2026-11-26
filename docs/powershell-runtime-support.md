@@ -8,18 +8,24 @@ Installing the plugin and discovering its skills never requires PowerShell.
 No workflow installs or upgrades PowerShell or any module.
 
 Feature 001 uses Resolver 2.1.0's note-content-free `get_server_info` response
-to check exact-vault authorization in the active client session. The
-PowerShell runtime cannot yet verify a trusted handoff from that session, so
-script-backed vault access remains blocked before reading a profile, guidance,
-or campaign note. An unconfirmed dependency returns `PREREQUISITE_MISSING`;
-if readiness is established but authorization is not, the runtime returns
-`VAULT_AUTHORIZATION_UNPROVEN`. A supported environment below does not imply
-that script-backed campaign-vault access works.
+to check exact-vault authorization in the active client session. As of
+2026-11-17 the calling skill owns these checks and supplies an explicit
+`callerPreflight` object with the checked absolute `vaultRoot` and Boolean
+`dependenciesReady` and `vaultAuthorized` values. PowerShell checks that
+confirmation and its root scope, not the live MCP session. Missing/negative
+readiness returns `PREREQUISITE_MISSING`; unconfirmed or wrong-vault
+authorization returns `VAULT_AUTHORIZATION_UNPROVEN`. Runtime, canonical
+filesystem boundaries, freshness, and write safeguards remain enforced.
 
 The packaged dependency inventory requires Resolver 2.1.0 or later with both
-`resolve_obsidian_link` and `get_server_info`. The production PowerShell probe
-cannot confirm the running server's version or active-session tools, and it
-does not treat a configured server as proof of readiness or authorization.
+`resolve_obsidian_link` and `get_server_info`. Copilot checks these live before
+supplying confirmation and may reuse the result within the same active session
+for the same vault until an invalidating change, failure, or lost evidence.
+An unnoticed change may go undetected.
+PowerShell no longer launches a separate CLI configuration probe. A caller
+confirmation is not independent authorization proof; standalone callers own
+the same precondition. Resolver symlink-target containment qualification is
+deferred to the vault owner, not a release gate. PowerShell containment is unchanged.
 
 ## Selection
 
@@ -27,15 +33,16 @@ does not treat a configured server as proof of readiness or authorization.
 | --- | --- |
 | Selection date | 2026-10-29 |
 | PowerShell | `pwsh` **7.6.9**, the latest stable PowerShell 7 release available at selection time |
-| Minimum PowerShell | 7.4, required so the built-in `Test-Json -Schema` validates JSON Schema Draft 2020-12; versions other than the selected release are unsupported |
+| Runtime prerequisite | Stable PowerShell Core 7.6.9 or later; `Test-Json -Schema` requires at least 7.4 for JSON Schema Draft 2020-12 |
 | YAML reader | `powershell-yaml` **0.4.12** (exact version), required by profile-dependent operations |
 | JSON Schema validator | Built-in `Test-Json -Schema`; no separate validator module |
 | Test runner (test-only) | Pester **6.2.0** (exact version); never a prerequisite for installing the plugin or for a DM's workflow |
 
 The runtime prerequisite check in
 `skills/vault-orientation/scripts/RuntimePreflight.psm1` enforces the selected
-PowerShell version, operating system, and exact module versions, and returns
-`PREREQUISITE_MISSING` without installing or upgrading anything.
+minimum stable PowerShell version, operating system, and exact module versions,
+and returns `PREREQUISITE_MISSING` without installing or upgrading anything.
+Passing this prerequisite check does not qualify a newer runtime for production.
 
 ## Support matrix
 
@@ -46,8 +53,9 @@ combination is unsupported.
 
 | Operating system | PowerShell | Add-ons | Status |
 | --- | --- | --- | --- |
-| Windows | 7.6.9 | `powershell-yaml` 0.4.12 | Candidate, not supported for production script-backed vault access. Local path-boundary, atomic-replace, and encoding cases pass; four file-symlink cases, installed-client checks, and the runtime authorization handoff remain unverified. |
-| Windows | Any other version | Any | Unsupported |
+| Windows | 7.6.9 | `powershell-yaml` 0.4.12 | Candidate, not production-qualified. Local path-boundary, atomic-replace, and encoding cases pass; file-symlink cases and installed-client checks remain outstanding. MCP checks are caller-managed. |
+| Windows | Stable 7.6.9 or later, other than 7.6.9 | `powershell-yaml` 0.4.12 | Passes the runtime version gate; platform and installed-client qualification remain unverified. |
+| Windows | Earlier or prerelease version | Any | Rejected by the runtime version gate. |
 | macOS | Any | Any | Unsupported (unverified) |
 | Linux | Any | Any | Unsupported (unverified) |
 
@@ -56,9 +64,10 @@ combination is unsupported.
 Obtain prerequisites yourself before using a script-backed workflow; the
 workflow only checks them.
 
-1. Install PowerShell 7.6.9 by following Microsoft's
+1. Install stable PowerShell 7.6.9 or later by following Microsoft's
    [Installing PowerShell on Windows](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)
-   guidance (for example, the MSI or `winget` package for that exact version).
+   guidance. Newer versions pass the prerequisite gate but are not automatically
+   qualified for production.
 2. In `pwsh`, install the exact YAML reader version for the current user:
    `Install-Module -Name powershell-yaml -RequiredVersion 0.4.12 -Scope CurrentUser`.
 3. Confirm with `$PSVersionTable.PSVersion` and
@@ -275,7 +284,20 @@ Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
   performed. The runtime handoff and single-note classification remain
   outstanding before production script-backed writes.
 
+### Caller-confirmation revision, 2026-11-17
+
+On PowerShell 7.7.0 with Pester 6.2.0, the full acceptance suite reported
+404 passed, 0 failed, and 5 skipped (Windows file-symlink privilege requirements).
+New cases cover explicit caller-confirmed production preflight and article
+creation without the authorization test provider, including blocked/malformed/
+wrong-vault confirmations and safe-writer rechecks. These are synthetic
+runtime checks, not installed-client MCP or cross-platform verification.
+
 ### Remaining acceptance work
+
+The dated evidence above describes the earlier runtime. Its always-blocked
+authorization handoff was replaced on 2026-11-17 by the documented caller
+precondition; historical results do not validate the revised installed-client flow.
 
 - **T045:** No five-DM usability walkthrough has been performed. SC-006's
   anonymized pass rate is not available; automated result-contract checks do
@@ -284,8 +306,9 @@ Same Windows/pwsh/dependency versions as above; all fixtures were synthetic.
   discovery without PowerShell have not been performed. The disposable copied
   package checks above are not client installation evidence. No supported
   production platform combination is claimed.
-- **T047:** The runtime has no verified way to consume the active session's
-  Resolver readiness and exact-vault authorization evidence.
+- **T047:** Validate the revised caller-confirmation contract in an installed
+  client; independent runtime authentication of the MCP session is no longer
+  required.
 - **T048:** Before enabling production writes, reconcile single-note operation
   classification with Feature 001's approval requirement for actual-play and
   continuity changes.
@@ -300,7 +323,7 @@ blocked by prerequisite/authorization checks.
 | Operation | Modes | Arguments | Target outcomes and scope |
 | --- | --- | --- | --- |
 | `notes.inspect` | `inspect` | Empty object | One or more explicit targets; reports existence, type, and byte fingerprint without returning note content or changing established facts. |
-| `note.replace-text` | `preview`, `apply` | Required non-empty string `oldText`; required string `newText` (may be empty) | Replaces every ordinal occurrence in one or more explicit existing notes; unchanged targets stay unchanged. Registered as a local text edit, not a workflow for changing actual-play records or established campaign facts. The invoking skill must apply the broader preview/approval safeguards, including approval in a later message, to such work. |
+| `note.replace-text` | `preview`, `apply` | Required non-empty string `oldText`; required string `newText` (may be empty) | Replaces every ordinal occurrence in one or more explicit existing notes; unchanged targets stay unchanged. Registered as a local text edit, not a workflow for changing actual-play records or established campaign facts. The invoking skill must apply the broader preview/approval safeguards, including explicit DM approval after the preview, to such work. |
 
 Unknown request fields and operation arguments are rejected. Multi-target
 changes require approval of the exact preview. Applying a change preserves

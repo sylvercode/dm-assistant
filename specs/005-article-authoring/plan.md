@@ -11,9 +11,11 @@ default for each of the nine built-in article types. Reuse Feature 002's
 `.dmassist.yaml` template mappings, selecting a valid DM-owned override before
 the skill-owned default and stopping on any invalid configured override. Follow
 the shared preflight, path-containment, change-detection, player-safety, and
-safe-write contracts. Production vault access remains fail-closed until the
-trusted authorization handoff is verified; do not invoke Resolver link
-resolution until target containment, including symlinks, is verified.
+safe-write contracts. Revised 2026-11-17: Copilot performs live MCP checks and
+supplies explicit vault-scoped `callerPreflight`; PowerShell enforces
+filesystem boundaries and safe writes, not independently authenticated MCP
+authorization. Resolver symlink-target qualification is deferred to the owner,
+not an authoring or T029 gate.
 
 ## Technical Context
 
@@ -55,10 +57,12 @@ fail-closed behavior, and preservation of existing content take precedence.
 in `skills/README.md`. Do not assume the plugin is the campaign vault, create
 missing folders, overwrite existing notes, execute template expressions, or
 infer authorization from profile data, Resolver availability, or test-only
-authorization. Treat invalid/stale dependencies as blockers. Production
-script-backed vault access remains fail-closed until a trusted active-session
-authorization handoff is verified; Resolver link resolution remains blocked
-until upstream target-containment protection is verified.
+authorization. Treat invalid/stale dependencies as blockers. Missing caller
+confirmation blocks script-backed vault access. The caller may reuse a
+successful same-session, same-vault live check until invalidated; PowerShell
+rechecks that confirmation and the
+filesystem. Deferred Resolver symlink qualification does not relax script
+containment or authorize unrelated access.
 
 **Scale/Scope**: One active campaign/party per vault; nine built-in article
 types plus profile-registered custom types. One article creation is the
@@ -75,7 +79,7 @@ reorganization, and dynamic template expansion are out of scope.
 | II. Keep the Campaign Vault Separate | PASS | Resolve DM-owned templates and articles only within the explicitly authorized vault; bundle defaults with the plugin skill. |
 | III. Preserve Campaign Continuity and User Control | PASS | Do not overwrite or restructure existing content; require preview and approval for changes beyond safe page-local creation. |
 | IV. Respect Character Knowledge and Player Safety | PASS | Keep preparation distinct from actual play and omit DM-only facts and revealing links from player-facing output. |
-| V. Distinguish Proposals from Implemented Behavior | PASS | Keep planning artifacts explicit about blocked production authorization and unverified client/runtime evidence. |
+| V. Distinguish Proposals from Implemented Behavior | PASS | Distinguish live caller checks, runtime confirmation handling, and unverified installed-client/platform evidence. |
 
 **Gate result**: PASS for planning and design. This does not authorize
 production vault access or writes; the implementation gates above remain
@@ -145,6 +149,7 @@ skill-level content and response behavior separately in the supported client.
 | IV. Respect Character Knowledge and Player Safety | PASS | Player-facing checks and preparation/history boundaries are part of the contract. |
 | V. Distinguish Proposals from Implemented Behavior | PASS | Research and quickstart distinguish design, synthetic runtime evidence, and installed-client verification. |
 
-**Post-design gate result**: PASS with the same mandatory production
-authorization and Resolver target-containment gates. No constitution
+**Post-design gate result**: PASS with caller-managed live MCP checks,
+explicit runtime confirmation, and mandatory filesystem/write safeguards.
+Resolver symlink qualification is deferred to the owner. No constitution
 violations require a complexity justification.

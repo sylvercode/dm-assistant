@@ -24,18 +24,22 @@ The plugin will give an AI assistant a focused set of tools and guidance for wor
 ## Project Status
 
 This repository contains an Agent Plugins 1.0 plugin with a portable
-vault-orientation skill and its bundled shared reference. It does not bundle
-the Obsidian Link Resolver server or enable production script-backed vault access.
+vault-orientation skill, an article-authoring skill, and the bundled shared
+reference. It does not bundle
+the Obsidian Link Resolver server.
 PowerShell modules implement prerequisite checks, profile validation,
-read-only inspection, preview approval, and conflict-aware atomic note writes;
-these have local synthetic acceptance coverage, not installed-client or
-cross-platform verification. Installed
+read-only inspection, preview approval, conflict-aware atomic note edits, and
+no-overwrite article creation; these have local synthetic acceptance coverage,
+not installed-client or cross-platform verification. Installed
 cross-skill resource loading was verified in a disposable two-skill fixture
 using owner-skill activation, not assumed sibling paths. The orientation skill
 checks exact-vault authorization with the separately configured Resolver's
 `get_server_info` tool and must stop when that check cannot be established.
-The PowerShell runtime cannot yet verify a handoff from the active session and
-remains fail-closed. Other planned capabilities above are not currently available.
+Copilot supplies an explicit vault-scoped `callerPreflight` confirmation after
+the live MCP checks; PowerShell validates that precondition and enforces
+filesystem boundaries, freshness, and write safeguards. It does not independently
+authenticate the MCP session. End-to-end installed-client qualification remains
+outstanding. Other planned capabilities above are not currently available.
 
 See [Plugin Architecture](docs/architecture.md) for component locations, extension boundaries, and the separation between the plugin and campaign vaults.
 
@@ -54,10 +58,17 @@ The canonical schema artifact is packaged with its consuming skill at
 [`skills/vault-orientation/assets/dmassist.schema.json`](skills/vault-orientation/assets/dmassist.schema.json).
 The PowerShell configuration reader and runtime validator use this installed
 skill-owned artifact with built-in `Test-Json -Schema`. Script-backed profile
-access remains blocked by the unverified authorization handoff. Plugin-added
+access requires the calling skill's live checks and explicit confirmation. Plugin-added
 support files use dot-prefixed names to stay hidden
 from Obsidian's normal note view. Campaign articles remain ordinary, visible
 Markdown notes.
+
+For new articles, the `article-authoring` skill uses its shipped PowerShell
+entry point for separate prepare, preview, and apply calls. Preparation
+returns the guidance text and selected template. A root
+`.dmassist-guidance.md` is used when present unless the profile configures
+another `guidance.path`. If the command is unavailable or denied, authoring
+stops rather than generating a replacement script.
 
 The vault is for the DM's eyes only. Documents meant to be shown to players are
 **handouts**, kept separate from DM commentary and hidden facts. A player-facing
@@ -76,8 +87,11 @@ guidance, after all other preflight checks pass, a lookup may read only
 relevant notes identified without relying on uncertain folder or note-role
 mappings. The lookup remains read-only and pauses if uncertainty affects
 findings or the next action. Resolver 2.1.0's `get_server_info` supplies the
-skill's note-content-free exact-vault check; the PowerShell runtime still
-fails closed until it can verify a trusted active-session handoff. Other skills
+skill's note-content-free exact-vault check. A successful check may be reused
+for the same vault in the same active session until a known or suspected
+configuration, authorization, dependency, or session change; an unnoticed
+change may go undetected. PowerShell still requires the skill's vault-scoped
+confirmation instead of querying MCP itself. Other skills
 must use the tested owner-activation pattern rather than assumed sibling
 paths. Source instructions alone do not validate runtime behavior.
 
@@ -128,7 +142,9 @@ The vault is expected to be in a Git repository. A clearly requested page-local
 edit needs no separate approval unless it changes an actual-play record or
 established continuity. Multi-note edits, deletion, moves, merges,
 reorganization, and actual-play or continuity changes require a scoped preview
-followed by DM approval in a later message. Git history does not replace
+followed by explicit DM approval. The native question form is used when available;
+if a human answer cannot be established, the assistant stops and requests a later
+DM message. Git history does not replace
 approval or justify overwriting user edits.
 
 ### Preparing and Recording Sessions
@@ -172,7 +188,7 @@ upgrades PowerShell or its modules. The selected `pwsh` release, exact module
 versions such as `powershell-yaml`, supported operating systems, provisioning
 guidance, and verification evidence are recorded in
 [PowerShell Runtime Support](docs/powershell-runtime-support.md). Script-backed
-vault access remains blocked until exact-vault authorization can be verified;
+vault access requires Copilot's live exact-vault check and `callerPreflight`;
 see the
 [scripting proposal](docs/vault-guidance-brainstorm.md#powershell-and-predictable-operations).
 
@@ -180,20 +196,19 @@ see the
 
 The Obsidian Link Resolver MCP server is a separate installation; the
 `dm-assistant` plugin does not install or configure it. The API baseline is
-version 2.1.0 or later, but that version alone is not safe for link resolution:
+version 2.1.0 or later. Known limitation:
 Resolver 2.1.0 can follow file symlinks outside an authorized root when reading
-heading or block targets. Before resolving any link, require an upstream
-release whose documentation or verified behavior guarantees canonical
-target-containment checks, including symlink targets. This repository has not
-verified such a release; until then, do not call `resolve_obsidian_link`.
-This known symbolic-link limitation and follow-up validation are tracked in
+heading or block targets. Qualification of this behavior is deferred to the
+vault owner, who may intentionally configure external targets; it is not a
+plugin-readiness or T029 gate. PowerShell still rejects filesystem targets
+outside the selected vault. This limitation and deferred follow-up are tracked in
 [sylvercode/obsidian-link-resolver#27](https://github.com/sylvercode/obsidian-link-resolver/issues/27).
 
 Before installing, check the version of any existing
 `obsidian-link-resolver-mcp` executable. Keep it if it already meets both the
-API and target-containment requirements; do not run an installer that would
+API requirements; do not run an installer that would
 replace a compatible installation. If an upgrade is needed, choose a release
-that meets both requirements from the
+that meets the API requirements from the
 [upstream installation instructions](https://github.com/sylvercode/obsidian-link-resolver#mcp-server-install--update)
 (choose the MCP server installer, not the Resolver CLI-only installer).
 On Windows, the PowerShell installer requires PowerShell 7 or later (`pwsh`).
@@ -237,10 +252,9 @@ are listed. Then call `get_server_info` without arguments and check that it
 reports version 2.1.0 or later and an authorized root that exactly matches
 the intended vault. This check requires no campaign-note content; server
 availability or tool discovery alone does not establish authorization.
-The exact-root check does not establish that link resolution is safe: do not
-call `resolve_obsidian_link` until the configured release is verified to
-contain resolved targets within the selected vault, including through
-symlinks.
+The exact-root check does not establish Resolver symlink-target containment;
+that qualification is deferred to the owner, not required for this setup.
+It does not authorize unrelated reads or relax the PowerShell vault boundary.
 The setup was verified in an isolated Copilot CLI session with a disposable
 vault using session-scoped MCP configuration; no user/global MCP configuration
 or campaign vault was changed. See the [Resolver MCP contract](specs/004-link-resolver-integration/contracts/resolver-mcp-contract.md)
@@ -254,10 +268,10 @@ copilot --plugin-dir .
 ```
 
 In the session, check component discovery with `/agent` and `/skills list`;
-the vault-orientation skill should be listed. To verify the local plugin is
-loaded, run `copilot --plugin-dir . plugin list`; it should appear under
-**External Plugins (via --plugin-dir)** as `dm-assistant`. When starting from
-another working directory, pass the absolute path to this plugin directory.
+the vault-orientation and article-authoring skills should be listed. To verify
+the local plugin is loaded, run `copilot --plugin-dir . plugin list`; it should
+appear as `dm-assistant`. When starting from another working directory, pass
+the absolute path to this plugin directory.
 `--plugin-dir` loads a local plugin for that CLI session; it does not install
 or persistently register the plugin. No Copilot-specific agents are currently
 included. See the feature

@@ -72,8 +72,9 @@ scope.
 - Bind template/profile validation to the inputs used by the operation. If a
   selected template or other dependency changes, stop and require
   revalidation; do not automatically retry with mixed old and new inputs.
-- Do not call `resolve_obsidian_link` until an upstream Resolver release with
-  verified target containment, including symlinks, is confirmed.
+- As revised on 2026-11-17, defer upstream Resolver symlink-target qualification
+  to the owner rather than blocking calls or T029. PowerShell path containment
+  remains mandatory and external results do not authorize unrelated reads.
 
 **Rationale:** Exact-root authorization and target containment are separate
 controls. Existing contracts require fail-closed behavior and revalidation of
@@ -95,7 +96,8 @@ operation.
 - Stop if the target already exists, its destination is ambiguous, or a
   required folder is absent; do not overwrite or create folders by
   assumption.
-- A single new article at one explicit vault-relative Markdown destination may
+- A single new article at one explicit in-vault Markdown destination, relative
+  or absolute within the selected vault, may
   use the page-local path. Feature 002 has no article-destination field, so
   section-folder and template mappings alone do not identify a note path.
   Any additional, destructive, restructuring, actual-play, or
@@ -119,24 +121,24 @@ approval-free would exceed the narrow page-local exception.
 
 ### Security and evidence boundaries
 
-- Production script-backed vault access remains blocked until the runtime can
-  verify a trusted active-session authorization handoff. Do not infer
-  authorization from profile contents, Resolver availability, test injection,
-  or successful link resolution.
-- The Resolver integration requires API compatibility `2.1.0` or later and
-  both declared tools, but API compatibility alone does not satisfy the
-  target-containment gate; no compliant upstream release is verified in the
-  current repository evidence.
+- Revised 2026-11-17: Copilot checks live dependency readiness and exact-vault
+  authorization, then supplies vault-scoped `callerPreflight`. The runtime
+  consumes those confirmations rather than authenticating the active MCP
+  session. Do not infer authorization from a profile, availability, successful
+  resolution, or test injection. Standalone callers own the same precondition.
+- Resolver API compatibility `2.1.0` or later and both declared tools remain
+  required. Symlink-target qualification is deferred to the owner; external
+  targets may be intentional but never relax PowerShell containment.
 - Use synthetic disposable vaults and the test-only authorization provider
   for local Pester tests. Report those as local runtime evidence only, not as
   production authorization or installed-client verification.
-- Keep installed-client validation, target-containment qualification, and
-  cross-platform support as explicit release gates where applicable.
+- Keep installed-client validation and cross-platform qualification separate
+  from synthetic evidence. Deferred Resolver checks are not release gates.
 
 **Rationale:** The README, architecture documentation, and runtime contracts
 state that test-only authorization does not prove production authorization.
-The installed-client evidence for Resolver readiness does not establish a
-PowerShell handoff.
+The installed-client evidence for Resolver readiness does not establish that
+the revised caller-confirmation flow works end-to-end.
 
 **Alternatives considered:** Enabling production reads/writes based on local
 synthetic tests or an earlier client check would exceed the evidence and
