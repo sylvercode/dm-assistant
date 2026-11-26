@@ -159,6 +159,20 @@ function Get-DmRuntimeVersion {
         $identity = 'skills/vault-orientation/scripts/' + $name
         $entries.Add([pscustomobject][ordered]@{ identity = $identity; version = 'sha256:' + (Get-DmSha256Hex -Bytes ([System.IO.File]::ReadAllBytes($path))) })
     }
+    $repositoryRoot = [System.IO.Path]::GetDirectoryName(
+        [System.IO.Path]::GetDirectoryName(
+            [System.IO.Path]::GetDirectoryName($PSScriptRoot)
+        )
+    )
+    $articleTemplateDirectory = [System.IO.Path]::Combine($repositoryRoot, 'skills', 'article-authoring', 'templates')
+    foreach ($path in [System.IO.Directory]::GetFiles($articleTemplateDirectory, '*.md', [System.IO.SearchOption]::TopDirectoryOnly)) {
+        $name = [System.IO.Path]::GetFileName($path)
+        $identity = 'skills/article-authoring/templates/' + $name
+        $entries.Add([pscustomobject][ordered]@{
+            identity = $identity
+            version = 'sha256:' + (Get-DmSha256Hex -Bytes ([System.IO.File]::ReadAllBytes($path)))
+        })
+    }
     $entries.Add((Get-DmDependencyInventoryVersion))
     $orderedEntries = [object[]]$entries.ToArray()
     [Array]::Sort($orderedEntries, [System.Comparison[object]]{

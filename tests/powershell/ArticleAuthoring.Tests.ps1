@@ -598,6 +598,31 @@ Describe 'Bundled article template static syntax' {
             [IO.File]::ReadAllText($destination) | Should -BeExactly $draft
         }
 
+        It 'revalidates a bundled template edit before apply' {
+            $templatePath = Join-Path $script:TemplateDirectory 'character.md'
+            $originalBytes = [System.IO.File]::ReadAllBytes($templatePath)
+            try {
+                $prepared = Invoke-TestArticleStage prepare $request
+                $request.preparationId = $prepared.preparationId
+                $request.content = $prepared.template.text.Replace('<!-- fill-in: required Character name -->', 'Ash Fen')
+                $preview = Invoke-TestArticleStage preview $request
+                $preview.result.completionCode | Should -BeExactly 'OK'
+
+                [System.IO.File]::AppendAllText(
+                    $templatePath,
+                    "`n<!-- edited after preview -->`n",
+                    [System.Text.UTF8Encoding]::new($false)
+                )
+
+                $request.previewId = $preview.preview.previewId
+                (Invoke-TestArticleStage apply $request).result.completionCode | Should -BeExactly 'TARGET_CONFLICT'
+                Test-Path -LiteralPath $destination | Should -BeFalse
+            }
+            finally {
+                [System.IO.File]::WriteAllBytes($templatePath, $originalBytes)
+            }
+        }
+
         It 'accepts an in-vault absolute destination and binds equivalent relative paths across stages' {
             [void][IO.Directory]::CreateDirectory((Join-Path $fixture.Root 'Articles'))
             $destination = Join-Path $fixture.Root 'Articles\New Character.md'
