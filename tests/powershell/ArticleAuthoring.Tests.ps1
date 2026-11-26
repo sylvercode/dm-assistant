@@ -732,6 +732,26 @@ Describe 'Bundled article template static syntax' {
             $response.PSObject.Properties.Name | Should -Be @('result')
         }
 
+        It 'resolves a custom article type named custom from the custom mapping' {
+            $templateDirectory = Join-Path $fixture.Root '.dmassist-templates'
+            [void][IO.Directory]::CreateDirectory($templateDirectory)
+            [IO.File]::WriteAllText(
+                (Join-Path $templateDirectory 'custom.md'),
+                '# <!-- fill-in: required custom article title -->'
+            )
+            [IO.File]::WriteAllText(
+                $fixture.ProfilePath,
+                "version: 1`ntemplates:`n  custom:`n    custom: .dmassist-templates/custom.md`n"
+            )
+            $request.articleType = 'custom'
+
+            $prepared = Invoke-TestArticleStage prepare $request
+
+            $prepared.template.source.kind | Should -BeExactly 'configured'
+            $prepared.template.source.path | Should -BeExactly '.dmassist-templates/custom.md'
+            $prepared.template.text | Should -BeExactly '# <!-- fill-in: required custom article title -->'
+        }
+
         It 'reports a missing configured template without fallback and rejects its disappearance after preparation' {
             [IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`ntemplates:`n  character: Override.md`n")
             $override = Join-Path $fixture.Root 'Override.md'

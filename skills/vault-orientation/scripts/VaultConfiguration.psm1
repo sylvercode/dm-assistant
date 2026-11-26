@@ -346,9 +346,15 @@ function Resolve-DmProfileTemplate {
         [Parameter(Mandatory)][string]$ArticleType
     )
     $path = $null
+    $builtInTypes = @('adventure', 'character', 'handout', 'location', 'monster', 'party', 'persona', 'rule', 'session')
     if ($Profile.Contains('templates')) {
-        if ($Profile.templates.Contains($ArticleType)) { $path = [string]$Profile.templates[$ArticleType] }
-        elseif ($Profile.templates.Contains('custom') -and $Profile.templates.custom.Contains($ArticleType)) { $path = [string]$Profile.templates.custom[$ArticleType] }
+        if ($ArticleType -cin $builtInTypes -and $Profile.templates.Contains($ArticleType)) {
+            $path = [string]$Profile.templates[$ArticleType]
+        }
+        elseif ($ArticleType -cnotin $builtInTypes -and
+            $Profile.templates.Contains('custom') -and $Profile.templates.custom.Contains($ArticleType)) {
+            $path = [string]$Profile.templates.custom[$ArticleType]
+        }
     }
     [pscustomobject][ordered]@{
         available = -not [string]::IsNullOrEmpty($path)
