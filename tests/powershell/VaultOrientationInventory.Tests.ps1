@@ -1,6 +1,14 @@
 BeforeAll {
     Import-Module -Name (Join-Path -Path $PSScriptRoot -ChildPath 'TestHarness.psm1') -Force
     Import-TestProductionModule -Name RuntimeContract, DependencyPreflight, VaultPathValidation, OperationRequest, VaultBoundary, RuntimePreflight, PluginResources, VaultConfiguration, VaultInventory
+    $script:InventoryEntryPoint = Join-Path (Get-TestScriptsRoot) 'Invoke-DmInventory.ps1'
+
+    function Invoke-TestInventoryEntryPoint {
+        param([Parameter(Mandatory)][string]$Json)
+        $output = $Json | & (Get-Process -Id $PID).Path -NoProfile -File $script:InventoryEntryPoint
+        $LASTEXITCODE | Should -Be 0
+        $output | ConvertFrom-Json -AsHashtable
+    }
 
     function New-TestInventoryRequest {
         [CmdletBinding()]
@@ -90,6 +98,85 @@ Describe 'Caller-confirmed inventory without an authorization test provider' {
         $outcome.inventoryReport.operation | Should -BeExactly 'vault.orientation.inventory'
     }
 
+    It 'uses the shipped entry point for names-only inventory without modifying the vault' {
+        $inputData = [ordered]@{
+            vaultRoot = $fixture.Root
+            callerPreflight = $request.callerPreflight
+        }
+        $before = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+        $outcome = Invoke-TestInventoryEntryPoint -Json (ConvertTo-Json -InputObject $inputData -Depth 10 -Compress)
+        $after = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+
+        $outcome.result.completionCode | Should -BeExactly 'OK'
+        $outcome.inventoryReport.scan.contentInspected | Should -BeFalse
+        $outcome.inventoryReport.guidance.contentInspectionBasis | Should -BeExactly 'names_only'
+        @($outcome.inventoryReport.entries | ForEach-Object { $_.path }) | Should -Contain 'Adventures'
+        $after | Should -BeExactly $before
+    }
+
+    It 'returns a review-only proposal through the shipped entry point' {
+        $inputData = [ordered]@{
+            vaultRoot = $fixture.Root
+            callerPreflight = $request.callerPreflight
+            proposeProfile = $true
+        }
+        $before = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+        $outcome = Invoke-TestInventoryEntryPoint -Json (ConvertTo-Json -InputObject $inputData -Depth 10 -Compress)
+        $after = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+
+        $outcome.result.completionCode | Should -BeExactly 'OK'
+        $outcome.inventoryReport.profileProposal.status | Should -BeExactly 'drafted-unapproved'
+        $outcome.inventoryReport.profileProposal.content | Should -Not -BeNullOrEmpty
+        $after | Should -BeExactly $before
+    }
+
+    It 'rejects missing caller confirmation before accessing the vault' {
+        $inputData = [ordered]@{ vaultRoot = $fixture.Root }
+        $before = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+        $outcome = Invoke-TestInventoryEntryPoint -Json (ConvertTo-Json -InputObject $inputData -Depth 10 -Compress)
+        $after = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+
+        $outcome.result.completionCode | Should -BeExactly 'PREREQUISITE_MISSING'
+        $outcome.inventoryReport | Should -BeNull
+        $after | Should -BeExactly $before
+    }
+
+    It 'rejects negative exact-root authorization before accessing the vault' {
+        $inputData = [ordered]@{
+            vaultRoot = $fixture.Root
+            callerPreflight = [ordered]@{
+                vaultRoot = $fixture.Root
+                dependenciesReady = $true
+                vaultAuthorized = $false
+            }
+        }
+        $before = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+        $outcome = Invoke-TestInventoryEntryPoint -Json (ConvertTo-Json -InputObject $inputData -Depth 10 -Compress)
+        $after = ConvertTo-Json -InputObject (Get-TestOwnedVaultSnapshot -Fixture $fixture) -Depth 10 -Compress
+
+        $outcome.result.completionCode | Should -BeExactly 'VAULT_AUTHORIZATION_UNPROVEN'
+        $outcome.inventoryReport | Should -BeNull
+        $after | Should -BeExactly $before
+    }
+
+    It 'rejects unknown wrapper fields as an invalid request' {
+        $inputData = [ordered]@{
+            vaultRoot = $fixture.Root
+            callerPreflight = $request.callerPreflight
+            unexpected = 'ignored fields must not become behavior'
+        }
+        $outcome = Invoke-TestInventoryEntryPoint -Json (ConvertTo-Json -InputObject $inputData -Depth 10 -Compress)
+        $outcome.result.completionCode | Should -BeExactly 'INVALID_REQUEST'
+        $outcome.inventoryReport | Should -BeNull
+    }
+
+    It 'rejects malformed JSON as an invalid request' {
+        $outcome = Invoke-TestInventoryEntryPoint -Json '{"vaultRoot":'
+
+        $outcome.result.completionCode | Should -BeExactly 'INVALID_REQUEST'
+        $outcome.inventoryReport | Should -BeNull
+    }
+
     It 'inventories an article created through the shipped authoring workflow' {
         Set-TestGuidanceFile -VaultRoot $fixture.Root -Path '.dmassist-guidance.md' -Text 'Use synthetic conventions.'
         $article = [ordered]@{
@@ -159,7 +246,7 @@ Describe 'Read-only vault orientation and inventory' {
     AfterEach { Remove-TestVaultFixture -Fixture $fixture }
 
     Context 'US1 preflight and guidance gates' {
-        It 'exposes the explicit module import and invocation boundary' {
+        It 'exports the inventory runtime API for internal use' {
             $modulePath = Join-Path -Path (Get-TestScriptsRoot) -ChildPath 'VaultInventory.psm1'
             Import-Module -Name $modulePath -Force -ErrorAction Stop
             (Get-Command -Name Invoke-DmInventory -Module VaultInventory -ErrorAction Stop).Name | Should -BeExactly 'Invoke-DmInventory'

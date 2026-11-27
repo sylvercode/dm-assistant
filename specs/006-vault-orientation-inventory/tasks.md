@@ -54,7 +54,7 @@ description: "Implementation tasks for read-only vault orientation and inventory
 
 ### Implementation for User Story 1
 
-- [X] T011 [US1] Create `skills\vault-orientation\scripts\VaultInventory.psm1` and export `Invoke-DmInventory -Request $request` as the supported manual caller boundary in `specs\006-vault-orientation-inventory\quickstart.md`; require explicit module import and invocation rather than a registry dispatcher. Reuse `Invoke-DmPreflight` and `Get-DmPreNoteContext` in the contract's order, preserve the Feature 003 `result` envelope, and return `{ result, inventoryReport }` with a null report for validation or preflight failure; T008 verifies the import/call path without claiming installed-client dispatch.
+- [X] T011 [US1] Create `skills\vault-orientation\scripts\VaultInventory.psm1` and export the internal `Invoke-DmInventory -Request $request` runtime API. Reuse `Invoke-DmPreflight` and `Get-DmPreNoteContext` in the contract's order, preserve the Feature 003 `result` envelope, and return `{ result, inventoryReport }` with a null report for validation or preflight failure; T008 verifies the internal API. The supported assistant-facing script entry point is added separately in Phase 7.
 - [X] T012 [US1] Implement request-selected guidance handling in `skills\vault-orientation\scripts\VaultInventory.psm1` after configured/default guidance. Preserve selection provenance `configured`, `default-designated`, or `request-selected` and internal load states `not-applicable`, `pending`, `loaded`, `missing`, `unreadable`, `non-markdown`, `unusable`, or `blocked`; essential missing, unreadable, non-Markdown, or unusable guidance returns `REFERENCE_UNAVAILABLE`, while optional skips contain only `{ selectionIndex, reason }` with reason `missing`, `unreadable`, `non-markdown`, or `unusable`. Invalid or uncontained paths fail with the appropriate request or boundary code and are never skipped.
 - [X] T013 [US1] In `skills\vault-orientation\scripts\VaultInventory.psm1`, safely read configured/default Markdown guidance against the pre-note dependency snapshot and capture validated versions for selected guidance; the pre-note helper's load state is not guidance text. Check visible and resolved paths before reads, recheck the profile and every loaded guidance version before returning, fail closed on changed sources, and never permit campaign-note content reads without successfully loaded applicable local guidance.
 - [X] T014 [US1] Update `skills\vault-orientation\SKILL.md` with the explicit call and pre-note sequence, assistant-side loading of the shared reference independently of script-reported state, essential versus optional guidance, and names-only fallback. Retain the Resolver 2.1.0+ dependency and both required tools; establish authorization from a normalized exact `get_server_info` `vaults[].path` match, not service availability or link resolution, never use the Resolver for inventory traversal, and explain the unverified production handoff without claiming a complete inventory before US2.
@@ -132,6 +132,44 @@ found no custom agents, but `copilot --plugin-dir . plugin list` showed
 Plugins grouping. T039 is checked to record its deferral to
 [#13](https://github.com/sylvercode/dm-assistant/issues/13), not a pass.
 Feature acceptance still requires the five-DM walkthrough to meet SC-005.
+
+## Phase 7: Ergonomic inventory invocation
+
+**Purpose**: Give the assistant one supported, documented inventory entry point
+so it does not inspect internal PowerShell modules to construct the request.
+
+- [X] T049 Define the high-level JSON input and fixed output contract for
+  `skills\vault-orientation\scripts\Invoke-DmInventory.ps1` in the
+  feature specification, contract, and quickstart. Preserve live caller
+  confirmation, generated runtime envelope fields, and the read-only boundary.
+- [X] T050 Add subprocess acceptance cases in
+  `tests\powershell\VaultOrientationInventory.Tests.ps1` for names-only
+  inventory, a review-only proposal, missing/negative caller confirmation,
+  malformed JSON and unknown input fields, and unchanged synthetic-vault
+  snapshots.
+  Add a static safety audit for the new entry point.
+- [X] T051 Implement `Invoke-DmInventory.ps1` to validate the high-level input,
+  construct the fixed inventory request, call the existing runtime, and return
+  exactly `{ result, inventoryReport }`. It must not authenticate MCP itself
+  or add any write path.
+- [X] T052 Replace direct module invocation guidance in
+  `skills\vault-orientation\SKILL.md` and the Feature 006 quickstart with the
+  shipped script. Update `docs\powershell-runtime-support.md` and this task
+  list; identify installed-client validation as outstanding.
+- [X] T053 Run the focused inventory suite and the full Pester 6.2.0 suite,
+  including the new wrapper tests. Record exact outcomes and skips in the
+  quickstart/runtime support document without claiming installed-client
+  validation. Latest: focused 56 passed, 0 failed, 1 symbolic-link skip; full
+  suite 530 passed, 0 failed, 7 symbolic-link skips.
+- [ ] T054 In a fresh installed Copilot client, run the Spec 006 inventory
+  scenario with the shipped script and record whether it succeeds without
+  internal module inspection. Recheck that the synthetic vault is unchanged.
+  This acceptance evidence belongs with the installed-client work in epic
+  [#5](https://github.com/sylvercode/dm-assistant/issues/5).
+
+**Dependencies**: T049 precedes T050 and T051; T050 precedes T051; T051
+precedes T052; T052 precedes T053; T053 precedes installed-client acceptance
+T054.
 
 ---
 

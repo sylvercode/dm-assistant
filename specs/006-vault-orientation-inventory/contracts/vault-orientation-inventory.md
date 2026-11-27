@@ -17,7 +17,8 @@ exact-vault authorization, the shared reference, and all pre-note policy.
 | Property | Contract |
 | --- | --- |
 | Stable operation name | `vault.orientation.inventory` |
-| Entry point | `Invoke-DmInventory -Request $request`, exported by `skills/vault-orientation/scripts/VaultInventory.psm1`. The caller imports and calls it explicitly. The operation registry supplies validation metadata; it is not a dispatcher. |
+| User-facing entry point | `skills/vault-orientation/scripts/Invoke-DmInventory.ps1`. The caller sends one JSON object on standard input; the script builds the fixed runtime request and invokes the internal module. The skill must not ask the assistant to inspect or import internal modules. |
+| Runtime operation | `Invoke-DmInventory -Request $request`, exported by `VaultInventory.psm1`. The operation registry supplies validation metadata; it is not a dispatcher. Callers must use the user-facing entry point rather than dispatching this runtime function directly. |
 | Supported mode | `inspect` only. The entry point rejects any other operation or mode. |
 | Writes and targets | None. `targets` is the required empty array `[]`; the operation never creates, edits, renames, moves, or deletes files. |
 | Registration | `FactChanging=false`, `ChangeKind=read`, `MinTargets=0`, `MaxTargets=0`, `RequiresMappings=false`, and `RequiresCampaignGroup=false`. This permits names-only orientation without local guidance; it does not permit reading note contents without guidance or relying on an unresolved mapping. |
@@ -26,10 +27,27 @@ exact-vault authorization, the shared reference, and all pre-note policy.
 
 ### Request and operation-specific arguments
 
-The Feature 003 request envelope is unchanged: `contractVersion` is the
-string `"1"`; `requestId` is a caller-generated correlation string;
-`vaultRoot` is the explicit absolute user-designated root; and `operation`,
-`campaignGroup`, `mode`, `arguments`, and `targets` have the values above.
+The user-facing JSON input has these exact case-sensitive top-level fields:
+
+| Field | Type, default, and meaning |
+| --- | --- |
+| `vaultRoot` | Required explicit absolute user-designated vault root. |
+| `callerPreflight` | Required object containing the completed live checks, bound to this exact root: `{ vaultRoot, dependenciesReady, vaultAuthorized }`. The assistant must perform the checks before setting either Boolean to `true`; this object is a caller confirmation, not an MCP credential. |
+| `selectedGuidance` | Optional ordered string array; defaults to `[]`. Same meaning as the runtime argument below. |
+| `optionalGuidance` | Optional ordered string array; defaults to `[]`. Same meaning as the runtime argument below. |
+| `proposeProfile` | Optional Boolean; defaults to `false`. |
+| `mappingDecisions` | Optional array of exact `{ ambiguityId, alternativeId }` records; defaults to `[]` and may be supplied only when `proposeProfile` is `true`. |
+
+Unknown top-level fields are rejected as `INVALID_REQUEST`. The wrapper
+constructs the Feature 003 request envelope itself: contract version `"1"`,
+a generated request ID, the stable operation name, `inspect` mode,
+`campaignGroup: { campaign: null, group: null }`, the validated arguments,
+and `targets: []`. The caller must not provide these internal fields.
+The result is JSON with exactly `{ result, inventoryReport }`, preserving
+the normal shared result envelope and payload contract below.
+
+The generated Feature 003 request must omit `approvedPreviewId`,
+`reviewedVersions`, `reviewedDependencyVersions`, and `declinedReviewId`.
 Do not supply `approvedPreviewId`, `reviewedVersions`,
 `reviewedDependencyVersions`, or `declinedReviewId` for this inspection.
 
@@ -73,35 +91,28 @@ every decision against a fresh scan as described below.
 
 ### Concrete invocation
 
-This is a syntactically valid PowerShell example using synthetic Windows
-paths; the synthetic plugin and vault must not be mistaken for an installed
-package or an authorized real vault. The caller must actually complete the
-live checks before supplying `callerPreflight`.
+The assistant resolves the script from the installed `vault-orientation`
+skill's resource directory, not from the source checkout or vault. The live
+Resolver checks must actually pass for the exact root before the confirmation
+is supplied. This synthetic Windows example demonstrates the small input
+contract; it does not authorize or access a real vault.
 
 ```powershell
-$request = [ordered]@{
-    contractVersion = '1'
-    requestId = 'synthetic-inventory-001'
-    operation = 'vault.orientation.inventory'
+$inventoryInput = [ordered]@{
     vaultRoot = 'C:\Synthetic Vaults\Oakvale'
     callerPreflight = [ordered]@{
         vaultRoot = 'C:\Synthetic Vaults\Oakvale'
         dependenciesReady = $true
         vaultAuthorized = $true
     }
-    campaignGroup = [ordered]@{ campaign = $null; group = $null }
-    mode = 'inspect'
-    arguments = [ordered]@{
-        selectedGuidance = @('Guidance/Conventions.md', '.dm-extra-guidance.md')
-        optionalGuidance = @('.dm-extra-guidance.md')
-        proposeProfile = $true
-        mappingDecisions = @()
-    }
-    targets = @()
+    selectedGuidance = @('Guidance/Conventions.md', '.dm-extra-guidance.md')
+    optionalGuidance = @('.dm-extra-guidance.md')
+    proposeProfile = $true
 }
 
-Import-Module -Name 'C:\Synthetic\dm-assistant\skills\vault-orientation\scripts\VaultInventory.psm1' -ErrorAction Stop
-$outcome = Invoke-DmInventory -Request $request
+$json = ConvertTo-Json -InputObject $inventoryInput -Depth 10 -Compress
+$outcome = $json | pwsh -NoProfile -File '<installed skill resource>\scripts\Invoke-DmInventory.ps1' |
+    ConvertFrom-Json
 $result = $outcome.result
 $report = $outcome.inventoryReport
 ```

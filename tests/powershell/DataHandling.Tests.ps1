@@ -301,4 +301,11 @@ foreach ($argument in @('mcp', 'get', $validatedId)) { $process.ArgumentList.Add
             $violations | Should -BeNullOrEmpty -Because "$($script.Name) must comply with the static safety audit"
         }
     }
+
+    It 'audits the shipped inventory entry point without false positives' {
+        $entryPointPath = Join-Path -Path (Get-TestScriptsRoot) -ChildPath 'Invoke-DmInventory.ps1'
+        Test-Path -LiteralPath $entryPointPath -PathType Leaf | Should -BeTrue
+        $source = [System.IO.File]::ReadAllText($entryPointPath)
+        Get-DmStaticAuditViolation -SourceText $source | Should -BeNullOrEmpty
+    }
 }

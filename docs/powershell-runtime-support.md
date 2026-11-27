@@ -294,14 +294,15 @@ runtime checks, not installed-client MCP or cross-platform verification.
 
 ## Feature 006 inventory and profile proposals
 
-The read-only inventory is implemented in
-`skills/vault-orientation/scripts/VaultInventory.psm1` and is reachable only
-through explicit import followed by `Invoke-DmInventory -Request $request`.
-Registration validates the operation but does not dispatch it; there is no
-installed command or transport for inventory. The caller must independently
-complete the shared-reference and exact-vault preflight and supply
-`callerPreflight`. The runtime validates the caller's confirmation, not the
-live MCP session. Synthetic test authorization verifies local logic only.
+The read-only inventory runtime is implemented in
+`skills/vault-orientation/scripts/VaultInventory.psm1`. The supported
+script-backed caller is `Invoke-DmInventory.ps1`: it accepts the documented
+high-level JSON input, constructs the fixed operation request, and returns
+the `{ result, inventoryReport }` envelope. The assistant must not inspect or
+import internal runtime modules to dispatch inventory. The caller must
+independently complete the shared-reference and exact-vault preflight and
+supply `callerPreflight`. The runtime validates the caller's confirmation,
+not the live MCP session. Synthetic tests verify local logic only.
 
 Inventory reports eligible directory and Markdown names, evidence-backed
 candidate mappings, and current ambiguity alternatives. It is names-only when
@@ -364,6 +365,13 @@ PowerShell does not independently verify it.
   523 and skipped 7. These include caller-confirmation gates without the
   test authorization provider and creation followed by inventory in the
   same disposable vault. Skipped file-symlink cases remain unverified.
+- **Inventory entry point:** The new wrapper has synthetic subprocess coverage
+  for names-only inventory, review-only proposals, missing or negative caller
+  confirmations, malformed JSON, unknown top-level fields, and unchanged-vault
+  snapshots. The latest focused run passed 56 tests with 0 failures and 1
+  environment-dependent symbolic-link skip; the complete Pester suite passed
+  530 tests with 0 failures and 7 such skips. Installed-client use remains part
+  of Spec 006 client acceptance and is not validated by these synthetic tests.
 - **Feature 006 human review (T039):** The five-DM SC-005 walkthrough is
   deferred to [#13](https://github.com/sylvercode/dm-assistant/issues/13) and
   has not been performed, so no usability result is claimed.
@@ -394,7 +402,8 @@ confirmations block access, but are not independently authenticated.
 | Operation | Modes | Arguments | Target outcomes and scope |
 | --- | --- | --- | --- |
 | `notes.inspect` | `inspect` | Empty object | One or more explicit targets; reports existence, type, and byte fingerprint without returning note content or changing established facts. |
-| `vault.orientation.inventory` | `inspect` | Selected and optional guidance arrays, proposal flag, mapping decisions | Read-only inventory and optional unapproved profile proposal; explicit module invocation required. |
+| `vault.orientation.inventory` | `inspect` | Selected and optional guidance arrays, proposal flag, mapping decisions | Read-only inventory and optional unapproved profile proposal, called through the shipped entry-point script. |
+| `Invoke-DmInventory.ps1` | stdin JSON | Vault root, caller confirmation, optional guidance/proposal inputs | Shipped user-facing script entry point; constructs and invokes the registered inventory request. |
 | `note.replace-text` | `preview`, `apply` | Required non-empty string `oldText`; required string `newText` (may be empty) | Replaces every ordinal occurrence in one or more explicit existing notes; unchanged targets stay unchanged. Registered as a local text edit, not a workflow for changing actual-play records or established campaign facts. The invoking skill must apply the broader preview/approval safeguards, including explicit DM approval after the preview, to such work. |
 | `note.create-article`, `note.create-article-fact-change` | `preview`, `apply` | Article content and versioned authoring inputs | Create one absent article without overwrite; fact-changing creation requires preview approval. |
 

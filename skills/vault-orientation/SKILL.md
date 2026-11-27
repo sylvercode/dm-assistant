@@ -166,29 +166,50 @@ operations.
 
 ## Read-only inventory operation
 
-The PowerShell inventory entry point is available only through explicit
-module import and invocation; the operation registry does not dispatch it and
-the installed plugin does not currently register a command or transport for
-it. The inventory module runs the runtime preflight itself, but the assistant
-must still complete the pre-note sequence above and independently load the
-shared reference. A script-reported reference state does not establish that
-the assistant read the reference. Never use the Resolver to enumerate the
-vault or establish traversal containment.
+After completing the live dependency and exact-vault checks in step 2 and
+reading this skill's shared reference, call the shipped inventory entry point.
+Do not inspect, import, or call internal runtime modules to construct or
+dispatch the request. The script path must come from this skill's installed
+resource directory; never locate it by searching the workspace, source
+checkout, or campaign vault. If the script is unavailable or fails, report
+the blocker and stop rather than generating a replacement command or script.
 
-The local developer call is:
+Send one JSON object on standard input to
+`scripts\Invoke-DmInventory.ps1`. It takes the explicit vault root and the
+live caller confirmation, plus optional guidance and proposal fields:
 
 ```powershell
-Import-Module -Name .\skills\vault-orientation\scripts\VaultInventory.psm1 -ErrorAction Stop
-$outcome = Invoke-DmInventory -Request $request
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false, $true)
+# Resolve this path from the loaded vault-orientation skill resources.
+$inventoryScriptPath = '<absolute skill resource path>\scripts\Invoke-DmInventory.ps1'
+$inventoryInput = [ordered]@{
+    vaultRoot = $vaultRoot
+    callerPreflight = @{
+        vaultRoot = $vaultRoot
+        dependenciesReady = $true
+        vaultAuthorized = $true
+    }
+}
+$json = ConvertTo-Json -InputObject $inventoryInput -Depth 10 -Compress
+$outcome = $json | pwsh -NoProfile -File $inventoryScriptPath | ConvertFrom-Json
 ```
 
-The request must name the explicit authorized vault, use
-`vault.orientation.inventory` in `inspect` mode, and provide null campaign and
-group values with an empty target list. Supply `callerPreflight` only after
-the live checks above. The runtime validates that confirmation, the profile,
-configured/default guidance, and request-selected guidance before enumerating.
-It does not independently verify the live MCP session; a local call, synthetic
-test authorization, or successful link resolution does not prove authorization.
+The caller must set `callerPreflight` only after completing the live checks
+for this exact vault. Never use this example's `true` values without actually
+performing those checks. To select additional guidance, supply
+`selectedGuidance` as an array of explicit vault-relative Markdown paths and
+`optionalGuidance` as the optional subset. To request a profile proposal, set
+`proposeProfile = $true`; pass `mappingDecisions` only with a proposal request
+and only for alternatives from a prior inventory report. They express a
+current DM choice, not approval to write. Do not send approval fields or use
+this read-only operation to change the vault.
+
+The script constructs the fixed inspect request and returns JSON with exactly
+`result` and `inventoryReport`. The registry validates the operation but does
+not dispatch it. PowerShell validates the root-scoped caller confirmation and
+filesystem boundaries; it does not independently verify the live MCP session.
+The inventory and proposal remain read-only. Never use the Resolver to
+enumerate the vault or establish traversal containment.
 
 Inventory includes only non-dot-prefixed directory and Markdown names.
 Directories are not excluded because their names have extensions, and

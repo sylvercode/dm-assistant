@@ -60,27 +60,40 @@ The runner's `-Path` parameter accepts a test file or folder. Use the common
 request/result harness and production modules; do not make a test-only
 implementation of the inventory algorithm. File-symlink cases may be skipped
 when the environment cannot create those links; report such skips explicitly.
+The latest run with Pester 6.2.0 passed 56 focused inventory tests with 0
+failures and 1 symbolic-link skip; the complete suite passed 530 tests with 0
+failures and 7 symbolic-link skips. These synthetic checks do not validate
+inventory use in an installed Copilot client or production MCP authorization.
 
 ## Explicit local operation invocation
 
 The operation registry validates request metadata but is not a dispatcher.
-The caller must explicitly import the skill-owned module and call the exported
-function; the installed plugin does not currently register a transport or
-automatic command for this operation. The manual PowerShell invocation is:
+Use the shipped wrapper to invoke it; the assistant should not inspect or
+directly import internal runtime modules. For this repository-local example,
+the wrapper path is relative to the repository root:
 
 ```powershell
-$modulePath = Join-Path (Get-Location) 'skills\vault-orientation\scripts\VaultInventory.psm1'
-Import-Module -Name $modulePath -Force
-$outcome = Invoke-DmInventory -Request $request
+$inventoryInput = [ordered]@{
+    vaultRoot = '<absolute synthetic vault path>'
+    callerPreflight = @{
+        vaultRoot = '<same absolute synthetic vault path>'
+        dependenciesReady = $true
+        vaultAuthorized = $true
+    }
+}
+$json = ConvertTo-Json -InputObject $inventoryInput -Depth 10 -Compress
+$outcome = $json | pwsh -NoProfile -File .\skills\vault-orientation\scripts\Invoke-DmInventory.ps1 |
+    ConvertFrom-Json
 ```
 
-`$request` must follow the
-[operation contract](contracts/vault-orientation-inventory.md), including
-the explicit authorized vault root and zero-target inspect envelope. Import
-and registration do not establish authorization; the function must perform
-the existing preflight itself and return the shared result with
-`inventoryReport`. This example does not establish production authorization or show that the current installed
-client can dispatch the operation.
+In an installed skill call, resolve the wrapper from that skill's installed
+resource directory, never by searching the workspace, source checkout, or
+vault. The input is the simple JSON contract from the
+[operation contract](contracts/vault-orientation-inventory.md); the wrapper
+constructs the internal envelope and returns exactly `result` and
+`inventoryReport`. The caller must actually perform live MCP checks before
+setting the test-shaped confirmations above. Those sample values do not
+establish production authorization or prove installed-client dispatch.
 
 ## Local discovery and static source audit
 
@@ -130,48 +143,53 @@ asks the DM when neither basis exists. See the
 This is a source-only audit, not a requirement to execute every skill; mark
 an unimplemented or uninspectable behavior blocked rather than passed.
 
-## Proposed call and request/result acceptance
+## Shipped entry point and request/result acceptance
 
-The implemented local operation still requires an explicit module import and
-invocation; registration supplies validation metadata and is **not** an
-automatic dispatcher or installed transport:
+The shipped `Invoke-DmInventory.ps1` accepts one JSON object on standard input.
+It requires `vaultRoot` and caller-confirmed preflight and optionally accepts
+`selectedGuidance`, `optionalGuidance`, `proposeProfile`, and
+`mappingDecisions`. It constructs the fixed operation name, inspect mode,
+null campaign/group context, generated request ID, and empty targets. Unknown
+input fields are rejected, and malformed inventory arguments are handled by
+the shared request validator.
 
 ```powershell
-Import-Module -Name .\skills\vault-orientation\scripts\VaultInventory.psm1 -ErrorAction Stop
-$outcome = Invoke-DmInventory -Request $request
+$inventoryInput = [ordered]@{
+    vaultRoot = $fixture.Root
+    callerPreflight = @{
+        vaultRoot = $fixture.Root
+        dependenciesReady = $true
+        vaultAuthorized = $true
+    }
+    proposeProfile = $true
+}
+$json = ConvertTo-Json -InputObject $inventoryInput -Depth 10 -Compress
+$outcome = $json | pwsh -NoProfile -File .\skills\vault-orientation\scripts\Invoke-DmInventory.ps1 |
+    ConvertFrom-Json
 ```
 
-Construct `$request` using the Feature 003
-envelope and an explicitly established absolute root from the synthetic
-fixture, not the plugin directory. Set `contractVersion` to `"1"`, supply a
-caller-generated `requestId`, and require exactly
-`operation: vault.orientation.inventory`, `mode: inspect`,
-`campaignGroup: { campaign: null, group: null }`, and `targets: []`. Supply
-`callerPreflight` only after completing the live checks for that exact root.
-The required `arguments` object accepts only these case-sensitive fields:
+The example's synthetic true confirmations are test-only; an installed caller
+must complete the actual dependency and exact-vault checks first. The exact
+user-facing field types and restrictions are:
 
-| Argument | Proposed value and acceptance checks |
+| Field | Type and acceptance checks |
 |---|---|
-| `selectedGuidance` | Ordered array of explicit vault-relative Markdown guidance paths, default `[]`. Normalize and de-duplicate stably under the existing lexical/platform rules, preserving the first spelling and order. Explicit dot-prefixed Markdown is permitted. |
-| `optionalGuidance` | Ordered array, default `[]`, identifying the DM-marked optional subset of `selectedGuidance` after the same normalization. Every other selection is essential. On Windows, path comparison is ordinal case-insensitive; a non-subset is `INVALID_REQUEST`. |
-| `proposeProfile` | Boolean, default `false`; request an unapproved proposal, never a write. Reject string or other scalar coercion. |
-| `mappingDecisions` | Ordered array, default `[]` when omitted, of exact `{ ambiguityId, alternativeId }` records. It may be supplied only when `proposeProfile` is `true`, even if the supplied array is empty. IDs must be non-empty, non-whitespace, single-line opaque strings without control characters and are compared case-sensitively. Reject unknown record fields, duplicate decisions, and more than one choice for an ambiguity. |
+| `vaultRoot` | Required explicit absolute path to the established vault, never the plugin directory. |
+| `callerPreflight` | Required exact-root-scoped `{ vaultRoot, dependenciesReady, vaultAuthorized }` object. Supply only after performing live checks; it is not MCP authentication. |
+| `selectedGuidance` | Optional ordered array of explicit vault-relative Markdown paths, default `[]`; dot-prefixed Markdown is allowed only by explicit selection. |
+| `optionalGuidance` | Optional array, default `[]`, identifying a subset of selected guidance. Every other selected source is essential. |
+| `proposeProfile` | Optional Boolean, default `false`; a proposal is unapproved and never written. |
+| `mappingDecisions` | Optional ordered array of exact `{ ambiguityId, alternativeId }` records; valid only with `proposeProfile: true`. IDs must be current, opaque, nonempty, and single-line. |
 
-In the future focused suite, check omitted defaults and valid inputs, then
-reject scalar or null arrays, non-string paths, non-Boolean proposal intent,
-malformed decision records, unknown or wrong-case request/argument/context
-fields, a missing or null `arguments` object, missing or non-null
-campaign/group values, a wrong operation or mode, and missing, null, or
-nonempty targets. These shape violations return `INVALID_REQUEST` before
-vault access.
-The inventory request must omit `approvedPreviewId`, `reviewedVersions`,
-`reviewedDependencyVersions`, and `declinedReviewId`; supplying any is
-`INVALID_REQUEST`. Verify shape errors retain Feature 003's
-`INVALID_REQUEST` precedence over a simultaneous lexical-path error; an
-otherwise well-shaped invalid path yields `PATH_INVALID`. Existing
-string, Boolean, and integer argument validation must continue to accept and
-reject the same scalar cases; do not encode arrays as strings or bypass the
-shared validator. Validation failures must not access the vault.
+Assert that omitted optional fields use their defaults and that scalar or
+null arrays, non-string paths, non-Boolean proposal intent, malformed decision
+records, invalid roots, and unknown or wrong-case wrapper fields do not read
+the vault. Missing caller confirmation must block before profile, guidance,
+or note access. Keep Feature 003's `INVALID_REQUEST` precedence for malformed
+shape and `PATH_INVALID` for an otherwise well-shaped invalid path. The
+wrapper must never accept approval fields or turn proposal generation into a
+write. Test both successful inventory and proposal calls against complete
+before/after snapshots of the synthetic vault.
 
 Assert every call returns exactly `{ result, inventoryReport }`. `result`
 retains the unchanged Feature 003 envelope and field order: `operation`,
