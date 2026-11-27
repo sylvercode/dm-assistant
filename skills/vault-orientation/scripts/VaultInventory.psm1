@@ -466,6 +466,8 @@ function Add-DmInventoryMapping {
     Normalized campaign role.
     .PARAMETER Path
     Vault-relative location for the role.
+    .PARAMETER Kind
+    Inventory entry kind, or unknown when the location was not enumerated.
     .PARAMETER Classification
     Whether the mapping is observed or inferred.
     .PARAMETER Basis
@@ -483,6 +485,7 @@ function Add-DmInventoryMapping {
         [Parameter(Mandatory)][System.Collections.Generic.Dictionary[string, object]]$Mappings,
         [Parameter(Mandatory)][string]$Role,
         [Parameter(Mandatory)][string]$Path,
+        [ValidateSet('directory', 'markdown', 'unknown')][string]$Kind = 'unknown',
         [Parameter(Mandatory)][ValidateSet('observed', 'inferred')][string]$Classification,
         [Parameter(Mandatory)][string]$Basis,
         [Parameter(Mandatory)][string]$Source,
@@ -492,7 +495,7 @@ function Add-DmInventoryMapping {
     )
     if ([string]::IsNullOrWhiteSpace($Role) -or [string]::IsNullOrWhiteSpace($Path) -or
         (Test-DmInventoryHasDotComponent -Path $Path) -or
-        ([System.IO.Path]::GetExtension($Path).Length -gt 0 -and
+        ($Kind -cne 'directory' -and [System.IO.Path]::GetExtension($Path).Length -gt 0 -and
             -not (Test-DmInventoryMarkdownPath -Path $Path))) { return }
     $key = "$Role`0$Path"
     if (-not $Mappings.ContainsKey($key)) {
@@ -554,7 +557,7 @@ function Get-DmInventoryGuidanceAssignments {
             default { 'dm-selected-guidance' }
         }
         foreach ($line in [string[]]([string]$GuidanceTexts[$source] -split '\r\n|\n|\r')) {
-            if ($line -match '^\s*([A-Za-z0-9][A-Za-z0-9 _-]{0,79}?)\s+(?:contains|holds|stores)\s+(?:the\s+)?(adventures?|arcs?|lore|monsters\s+stats|rules|sessions|handouts|locations?|cosmology|persona|player)\b') {
+            if ($line -match '^\s*([A-Za-z0-9][A-Za-z0-9 ._-]{0,79}?)\s+(?:contains|holds|stores)\s+(?:the\s+)?(adventures?|arcs?|lore|monsters\s+stats|rules|sessions|handouts|locations?|cosmology|persona|player)\b') {
                 $role = ConvertTo-DmInventoryRole -Label ([string]$Matches[2])
                 if ($null -ne $role) {
                     $assignments.Add([pscustomobject]@{
@@ -651,7 +654,7 @@ function Get-DmInventoryTokenMappings {
             'Adventures'
         }
         $basis = if ([string]$entry.kind -ceq 'directory') { 'folder-name' } else { 'entry-name' }
-        Add-DmInventoryMapping -Mappings $Mappings -Role $role -Path ([string]$entry.path) `
+        Add-DmInventoryMapping -Mappings $Mappings -Role $role -Path ([string]$entry.path) -Kind ([string]$entry.kind) `
             -Classification inferred -Basis $basis -Source ([string]$entry.path) `
             -Summary 'The eligible entry name contains a recognized whole-word role token.' `
             -Uncertainty 'Name evidence is provisional and may not establish the intended campaign role.'
@@ -731,7 +734,7 @@ function Add-DmInventoryConventionalMappings {
             $prefix.Add($component)
             $role = Get-DmInventorySectionRole -Component $component -ParentComponents ([string[]]$parents.ToArray())
             if ($null -ne $role) {
-                Add-DmInventoryMapping -Mappings $Mappings -Role $role -Path ([string]::Join('/', [string[]]$prefix.ToArray())) `
+                Add-DmInventoryMapping -Mappings $Mappings -Role $role -Path ([string]::Join('/', [string[]]$prefix.ToArray())) -Kind directory `
                     -Classification inferred -Basis 'default-convention' -Source ([string]$entry.path) `
                     -Summary 'The location uses an exact recognized conventional section name.' `
                     -Uncertainty 'Conventional naming is provisional and may not establish the intended campaign role.'
@@ -1479,25 +1482,25 @@ function Invoke-DmInventory {
     }
 
     $mappings = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::Ordinal)
+    $entryKinds = [System.Collections.Generic.Dictionary[string, string]]::new($pathComparer)
+    foreach ($entry in $internalEntries) { $entryKinds[[string]$entry.path] = [string]$entry.kind }
     $profileVersion = if ($null -ne $context.context -and $context.context.PSObject.Properties['profileVersion']) {
         [string]$context.context.profileVersion
     }
     else { 'absent' }
     foreach ($assignment in Get-DmInventoryProfileAssignments -Profile $context.sourceProfile) {
         $pathCheck = Test-DmVaultRelativePath -Path ([string]$assignment.path)
-        if (-not $pathCheck.isValid -or (Test-DmInventoryHasDotComponent -Path ([string]$assignment.path)) -or
-            ([System.IO.Path]::GetExtension([string]$assignment.path).Length -gt 0 -and
-                -not (Test-DmInventoryMarkdownPath -Path ([string]$assignment.path)))) { continue }
-        Add-DmInventoryMapping -Mappings $mappings -Role ([string]$assignment.role) -Path ([string]$assignment.path) `
+        if (-not $pathCheck.isValid -or (Test-DmInventoryHasDotComponent -Path ([string]$assignment.path))) { continue }
+        $kind = if ($entryKinds.ContainsKey([string]$assignment.path)) { $entryKinds[[string]$assignment.path] } else { 'unknown' }
+        Add-DmInventoryMapping -Mappings $mappings -Role ([string]$assignment.role) -Path ([string]$assignment.path) -Kind $kind `
             -Classification observed -Basis ([string]$assignment.basis) -Source ([string]$assignment.source) `
             -Summary ([string]$assignment.summary) -Uncertainty $null -SourceVersion $profileVersion
     }
     foreach ($assignment in Get-DmInventoryGuidanceAssignments -LoadedSources ([object[]]$loadedSources.ToArray()) -GuidanceTexts $guidanceTexts) {
         $pathCheck = Test-DmVaultRelativePath -Path ([string]$assignment.path)
-        if (-not $pathCheck.isValid -or (Test-DmInventoryHasDotComponent -Path ([string]$assignment.path)) -or
-            ([System.IO.Path]::GetExtension([string]$assignment.path).Length -gt 0 -and
-                -not (Test-DmInventoryMarkdownPath -Path ([string]$assignment.path)))) { continue }
-        Add-DmInventoryMapping -Mappings $mappings -Role ([string]$assignment.role) -Path ([string]$assignment.path) `
+        if (-not $pathCheck.isValid -or (Test-DmInventoryHasDotComponent -Path ([string]$assignment.path))) { continue }
+        $kind = if ($entryKinds.ContainsKey([string]$assignment.path)) { $entryKinds[[string]$assignment.path] } else { 'unknown' }
+        Add-DmInventoryMapping -Mappings $mappings -Role ([string]$assignment.role) -Path ([string]$assignment.path) -Kind $kind `
             -Classification observed -Basis ([string]$assignment.basis) -Source ([string]$assignment.source) `
             -Summary ([string]$assignment.summary) -Uncertainty $null `
             -SourceVersion ([string]$loadedGuidanceVersions[[string]$assignment.source])
@@ -1505,7 +1508,7 @@ function Invoke-DmInventory {
     Add-DmInventoryConventionalMappings -Entries ([object[]]$internalEntries.ToArray()) -Mappings $mappings
     Get-DmInventoryTokenMappings -Entries ([object[]]$internalEntries.ToArray()) -Mappings $mappings
     foreach ($label in $noteRoles) {
-        Add-DmInventoryMapping -Mappings $mappings -Role ([string]$label.role) -Path ([string]$label.path) `
+        Add-DmInventoryMapping -Mappings $mappings -Role ([string]$label.role) -Path ([string]$label.path) -Kind markdown `
             -Classification inferred -Basis ([string]$label.basis) -Source ([string]$label.source) `
             -Summary 'Permitted Markdown content explicitly labels or self-identifies this role.' `
             -Uncertainty 'Note-content evidence is provisional and may not establish the intended campaign role.' `

@@ -786,6 +786,31 @@ Describe 'Read-only vault orientation and inventory' {
             $second.inventoryReport | ConvertTo-Json -Depth 30 -Compress | Should -Not -Match ([regex]::Escape($fixture.Root))
         }
 
+        It 'retains suffixed directory mappings without exposing non-Markdown files' {
+            foreach ($directory in @('Chronicles.txt', 'My Lore.txt', 'Adventure.txt')) {
+                [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root $directory))
+            }
+            [System.IO.File]::WriteAllText((Join-Path $fixture.Root 'Secret.txt'), 'Synthetic attachment.')
+            [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nsections:`n  adventures: Chronicles.txt`n")
+            Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Layout.md' -Text "My Lore.txt contains lore.`nSecret.txt contains lore.`n"
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+            $request.arguments = [ordered]@{ selectedGuidance = [string[]]@('Selected/Layout.md') }
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $configured = @($outcome.inventoryReport.candidateMappings | Where-Object { $_.path -ceq 'Chronicles.txt' -and $_.role -ceq 'Adventures' })
+            $configured.Count | Should -Be 1
+            $configured[0].basis | Should -Contain 'profile-configured'
+            $guided = @($outcome.inventoryReport.candidateMappings | Where-Object { $_.path -ceq 'My Lore.txt' -and $_.role -ceq 'Lore' })
+            $guided.Count | Should -Be 1
+            $guided[0].basis | Should -Contain 'dm-selected-guidance'
+            $inferred = @($outcome.inventoryReport.candidateMappings | Where-Object { $_.path -ceq 'Adventure.txt' -and $_.role -ceq 'Adventures' })
+            $inferred.Count | Should -Be 1
+            $inferred[0].basis | Should -Contain 'folder-name'
+            $outcome.inventoryReport | ConvertTo-Json -Depth 30 -Compress | Should -Not -Match 'Secret\.txt'
+        }
+
         It 'uses explicit Markdown role evidence only after guidance opens the content gate' {
             [System.IO.File]::WriteAllText(
                 $fixture.NotePaths[1],
