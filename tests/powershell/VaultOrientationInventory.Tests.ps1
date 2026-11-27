@@ -342,9 +342,11 @@ Describe 'Read-only vault orientation and inventory' {
 
         It 'allows absent or all-skipped optional guidance to produce a names-only report' {
             Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+            $selectedPath = 'Selected/Missing.md'
+            $optionalPath = if ($IsWindows) { 'selected/missing.md' } else { $selectedPath }
             $request.arguments = [ordered]@{
-                selectedGuidance = [string[]]@('Selected/Missing.md')
-                optionalGuidance = [string[]]@('Selected/Missing.md')
+                selectedGuidance = [string[]]@($selectedPath)
+                optionalGuidance = [string[]]@($optionalPath)
             }
 
             $outcome = Invoke-DmInventory -Request $request

@@ -708,7 +708,13 @@ function Get-DmPreNoteContext {
             if ($arguments.PSObject.Properties['selectedGuidance']) { $selectedGuidance = @($arguments.selectedGuidance) }
             if ($arguments.PSObject.Properties['optionalGuidance']) { $optionalGuidance = @($arguments.optionalGuidance) }
         }
-        $optionalGuidanceSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        $pathComparer = if ([System.StringComparison]$Preflight.boundary.comparison -eq [System.StringComparison]::OrdinalIgnoreCase) {
+            [System.StringComparer]::OrdinalIgnoreCase
+        }
+        else {
+            [System.StringComparer]::Ordinal
+        }
+        $optionalGuidanceSet = [System.Collections.Generic.HashSet[string]]::new($pathComparer)
         foreach ($path in $optionalGuidance) { [void]$optionalGuidanceSet.Add([string]$path) }
 
         foreach ($path in $selectedGuidance) {
