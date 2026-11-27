@@ -581,7 +581,7 @@ function Get-DmInventoryNoteRoleLabels {
     .PARAMETER Text
     Markdown text whose inspection was authorized by the content gate.
     #>
-    param([Parameter(Mandatory)][string]$Text)
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
     $labels = [System.Collections.Generic.List[object]]::new()
     $lines = [string[]]($Text -split '\r\n|\n|\r')
     $bodyStart = 0

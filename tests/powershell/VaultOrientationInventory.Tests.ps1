@@ -811,6 +811,19 @@ Describe 'Read-only vault orientation and inventory' {
             $outcome.inventoryReport | ConvertTo-Json -Depth 30 -Compress | Should -Not -Match 'Secret\.txt'
         }
 
+        It 'inspects an empty Markdown note without producing role labels' {
+            [System.IO.File]::WriteAllText((Join-Path $fixture.Root 'Empty.md'), '')
+            Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Usable.md' -Text "# Guidance`nPermit synthetic note inspection.`n"
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+            $request.arguments = [ordered]@{ selectedGuidance = [string[]]@('Selected/Usable.md') }
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $outcome.inventoryReport.scan.contentInspected | Should -BeTrue
+            @($outcome.inventoryReport.candidateMappings | Where-Object { $_.path -ceq 'Empty.md' }).Count | Should -Be 0
+        }
+
         It 'uses explicit Markdown role evidence only after guidance opens the content gate' {
             [System.IO.File]::WriteAllText(
                 $fixture.NotePaths[1],
