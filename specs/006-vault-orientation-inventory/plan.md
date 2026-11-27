@@ -101,12 +101,13 @@ exceptions are required.
    campaign/group, and `RequiresMappings=false`. The latter permits
    mapping-independent names-only orientation; it does not permit
    guidance-dependent note reads or treating inferred mappings as confirmed.
-   Export the proposed `Invoke-DmInventory -Request $request` from
-   `VaultInventory.psm1`; the caller imports and invokes it explicitly. The
-   existing registry validates operations but is not a dispatcher. The entry
-   point rejects any other operation or mode, uses the established preflight,
-   and always returns `{ result, inventoryReport }`; the shared result envelope
-   is unchanged.
+   Use `scripts\Invoke-DmInventory.ps1` as the assistant-facing entry point. It
+   accepts one JSON input object, constructs the fixed runtime request, and
+   invokes the internal `Invoke-DmInventory -Request $request` exported by
+   `VaultInventory.psm1`. The existing registry validates operations but is
+   not a dispatcher. The entry point rejects any other operation or mode,
+   uses the established preflight, and always returns
+   `{ result, inventoryReport }`; the shared result envelope is unchanged.
 2. Keep Feature 002 authoritative for `.dmassist.yaml` and configured/default
    guidance. Additional guidance is an ordered `selectedGuidance` array of
    explicit relative paths; the `optionalGuidance` subset records which
@@ -167,17 +168,20 @@ exceptions are required.
 
 ## Call and Approval Boundaries
 
-1. The caller follows Feature 001's own dependency, exact-vault, and
+1. The assistant follows Feature 001's own dependency, exact-vault, and
    shared-reference sequence; a script reporting a loaded reference is not
-   proof that the assistant loaded it. The caller supplies the Feature 003
-   request envelope with operation
-   `vault.orientation.inventory`, `mode: inspect`, explicit null campaign and
-   group, and `targets: []`. Its arguments carry selected guidance, optional
-   selections, proposal intent, and any explicit DM mapping decisions as
-   defined in the [operation contract](contracts/vault-orientation-inventory.md).
-   No preview or approval fields belong to an inventory request.
-2. `Invoke-DmInventory` checks that exact operation and mode, runs the existing
-   runtime/request/dependency/authorization/root preflight, then loads the
+   proof that the assistant loaded it. After collecting the DM's explicit
+   guidance selections, optionality, proposal intent, and any mapping
+   decisions, the assistant sends the JSON input defined in the
+   [operation contract](contracts/vault-orientation-inventory.md) to
+   `scripts\Invoke-DmInventory.ps1`, including the completed live checks in
+   `callerPreflight`. The entry point constructs the Feature 003 request with
+   operation `vault.orientation.inventory`, `mode: inspect`, explicit null
+   campaign and group, and `targets: []`. No preview or approval fields belong
+   to an inventory request.
+2. The entry point validates the input, constructs the runtime request, and
+   invokes `Invoke-DmInventory`, which runs the established
+   runtime/request/dependency/authorization/root preflight before loading the
    shared reference, Feature 002 profile/guidance, and request-selected
    guidance in order. `Get-DmPreNoteContext` reports guidance state and
    versions rather than returning its text; when inventory interprets that
@@ -185,8 +189,8 @@ exceptions are required.
    validated dependency snapshot. Capture and recheck the versions of selected
    guidance and note-content evidence before returning; a changed dependency
    invalidates the report. It reads permitted inventory inputs and returns a
-   shared result plus the report. The caller must explicitly carry the report;
-   no registered dispatcher or installed transport is assumed.
+   shared result plus the report. No registered dispatcher or installed
+   transport is assumed.
 3. A complete orientation returns `OK`. An ambiguity affecting a requested
    proposal returns `AMBIGUOUS_CONTEXT` with the successfully collected
    inventory and unresolved alternatives, not a finalized profile. An I/O,
@@ -252,6 +256,7 @@ skills/
 └── vault-orientation/
     ├── SKILL.md
     └── scripts/
+        ├── Invoke-DmInventory.ps1  # Assistant-facing JSON entry point
         ├── OperationRequest.psm1
         ├── RuntimeContract.psm1
         ├── VaultBoundary.psm1
@@ -272,12 +277,13 @@ tests/
 **Structure Decision**: Extend the existing plugin skill/runtime layout rather
 than introducing a new project or transport. The inventory module and Pester
 tests are new; operation registration/request validation and the skill
-workflow are integrated with existing modules. The caller-owned invocation
-boundary is an explicit import of `VaultInventory.psm1` followed by
-`Invoke-DmInventory -Request $request`, as documented in `quickstart.md`;
-registration is not dispatch. Only update the shared runtime contract or
-completion-code taxonomy if implementation demonstrates a necessary
-compatible contract extension.
+workflow are integrated with existing modules. The assistant-facing
+invocation boundary is `Invoke-DmInventory.ps1`; it constructs and dispatches
+the internal runtime request. `VaultInventory.psm1` exports
+`Invoke-DmInventory -Request $request` for that internal call, while
+registration remains validation metadata rather than dispatch. Only update the
+shared runtime contract or completion-code taxonomy if implementation
+demonstrates a necessary compatible contract extension.
 
 The current `tasks.md` incorporates these call/approval boundaries, the
 FR-015/FR-016 refinements, and the decision to omit non-Markdown inventory

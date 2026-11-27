@@ -18,12 +18,16 @@ owns live MCP readiness and exact-vault authorization checks; PowerShell owns
 request, filesystem, freshness, and write safeguards. Before script-backed work:
 
 - Establish the intended vault from the user's workspace or explicit input as
-  in step 1 below, complete step 2's live checks, then run the runtime prerequisite check
+  in step 1 below and complete step 2's live checks. For script-backed
+  operations other than inventory, then run the runtime prerequisite check
   (`Invoke-DmPreflight` in this skill's `scripts/RuntimePreflight.psm1`). It
   checks the supported runtime, request shape, your vault-scoped confirmations,
   and the canonical vault boundary. It does not independently query or
-  authenticate the active MCP session. Then complete the remaining pre-note
-  sequence below in order.
+  authenticate the active MCP session. Inventory instead uses the shipped
+  `scripts\Invoke-DmInventory.ps1` JSON entry point, which constructs the
+  runtime request and performs PowerShell preflight internally; do not invoke
+  `Invoke-DmPreflight` separately or import internal modules for inventory.
+  Then complete the remaining pre-note sequence below in order.
 - If the check returns `not completed`, report its completion code and
   message, stop the script-backed work, and do not retry around it.
   Missing or negative dependency confirmation returns `PREREQUISITE_MISSING`;

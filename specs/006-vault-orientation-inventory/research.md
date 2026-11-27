@@ -39,11 +39,12 @@ bypass established preflight and path-boundary safeguards.
 
 **Decision:** Add the inspect-only `vault.orientation.inventory` registration
 and export `Invoke-DmInventory -Request $request` from the new inventory
-module. A caller imports and invokes the function explicitly; registration
-does not dispatch it. The function checks the exact operation and mode, runs
-the existing preflight and guidance sequence, and returns a stable wrapper
-with the unchanged shared `result` envelope and an `inventoryReport` payload.
-On successful enumeration, an unresolved proposal decision returns
+module. The assistant-facing `Invoke-DmInventory.ps1` entry point accepts JSON,
+constructs the fixed runtime request, and invokes that function internally.
+Registration does not dispatch it. The runtime checks the exact operation and
+mode, runs the existing preflight and guidance sequence, and returns a stable
+wrapper with the unchanged shared `result` envelope and an `inventoryReport`
+payload. On successful enumeration, an unresolved proposal decision returns
 `AMBIGUOUS_CONTEXT` with the report and alternatives; preflight, unsafe-path,
 guidance, or traversal/read failures return no report.
 

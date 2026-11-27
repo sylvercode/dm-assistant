@@ -129,16 +129,17 @@ report. It must not choose an alternative by array position or infer approval.
    independently before using campaign observations. A script reporting a
    loaded reference is not proof the assistant loaded it. Collect only the
    DM's explicit guidance selections, optionality, proposal request, and any
-   mapping decisions. Supply the completed live checks in `callerPreflight`.
-   Construct the Feature 003 request, import the
-   module, and call `Invoke-DmInventory` explicitly. Registration alone does
-   not invoke it; the runtime must still perform its own fail-closed checks.
-2. **Entry point and preflight:** Reject a different operation or mode without
-   vault access. Run the established preflight in order: runtime prerequisites;
-   request shape and operation-specific validation; declared dependency
-   readiness; separate exact-vault authorization; then canonical root
-   resolution. No profile, guidance, or campaign note is read to establish the
-   vault or authorization.
+   mapping decisions. Supply the completed live checks in `callerPreflight`,
+   then send the JSON input defined above to the shipped
+   `Invoke-DmInventory.ps1` entry point. Do not construct the Feature 003
+   request or import internal modules as the assistant-facing call boundary.
+2. **Entry point and preflight:** The script constructs the fixed Feature 003
+   request and invokes the internal runtime operation. Reject a different
+   operation or mode without vault access. Run the established preflight in
+   order: runtime prerequisites; request shape and operation-specific
+   validation; declared dependency readiness; separate exact-vault
+   authorization; then canonical root resolution. No profile, guidance, or
+   campaign note is read to establish the vault or authorization.
 3. **Shared reference:** Load the canonical plugin-owned shared reference
    through the installed plugin resource mechanism. Do not use the current
    directory, source checkout, or vault as a fallback.

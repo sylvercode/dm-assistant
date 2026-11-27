@@ -29,7 +29,9 @@ reference. It does not bundle the Obsidian Link Resolver server.
 PowerShell modules implement prerequisite checks, profile validation, read-only
 inspection and inventory, review-only profile proposals, preview approval,
 conflict-aware atomic note edits, and no-overwrite article creation. Inventory
-requires explicit module import and invocation rather than a dispatcher.
+uses its shipped JSON entry point, which constructs the runtime request and
+performs PowerShell preflight internally; the operation registry is not a
+dispatcher.
 These have local synthetic acceptance coverage, not installed-client or
 cross-platform verification. Installed cross-skill resource loading was
 verified in a disposable two-skill fixture using owner-skill activation.
