@@ -631,6 +631,12 @@ function Get-DmPreNoteContext {
     }
 
     $request = $Preflight.request
+    $pathComparer = if ([System.StringComparison]$Preflight.boundary.comparison -eq [System.StringComparison]::OrdinalIgnoreCase) {
+        [System.StringComparer]::OrdinalIgnoreCase
+    }
+    else {
+        [System.StringComparer]::Ordinal
+    }
     $registration = Get-DmOperation -Name ([string]$request.operation)
     if ($null -ne $registration -and $registration.requiresCampaignGroup -and
         ($null -eq $request.campaignGroup -or
@@ -708,12 +714,6 @@ function Get-DmPreNoteContext {
             if ($arguments.PSObject.Properties['selectedGuidance']) { $selectedGuidance = @($arguments.selectedGuidance) }
             if ($arguments.PSObject.Properties['optionalGuidance']) { $optionalGuidance = @($arguments.optionalGuidance) }
         }
-        $pathComparer = if ([System.StringComparison]$Preflight.boundary.comparison -eq [System.StringComparison]::OrdinalIgnoreCase) {
-            [System.StringComparer]::OrdinalIgnoreCase
-        }
-        else {
-            [System.StringComparer]::Ordinal
-        }
         $optionalGuidanceSet = [System.Collections.Generic.HashSet[string]]::new($pathComparer)
         foreach ($path in $optionalGuidance) { [void]$optionalGuidanceSet.Add([string]$path) }
 
@@ -749,16 +749,21 @@ function Get-DmPreNoteContext {
 
     try {
         $profileArgument = if ($profilePresent) { $loaded.profile } else { $null }
-        $referencePaths = @($guidancePath) + @($selectedGuidancePaths.ToArray())
+        $referencePathSet = [System.Collections.Generic.HashSet[string]]::new($pathComparer)
+        $referencePaths = [System.Collections.Generic.List[string]]::new()
+        foreach ($referencePath in @($guidancePath) + @($selectedGuidancePaths.ToArray())) {
+            $referencePath = [string]$referencePath
+            if ($referencePathSet.Add($referencePath)) { $referencePaths.Add($referencePath) }
+        }
         $dependencies = Get-DmProfileDependencyVersions -Boundary $Preflight.boundary -Profile $profileArgument `
-            -ExpectedProfileVersion ([string]$loaded.sourceVersion) -ReferencePaths $referencePaths `
+            -ExpectedProfileVersion ([string]$loaded.sourceVersion) -ReferencePaths $referencePaths.ToArray() `
             -AdditionalGuidancePaths $selectedGuidancePaths.ToArray()
-        $guidanceSnapshot = @($dependencies | Where-Object { [string]$_.identity -ceq $guidancePath })
+        $guidanceSnapshot = @($dependencies | Where-Object { $pathComparer.Equals([string]$_.identity, $guidancePath) })
         if ($guidanceSnapshot.Count -ne 1 -or [string]$guidanceSnapshot[0].version -cne $guidanceVersion) {
             throw 'The guidance changed after validation and before its dependency snapshot.'
         }
         foreach ($selectedPath in $selectedGuidanceVersions.Keys) {
-            $selectedSnapshot = @($dependencies | Where-Object { [string]$_.identity -ceq $selectedPath })
+            $selectedSnapshot = @($dependencies | Where-Object { $pathComparer.Equals([string]$_.identity, $selectedPath) })
             if ($selectedSnapshot.Count -ne 1 -or
                 [string]$selectedSnapshot[0].version -cne $selectedGuidanceVersions[$selectedPath]) {
                 throw 'Selected guidance changed after validation and before its dependency snapshot.'

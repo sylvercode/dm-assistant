@@ -400,6 +400,28 @@ Describe 'Read-only vault orientation and inventory' {
             $outcome.result.completionCode | Should -BeExactly 'TARGET_CONFLICT'
             $outcome.inventoryReport | Should -BeNull
         }
+
+        It 'deduplicates case-insensitive configured and selected guidance dependencies' {
+            if (-not $IsWindows) {
+                Set-ItResult -Skipped -Because 'case-insensitive vault paths are specific to Windows'
+                return
+            }
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+            Set-TestGuidanceFile -VaultRoot $fixture.Root -Path '.dmassist-guidance.md' -Text "# Guidance`nSynthetic guidance body.`n"
+            [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nguidance:`n  path: .dmassist-guidance.md`n")
+            $request.arguments = [ordered]@{
+                selectedGuidance = [string[]]@('.DMASSIST-GUIDANCE.md')
+            }
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            Assert-InventoryWrapper -Outcome $outcome
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $outcome.inventoryReport.guidance.loadedSources.Count | Should -Be 2
+            $outcome.inventoryReport.guidance.loadedSources[0].selectionKind | Should -BeExactly 'configured'
+            $outcome.inventoryReport.guidance.loadedSources[1].selectionKind | Should -BeExactly 'request-selected'
+            $outcome.inventoryReport.guidance.loadedSources[1].path | Should -BeExactly '.DMASSIST-GUIDANCE.md'
+        }
     }
 
     Context 'US1 selected guidance usability' {
