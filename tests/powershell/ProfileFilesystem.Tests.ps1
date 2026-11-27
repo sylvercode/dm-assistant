@@ -58,11 +58,13 @@ Describe 'Vault profile filesystem and reference validation' {
         }
         $profile = [ordered]@{ guidance = [ordered]@{ path = $path } }
 
-        $reference = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind guidance
+        foreach ($kind in @('guidance', 'Guidance', 'GUIDANCE')) {
+            $reference = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind $kind
+            $reference.passed | Should -BeFalse
+            $reference.code | Should -Be 'REFERENCE_UNAVAILABLE'
+        }
         { Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $profile } | Should -Throw
 
-        $reference.passed | Should -BeFalse
-        $reference.code | Should -Be 'REFERENCE_UNAVAILABLE'
         $reads | Should -Not -Contain $path
     }
 
@@ -140,11 +142,13 @@ Describe 'Vault profile filesystem and reference validation' {
         }
         $profile = [ordered]@{ guidance = [ordered]@{ path = $path } }
 
-        $reference = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind guidance
+        foreach ($kind in @('guidance', 'Guidance', 'GUIDANCE')) {
+            $reference = Test-DmProfileReference -Boundary $root.boundary -Path $path -Kind $kind
+            $reference.passed | Should -BeFalse
+            $reference.code | Should -Be 'REFERENCE_UNAVAILABLE'
+        }
         { Get-DmProfileDependencyVersions -Boundary $root.boundary -Profile $profile } | Should -Throw
 
-        $reference.passed | Should -BeFalse
-        $reference.code | Should -Be 'REFERENCE_UNAVAILABLE'
         $reads | Should -Not -Contain $path
         $reads | Should -Not -Contain $target
     }

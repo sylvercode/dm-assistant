@@ -439,13 +439,13 @@ function Test-DmProfileReference {
             boundaryFailure = $true
         }
     }
-    if ($Kind -ceq 'guidance' -and -not (Test-DmMarkdownPath -Path $Path)) {
+    if ($Kind -ieq 'guidance' -and -not (Test-DmMarkdownPath -Path $Path)) {
         return [pscustomobject][ordered]@{ passed = $false; code = 'REFERENCE_UNAVAILABLE'; message = 'The configured guidance is not a Markdown file.' }
     }
     if (-not $resolution.exists -or $resolution.itemType -cne 'file') {
         return [pscustomobject][ordered]@{ passed = $false; code = 'REFERENCE_UNAVAILABLE'; message = 'The configured reference is missing or is not a file.' }
     }
-    if ($Kind -ceq 'guidance') {
+    if ($Kind -ieq 'guidance') {
         $resolvedRelativePath = [string]$resolution.resolvedRelativePath
         if ([string]::IsNullOrWhiteSpace($resolvedRelativePath) -or
             -not (Test-DmMarkdownPath -Path $resolvedRelativePath)) {
