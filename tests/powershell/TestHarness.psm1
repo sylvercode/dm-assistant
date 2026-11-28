@@ -166,6 +166,99 @@ function Get-TestVaultSnapshot {
     $array
 }
 
+function Get-TestOwnedVaultSnapshot {
+    <#
+    Captures an owned disposable fixture tree for before/after assertions.
+    Links are recorded from their reparse metadata and are never traversed or
+    hashed. This harness-only snapshot is separate from operation read probes.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)]$Fixture)
+
+    if ($null -eq $Fixture -or
+        $Fixture.PSObject.Properties.Name -notcontains 'OwnedDirectory' -or
+        $Fixture.PSObject.Properties.Name -notcontains 'OwnershipParentPath' -or
+        $Fixture.PSObject.Properties.Name -notcontains 'Root') {
+        throw [System.ArgumentException]::new('A complete owned test fixture is required.')
+    }
+
+    $ownershipParent = [System.IO.Path]::GetFullPath([string]$Fixture.OwnershipParentPath)
+    $ownedDirectory = [System.IO.Path]::GetFullPath([string]$Fixture.OwnedDirectory)
+    $vaultRoot = [System.IO.Path]::GetFullPath([string]$Fixture.Root)
+    $actualParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetDirectoryName($ownedDirectory))
+    $actualVaultParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetDirectoryName($vaultRoot))
+    $comparison = if ($IsWindows) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+    $ownedName = [System.IO.Path]::GetFileName($ownedDirectory)
+
+    if (-not [string]::Equals($actualParent, $ownershipParent, $comparison) -or
+        $ownedName -notmatch '^dmassist-test-[0-9a-f]{32}$' -or
+        -not [string]::Equals($actualVaultParent, $ownedDirectory, $comparison)) {
+        throw [System.ArgumentException]::new('Snapshot target is not a uniquely owned test fixture.')
+    }
+    if (-not [System.IO.Directory]::Exists($ownedDirectory) -or
+        -not [System.IO.Directory]::Exists($vaultRoot)) {
+        throw [System.ArgumentException]::new('Snapshot target fixture is unavailable.')
+    }
+
+    $entries = [System.Collections.Generic.List[object]]::new()
+    $pendingDirectories = [System.Collections.Generic.Stack[string]]::new()
+    $pendingDirectories.Push($ownedDirectory)
+    while ($pendingDirectories.Count -gt 0) {
+        $directory = $pendingDirectories.Pop()
+        foreach ($item in [System.IO.Directory]::GetFileSystemEntries($directory)) {
+            $relativePath = [System.IO.Path]::GetRelativePath($ownedDirectory, $item)
+            $attributes = [System.IO.File]::GetAttributes($item)
+            $isLink = ($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+            $isDirectory = ($attributes -band [System.IO.FileAttributes]::Directory) -ne 0
+
+            if ($isLink) {
+                $info = if ($isDirectory) {
+                    [System.IO.DirectoryInfo]::new($item)
+                }
+                else {
+                    [System.IO.FileInfo]::new($item)
+                }
+                $entries.Add([pscustomobject][ordered]@{
+                    RelativePath = $relativePath
+                    Kind = 'link'
+                    Attributes = $attributes
+                    LinkTarget = $info.LinkTarget
+                })
+                continue
+            }
+
+            if ($isDirectory) {
+                $entries.Add([pscustomobject][ordered]@{
+                    RelativePath = $relativePath
+                    Kind = 'directory'
+                    Attributes = $attributes
+                    LastWriteTimeUtcTicks = [System.IO.Directory]::GetLastWriteTimeUtc($item).Ticks
+                })
+                $pendingDirectories.Push($item)
+                continue
+            }
+
+            $hash = [System.Convert]::ToHexString(
+                [System.Security.Cryptography.SHA256]::HashData([System.IO.File]::ReadAllBytes($item))
+            )
+            $entries.Add([pscustomobject][ordered]@{
+                RelativePath = $relativePath
+                Kind = 'file'
+                Attributes = $attributes
+                Sha256 = $hash
+                LastWriteTimeUtcTicks = [System.IO.File]::GetLastWriteTimeUtc($item).Ticks
+            })
+        }
+    }
+
+    $array = $entries.ToArray()
+    [System.Array]::Sort($array, [System.Comparison[object]]{
+        param($left, $right)
+        [System.StringComparer]::Ordinal.Compare([string]$left.RelativePath, [string]$right.RelativePath)
+    })
+    $array
+}
+
 function New-TestOperationRequest {
     <#
     Builds a synthetic contract-section-2 request as an ordered hashtable.
@@ -265,4 +358,4 @@ function Get-TestReadinessState {
 
 $script:TestReadinessState = 'ready'
 
-Export-ModuleMember -Function Get-TestRepositoryRoot, Get-TestScriptsRoot, Import-TestProductionModule, New-TestVaultFixture, Remove-TestVaultFixture, Get-TestVaultSnapshot, New-TestOperationRequest, Test-TestAuthorizedRoot, Enable-TestAuthorizationProvider, Set-TestDependencyReadiness, Get-TestReadinessState
+Export-ModuleMember -Function Get-TestRepositoryRoot, Get-TestScriptsRoot, Import-TestProductionModule, New-TestVaultFixture, Remove-TestVaultFixture, Get-TestVaultSnapshot, Get-TestOwnedVaultSnapshot, New-TestOperationRequest, Test-TestAuthorizedRoot, Enable-TestAuthorizationProvider, Set-TestDependencyReadiness, Get-TestReadinessState

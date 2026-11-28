@@ -14,10 +14,10 @@ and campaign/group names must be synthetic and disposable.
 
 Before testing a future script-backed operation:
 
-- Confirm the release documents the supported Windows, macOS, and Linux
-  combinations, exact PowerShell 7 (`pwsh`) and add-on versions, selection
-  date, and how to obtain prerequisites. Do not install or upgrade them as
-  part of a workflow test.
+- Confirm the release documents the Windows, macOS, and Linux combinations,
+  minimum stable PowerShell (`pwsh`) and exact add-on versions, and how to
+  obtain prerequisites. Do not install or upgrade them as part of a workflow
+  test.
 - Use only a release-supported environment with the declared runtime and
   operation-specific modules available. Profile tests require the selected
   YAML reader and PowerShell 7.4 or later, whose built-in `Test-Json`

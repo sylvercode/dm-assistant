@@ -82,3 +82,96 @@ Describe 'Test vault fixture ownership' {
         $exitCode | Should -Be 2
     }
 }
+
+Describe 'No-follow test vault snapshots' {
+    It 'captures outside directory-link metadata without following the link' {
+        $fixture = New-TestVaultFixture -ParentPath $TestDrive
+        try {
+            $outsideDirectoryLink = Join-Path $fixture.Root 'outside-directory'
+
+            try {
+                [void][System.IO.Directory]::CreateSymbolicLink($outsideDirectoryLink, $fixture.OutsidePath)
+            }
+            catch {
+                try {
+                    $null = New-Item -ItemType Junction -Path $outsideDirectoryLink -Target $fixture.OutsidePath -ErrorAction Stop
+                }
+                catch {
+                    Set-ItResult -Skipped -Because 'directory symbolic links and junctions cannot be created here'
+                    return
+                }
+            }
+
+            $snapshot = @(Get-TestOwnedVaultSnapshot -Fixture $fixture)
+            $vaultPrefix = [System.IO.Path]::GetFileName($fixture.Root) + [System.IO.Path]::DirectorySeparatorChar
+            $outsideDirectoryAlias = $vaultPrefix + 'outside-directory'
+            $arcRelative = $vaultPrefix + 'Adventures'
+            $noteRelative = $vaultPrefix + 'Adventures' + [System.IO.Path]::DirectorySeparatorChar + 'Synthetic Arc.md'
+
+            ($snapshot | Where-Object RelativePath -EQ $arcRelative).Kind | Should -BeExactly 'directory'
+            $note = $snapshot | Where-Object RelativePath -EQ $noteRelative
+            $note.Kind | Should -BeExactly 'file'
+            $note.Sha256 | Should -BeExactly ([System.Convert]::ToHexString(
+                [System.Security.Cryptography.SHA256]::HashData([System.IO.File]::ReadAllBytes($fixture.NotePaths[0]))
+            ))
+            $note.LastWriteTimeUtcTicks | Should -Be ([System.IO.File]::GetLastWriteTimeUtc($fixture.NotePaths[0]).Ticks)
+            (($note.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) | Should -BeFalse
+
+            $directoryLink = $snapshot | Where-Object RelativePath -EQ $outsideDirectoryAlias
+            $directoryLink.Kind | Should -BeExactly 'link'
+            $directoryLink.LinkTarget | Should -BeExactly $fixture.OutsidePath
+            @($snapshot | Where-Object RelativePath -Like "$outsideDirectoryAlias*").Count | Should -Be 1
+            @($snapshot | Where-Object RelativePath -Like "$vaultPrefix*").Count | Should -Be 5
+        }
+        finally {
+            Remove-TestVaultFixture -Fixture $fixture
+        }
+    }
+
+    It 'captures outside and dangling file-link metadata without hashing targets' {
+        $fixture = New-TestVaultFixture -ParentPath $TestDrive
+        try {
+            $outsideFile = Join-Path $fixture.OutsidePath 'secret.md'
+            $outsideFileLink = Join-Path $fixture.Root 'outside-link.md'
+            $danglingLink = Join-Path $fixture.Root 'dangling.md'
+            try {
+                [void][System.IO.File]::CreateSymbolicLink($outsideFileLink, $outsideFile)
+                [void][System.IO.File]::CreateSymbolicLink($danglingLink, (Join-Path $fixture.OutsidePath 'missing.md'))
+            }
+            catch {
+                Set-ItResult -Skipped -Because 'file symbolic links cannot be created here'
+                return
+            }
+
+            $snapshot = @(Get-TestOwnedVaultSnapshot -Fixture $fixture)
+            $vaultPrefix = [System.IO.Path]::GetFileName($fixture.Root) + [System.IO.Path]::DirectorySeparatorChar
+            $fileLink = $snapshot | Where-Object RelativePath -EQ ($vaultPrefix + 'outside-link.md')
+            $fileLink.Kind | Should -BeExactly 'link'
+            $fileLink.LinkTarget | Should -BeExactly $outsideFile
+            $fileLink.PSObject.Properties.Name | Should -Not -Contain 'Sha256'
+
+            $dangling = $snapshot | Where-Object RelativePath -EQ ($vaultPrefix + 'dangling.md')
+            $dangling.Kind | Should -BeExactly 'link'
+            $dangling.LinkTarget | Should -BeExactly (Join-Path $fixture.OutsidePath 'missing.md')
+            $dangling.PSObject.Properties.Name | Should -Not -Contain 'Sha256'
+        }
+        finally {
+            Remove-TestVaultFixture -Fixture $fixture
+        }
+    }
+
+    It 'refuses to snapshot a caller-owned directory that is not a generated fixture' {
+        $callerDirectory = Join-Path $TestDrive 'caller-owned'
+        [void][System.IO.Directory]::CreateDirectory($callerDirectory)
+        $sentinel = Join-Path $callerDirectory 'preserve.txt'
+        [System.IO.File]::WriteAllText($sentinel, 'preserve')
+        $fixture = [pscustomobject]@{
+            OwnershipParentPath = $TestDrive
+            OwnedDirectory = $callerDirectory
+            Root = $callerDirectory
+        }
+
+        { Get-TestOwnedVaultSnapshot -Fixture $fixture } | Should -Throw
+        [System.IO.File]::ReadAllText($sentinel) | Should -BeExactly 'preserve'
+    }
+}

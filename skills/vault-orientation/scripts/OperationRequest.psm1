@@ -12,7 +12,7 @@ $script:DmRequestFields = @('contractVersion', 'requestId', 'operation', 'vaultR
     'approvedPreviewId', 'reviewedVersions', 'reviewedDependencyVersions', 'declinedReviewId')
 $script:DmRequiredRequestFields = @('contractVersion', 'requestId', 'operation', 'vaultRoot', 'campaignGroup', 'mode', 'arguments', 'targets')
 $script:DmModes = @('inspect', 'preview', 'apply')
-$script:DmArgumentTypes = @('string', 'boolean', 'integer')
+$script:DmArgumentTypes = @('string', 'boolean', 'integer', 'stringArray', 'mappingDecisions')
 $script:DmChangeKinds = @('read', 'edit', 'create', 'delete', 'reorganize', 'unclassified')
 $script:DmConversionDecisions = @('preserve')
 $script:DmDigestPattern = '^sha256:[0-9a-f]{64}$'
@@ -114,6 +114,7 @@ function Test-DmArgumentValue {
         }
         'boolean' { return $Value -is [bool] }
         'integer' { return $Value -is [int] -or $Value -is [long] }
+        { $_ -in @('stringArray', 'mappingDecisions') } { return Test-DmListValue -Value $Value }
     }
     $false
 }
@@ -443,10 +444,114 @@ function Test-DmOperationRequest {
                 $entry = Get-DmExactField -Object $rawArguments -Name $name
                 if (-not $entry.present) {
                     if ($spec.required) { $problems.Add("Argument $name is required.") }
+                    if ($registration.name -ceq 'vault.orientation.inventory') {
+                        switch -CaseSensitive ($name) {
+                            'selectedGuidance' { $arguments[$name] = [string[]]@() }
+                            'optionalGuidance' { $arguments[$name] = [string[]]@() }
+                            'proposeProfile' { $arguments[$name] = $false }
+                            'mappingDecisions' { $arguments[$name] = [object[]]@() }
+                        }
+                    }
                     continue
                 }
                 if (-not (Test-DmArgumentValue -Value $entry.value -Spec $spec)) { $problems.Add("Argument $name must be a $($spec.type) value.") }
                 $arguments[$name] = $entry.value
+            }
+        }
+    }
+
+    if ($null -ne $registration -and $registration.name -ceq 'vault.orientation.inventory' -and
+        $f['arguments'].present -and (Test-DmObjectValue -Value $f['arguments'].value)) {
+        $rawArguments = $f['arguments'].value
+        $pathComparison = if ([System.IO.Path]::DirectorySeparatorChar -eq [char]'\') {
+            [System.StringComparer]::OrdinalIgnoreCase
+        }
+        else {
+            [System.StringComparer]::Ordinal
+        }
+        $normalizedPaths = @{}
+        $invalidGuidancePath = $false
+        foreach ($field in @('selectedGuidance', 'optionalGuidance')) {
+            $entry = Get-DmExactField -Object $rawArguments -Name $field
+            $rawPaths = @()
+            if ($entry.present) { $rawPaths = $entry.value }
+            if (-not (Test-DmListValue -Value $rawPaths)) { continue }
+            $paths = [System.Collections.Generic.List[string]]::new()
+            $seenPaths = [System.Collections.Generic.HashSet[string]]::new($pathComparison)
+            $index = 0
+            foreach ($path in $rawPaths) {
+                if ($path -isnot [string]) {
+                    $problems.Add("Argument $field[$index] must be a string.")
+                }
+                else {
+                    $check = Test-DmVaultRelativePath -Path $path
+                    if (-not $check.isValid) {
+                        $pathProblems.Add("Argument $field[$index]: $($check.reason)")
+                        $invalidGuidancePath = $true
+                    }
+                    else {
+                        $normalizedPath = [string]::Join('/', [string[]]$check.components)
+                        if ($seenPaths.Add($normalizedPath)) { $paths.Add($normalizedPath) }
+                    }
+                }
+                $index++
+            }
+            $normalizedPaths[$field] = [string[]]$paths.ToArray()
+            $arguments[$field] = [string[]]$paths.ToArray()
+        }
+
+        $proposeEntry = Get-DmExactField -Object $rawArguments -Name 'proposeProfile'
+        $proposeProfile = $false
+        if ($proposeEntry.present -and $proposeEntry.value -is [bool]) { $proposeProfile = $proposeEntry.value }
+        $decisionsEntry = Get-DmExactField -Object $rawArguments -Name 'mappingDecisions'
+        $rawDecisions = @()
+        if ($decisionsEntry.present) { $rawDecisions = $decisionsEntry.value }
+        if ($decisionsEntry.present -and -not $proposeProfile) {
+            $problems.Add('mappingDecisions is valid only when proposeProfile is true.')
+        }
+        if (Test-DmListValue -Value $rawDecisions) {
+            $decisions = [System.Collections.Generic.List[object]]::new()
+            $seenAmbiguities = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            $seenDecisions = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            $index = 0
+            foreach ($decision in $rawDecisions) {
+                $validDecision = Test-DmObjectValue -Value $decision
+                if ($validDecision) {
+                    $names = @(Get-DmFieldName -Object $decision)
+                    $ambiguity = Get-DmExactField -Object $decision -Name 'ambiguityId'
+                    $alternative = Get-DmExactField -Object $decision -Name 'alternativeId'
+                    $validDecision = $names.Count -eq 2 -and $ambiguity.present -and $alternative.present -and
+                        (Test-DmPlainText -Value $ambiguity.value -MaxLength 2147483647) -and
+                        (Test-DmPlainText -Value $alternative.value -MaxLength 2147483647) -and
+                        ([string]$ambiguity.value).IndexOfAny([char[]]@([char]0x2028, [char]0x2029)) -lt 0 -and
+                        ([string]$alternative.value).IndexOfAny([char[]]@([char]0x2028, [char]0x2029)) -lt 0
+                    if ($validDecision) {
+                        $ambiguityId = [string]$ambiguity.value
+                        $alternativeId = [string]$alternative.value
+                        $decisionKey = "$($ambiguityId.Length):$ambiguityId$alternativeId"
+                        if (-not $seenDecisions.Add($decisionKey) -or -not $seenAmbiguities.Add($ambiguityId)) {
+                            $validDecision = $false
+                        }
+                        $decisions.Add([pscustomobject][ordered]@{
+                            ambiguityId  = $ambiguityId
+                            alternativeId = $alternativeId
+                        })
+                    }
+                }
+                if (-not $validDecision) { $problems.Add("Argument mappingDecisions[$index] must carry exactly non-empty single-line ambiguityId and alternativeId strings, with at most one decision per ambiguity.") }
+                $index++
+            }
+            $arguments['mappingDecisions'] = [object[]]$decisions.ToArray()
+        }
+
+        if (-not $invalidGuidancePath -and $normalizedPaths.ContainsKey('selectedGuidance') -and $normalizedPaths.ContainsKey('optionalGuidance')) {
+            $selectedSet = [System.Collections.Generic.HashSet[string]]::new($pathComparison)
+            foreach ($path in $normalizedPaths['selectedGuidance']) { $null = $selectedSet.Add($path) }
+            foreach ($path in $normalizedPaths['optionalGuidance']) {
+                if (-not $selectedSet.Contains($path)) {
+                    $problems.Add('optionalGuidance must be a subset of selectedGuidance.')
+                    break
+                }
             }
         }
     }
@@ -680,6 +785,24 @@ Register-DmBuiltInOperation -Parameters @{
     AllowedArguments = @{}
     ChangeKind       = 'read'
     MinTargets       = 1
+}
+
+Register-DmBuiltInOperation -Parameters @{
+    Name             = 'vault.orientation.inventory'
+    Description      = 'Validates an explicit read-only orientation and inventory request without dispatching it.'
+    Modes            = @('inspect')
+    FactChanging     = $false
+    AllowedArguments = [ordered]@{
+        selectedGuidance = 'stringArray'
+        optionalGuidance = 'stringArray'
+        proposeProfile = 'boolean'
+        mappingDecisions = 'mappingDecisions'
+    }
+    ChangeKind       = 'read'
+    MinTargets       = 0
+    MaxTargets       = 0
+    RequiresMappings = $false
+    RequiresCampaignGroup = $false
 }
 
 Register-DmBuiltInOperation -Parameters @{

@@ -1,8 +1,10 @@
 # Plugin Architecture
 
 DM Assistant uses Agent Plugins 1.0. The repository root is the installable
-plugin directory. The repository includes a portable vault-orientation skill
-and its bundled shared reference, schema, and PowerShell runtime modules.
+plugin directory. The repository includes portable vault-orientation and
+article-authoring skills. Vault orientation bundles the shared reference,
+schema, and PowerShell runtime modules; article authoring bundles its
+entry point and templates.
 The Obsidian Link Resolver is an externally installed dependency; its
 user-specific Copilot CLI configuration and authorized vault roots stay
 outside the plugin. Feature 001 verified Resolver 2.1.0, both required tools,
@@ -24,6 +26,10 @@ dm-assistant/
 |-- plugin.json
 |-- skills/
 |   |-- README.md
+|   |-- article-authoring/
+|   |   |-- SKILL.md
+|   |   |-- scripts/
+|   |   `-- templates/
 |   `-- vault-orientation/
 |       |-- SKILL.md
 |       |-- VAULT-REFERENCE.md
@@ -51,7 +57,7 @@ agent definitions.
 | Component | Location | Responsibility |
 | --- | --- | --- |
 | Manifest | `plugin.json` | Plugin identity, version, and distribution metadata. |
-| Portable skills | `skills/<skill-name>/SKILL.md` | Task-specific workflows and any bundled templates or scripts. Each skill must be an immediate child of `skills/`. The current vault-orientation skill bundles `VAULT-REFERENCE.md`. |
+| Portable skills | `skills/<skill-name>/SKILL.md` | Task-specific workflows and any bundled templates or scripts. Each skill must be an immediate child of `skills/`. Vault orientation owns `VAULT-REFERENCE.md`; article authoring activates it for shared safeguards. |
 | Copilot agents | `com.github.copilot/agents/<name>.agent.md` | Copilot-specific assistant profiles and orchestration. Keep only agent definitions in this discovery directory. |
 | Skill inventory | `skills/README.md` | Declares every immediate-child skill directory containing `SKILL.md` and classifies each as vault-facing or non-vault-facing. It is contributor documentation, not a plugin component. |
 | MCP integration (future) | `mcp.json` | Register actual tool servers using the Agent Plugins MCP schema. |

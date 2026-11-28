@@ -18,12 +18,16 @@ owns live MCP readiness and exact-vault authorization checks; PowerShell owns
 request, filesystem, freshness, and write safeguards. Before script-backed work:
 
 - Establish the intended vault from the user's workspace or explicit input as
-  in step 1 below, complete step 2's live checks, then run the runtime prerequisite check
+  in step 1 below and complete step 2's live checks. For script-backed
+  operations other than inventory, then run the runtime prerequisite check
   (`Invoke-DmPreflight` in this skill's `scripts/RuntimePreflight.psm1`). It
   checks the supported runtime, request shape, your vault-scoped confirmations,
   and the canonical vault boundary. It does not independently query or
-  authenticate the active MCP session. Then complete the remaining pre-note
-  sequence below in order.
+  authenticate the active MCP session. Inventory instead uses the shipped
+  `scripts\Invoke-DmInventory.ps1` JSON entry point, which constructs the
+  runtime request and performs PowerShell preflight internally; do not invoke
+  `Invoke-DmPreflight` separately or import internal modules for inventory.
+  Then complete the remaining pre-note sequence below in order.
 - If the check returns `not completed`, report its completion code and
   message, stop the script-backed work, and do not retry around it.
   Missing or negative dependency confirmation returns `PREREQUISITE_MISSING`;
@@ -163,6 +167,99 @@ first. If uncertainty affects the findings or next action, stop before
 further note access and ask the DM. Provisional assumptions never authorize
 creating or changing notes. The same restriction applies to script-backed
 operations.
+
+## Read-only inventory operation
+
+After completing the live dependency and exact-vault checks in step 2 and
+reading this skill's shared reference, call the shipped inventory entry point.
+Do not inspect, import, or call internal runtime modules to construct or
+dispatch the request. The script path must come from this skill's installed
+resource directory; never locate it by searching the workspace, source
+checkout, or campaign vault. If the script is unavailable or fails, report
+the blocker and stop rather than generating a replacement command or script.
+
+Send one JSON object on standard input to
+`scripts\Invoke-DmInventory.ps1`. It takes the explicit vault root and the
+live caller confirmation, plus optional guidance and proposal fields:
+
+```powershell
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false, $true)
+# Resolve this path from the loaded vault-orientation skill resources.
+$inventoryScriptPath = '<absolute skill resource path>\scripts\Invoke-DmInventory.ps1'
+$inventoryInput = [ordered]@{
+    vaultRoot = $vaultRoot
+    callerPreflight = @{
+        vaultRoot = $vaultRoot
+        dependenciesReady = $true
+        vaultAuthorized = $true
+    }
+}
+$json = ConvertTo-Json -InputObject $inventoryInput -Depth 10 -Compress
+$outcome = $json | pwsh -NoProfile -File $inventoryScriptPath | ConvertFrom-Json
+```
+
+The caller must set `callerPreflight` only after completing the live checks
+for this exact vault. Never use this example's `true` values without actually
+performing those checks. To select additional guidance, supply
+`selectedGuidance` as an array of explicit vault-relative Markdown paths and
+`optionalGuidance` as the optional subset. To request a profile proposal, set
+`proposeProfile = $true`; pass `mappingDecisions` only with a proposal request
+and only for alternatives from a prior inventory report. They express a
+current DM choice, not approval to write. Do not send approval fields or use
+this read-only operation to change the vault.
+
+The script constructs the fixed inspect request and returns JSON with exactly
+`result` and `inventoryReport`. The registry validates the operation but does
+not dispatch it. PowerShell validates the root-scoped caller confirmation and
+filesystem boundaries; it does not independently verify the live MCP session.
+The inventory and proposal remain read-only. Never use the Resolver to
+enumerate the vault or establish traversal containment.
+
+Inventory includes only non-dot-prefixed directory and Markdown names.
+Directories are not excluded because their names have extensions, and
+non-dot-prefixed Markdown remains eligible regardless of Hidden/System
+attributes. It omits dot-prefixed entries, all non-Markdown filenames, and
+selected guidance files; it never opens attachments or other non-Markdown
+contents. Directory links are listed by name but never traversed. A Markdown
+file link is eligible only when both its visible name and contained final
+target are Markdown and the target has no dot-prefixed path component;
+escaping, cyclic, unresolvable, or changed targets fail without a partial
+report.
+
+Without successfully loaded applicable local guidance, inventory is names-only
+and does not read or fingerprint campaign-note contents. Loaded configured,
+default-designated, or explicitly selected guidance opens the content gate
+only after all required sources pass; then eligible Markdown may be inspected
+for explicit frontmatter labels or body self-identification. Mappings require
+an explicit profile/guidance assignment, an exact conventional section name,
+a whole-word Adventure/Arc role token, or permitted explicit note-content
+evidence. Thematic resemblance is insufficient. Direct profile/guidance
+assignments are `observed`; names and permitted note-content evidence are
+`inferred` and remain provisional. Orientation-only alternatives are
+informational; a proposal-affecting unresolved alternative requires DM
+direction. When `proposeProfile` is true, the result can include a
+`drafted-unapproved` proposal with schema-validated YAML, candidate evidence,
+and a reviewable diff. If a choice is unresolved or a supplied decision is
+stale or unknown, the successful inventory report still includes the current
+alternatives, while proposal `content` and `differences` are `null`; provide
+fresh DM direction in a new request. Decisions are not approval and do not
+change evidence classifications. A proposal is never written: the DM may
+decline by taking no further action. Existing profile text and comments are
+preserved when a safe proposal can be represented; if safe preservation or
+disclosure is impossible, the operation fails without returning a partial
+report.
+
+Do not treat proposal content or its diff as a write preview. A future
+profile-specific writer must preview the exact target, content, encoding, and
+bytes, receive explicit approval in a later message, and revalidate the
+authorization, vault root, target, dependencies, and runtime identity before
+a no-clobber create or guarded replacement. Do not use `note.replace-text` or
+a direct file write to apply a profile proposal. The existing generic
+`note.replace-text` operation can technically target an existing
+`.dmassist.yaml` after its own gates; a single ordinary-target edit need not
+have a preview, and replacement YAML is not validated against the profile
+schema. This is a workflow boundary, not a runtime-wide guard. The caller must
+complete the live MCP checks; the runtime cannot independently authenticate them.
 
 ### Pause conditions
 

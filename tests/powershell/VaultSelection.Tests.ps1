@@ -72,6 +72,21 @@ BeforeAll {
         (Test-DmResult -Result $r -RequestedTargets $Targets).isValid | Should -BeTrue
     }
 
+    function New-TestInventoryRequest {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory)][string]$VaultRoot,
+            [System.Collections.IDictionary]$Arguments = [ordered]@{},
+            [System.Collections.IDictionary]$Extra
+        )
+        $request = New-TestOperationRequest -VaultRoot $VaultRoot -Operation 'vault.orientation.inventory' -Mode 'inspect' -Targets @() -Arguments $Arguments
+        $request['campaignGroup'] = [ordered]@{ campaign = $null; group = $null }
+        if ($null -ne $Extra) {
+            foreach ($key in $Extra.Keys) { $request[$key] = $Extra[$key] }
+        }
+        $request
+    }
+
     $script:FileLinkSkipReason = 'Creating file symbolic links requires Windows Developer Mode or elevation in this environment; directory cases use junctions instead.'
 }
 
@@ -588,6 +603,230 @@ Describe 'Vault selection and inspection' {
                 (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST' -Because 'MaxTargets is 1'
                 Unregister-DmOperation -Name 'synthetic.lookup' | Should -BeTrue
                 $req['targets'] = @('Lore/Invented Town.md')
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+            }
+        }
+
+        Describe 'Vault orientation inventory request contract' {
+            It 'registers the operation as inspect-only, read-only, mapping-independent, and target-free' {
+                $registration = Get-DmOperation -Name 'vault.orientation.inventory'
+                $registration | Should -Not -BeNullOrEmpty
+                $registration.name | Should -BeExactly 'vault.orientation.inventory'
+                $registration.modes | Should -Be @('inspect')
+                $registration.factChanging | Should -BeFalse
+                $registration.changeKind | Should -BeExactly 'read'
+                $registration.minTargets | Should -Be 0
+                $registration.maxTargets | Should -Be 0
+                $registration.requiresMappings | Should -BeFalse
+                $registration.requiresCampaignGroup | Should -BeFalse
+                @($registration.arguments.Keys) | Should -Be @('selectedGuidance', 'optionalGuidance', 'proposeProfile', 'mappingDecisions')
+            }
+
+            It 'accepts an inspect request with empty targets and explicit null campaign and group defaults' {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root
+                $check = Test-DmOperationRequest -Request $req
+                $check.isValid | Should -BeTrue -Because ($check.problems -join ' ')
+                $check.request.operation | Should -BeExactly 'vault.orientation.inventory'
+                $check.request.mode | Should -BeExactly 'inspect'
+                @($check.request.targets).Count | Should -Be 0
+                $check.request.campaignGroup.campaign | Should -BeNull
+                $check.request.campaignGroup.group | Should -BeNull
+                @($req.Keys) | Should -Not -Contain 'approvedPreviewId'
+                @($req.Keys) | Should -Not -Contain 'reviewedVersions'
+                @($req.Keys) | Should -Not -Contain 'reviewedDependencyVersions'
+                @($req.Keys) | Should -Not -Contain 'declinedReviewId'
+            }
+
+            It 'defaults the ordered guidance and mapping arrays and proposal flag' {
+                $check = Test-DmOperationRequest -Request (New-TestInventoryRequest -VaultRoot $fixture.Root)
+                $check.isValid | Should -BeTrue -Because ($check.problems -join ' ')
+                ($check.request.arguments['selectedGuidance'] -is [string[]]) | Should -BeTrue
+                @($check.request.arguments['selectedGuidance']).Count | Should -Be 0
+                ($check.request.arguments['optionalGuidance'] -is [string[]]) | Should -BeTrue
+                @($check.request.arguments['optionalGuidance']).Count | Should -Be 0
+                $check.request.arguments['proposeProfile'] | Should -BeOfType ([bool])
+                $check.request.arguments['proposeProfile'] | Should -BeFalse
+                ($check.request.arguments['mappingDecisions'] -is [System.Collections.IList]) | Should -BeTrue
+                $check.request.arguments['mappingDecisions'] | Should -Not -BeOfType ([string])
+                @($check.request.arguments['mappingDecisions']).Count | Should -Be 0
+                @($check.request.arguments.Keys) | Should -Be @('selectedGuidance', 'optionalGuidance', 'proposeProfile', 'mappingDecisions')
+            }
+
+            It 'preserves string-array order and accepts syntactically valid non-Markdown selections' {
+                $arguments = [ordered]@{
+                    selectedGuidance = [string[]]@('Guidance/Second.txt', 'Guidance/First.md')
+                    optionalGuidance = [string[]]@('Guidance/First.md')
+                }
+                $check = Test-DmOperationRequest -Request (New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments $arguments)
+                $check.isValid | Should -BeTrue -Because 'content type and readability are evaluated after request-shape validation'
+                $check.request.arguments['selectedGuidance'] | Should -Be @('Guidance/Second.txt', 'Guidance/First.md')
+                ($check.request.arguments['selectedGuidance'] -is [string[]]) | Should -BeTrue
+                $check.request.arguments['optionalGuidance'] | Should -Be @('Guidance/First.md')
+                ($check.request.arguments['optionalGuidance'] -is [string[]]) | Should -BeTrue
+            }
+
+            It 'deduplicates guidance selections stably while retaining the first selected order' {
+                $arguments = [ordered]@{
+                    selectedGuidance = [string[]]@('Guidance/First.md', 'Guidance/First.md', 'Guidance/Second.txt')
+                    optionalGuidance = [string[]]@('Guidance/First.md', 'Guidance/First.md')
+                }
+                $check = Test-DmOperationRequest -Request (New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments $arguments)
+
+                $check.isValid | Should -BeTrue -Because ($check.problems -join ' ')
+                $check.request.arguments['selectedGuidance'] | Should -Be @('Guidance/First.md', 'Guidance/Second.txt')
+                $check.request.arguments['optionalGuidance'] | Should -Be @('Guidance/First.md')
+            }
+
+            It 'accepts exact single-line mapping decisions only when proposing a profile' {
+                $arguments = [ordered]@{
+                    proposeProfile = $true
+                    mappingDecisions = @(
+                        [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-2' }
+                        [ordered]@{ ambiguityId = 'amb-2'; alternativeId = 'alt-1' }
+                    )
+                }
+                $check = Test-DmOperationRequest -Request (New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments $arguments)
+                $check.isValid | Should -BeTrue -Because ($check.problems -join ' ')
+                ($check.request.arguments['mappingDecisions'] -is [System.Collections.IList]) | Should -BeTrue
+                @($check.request.arguments['mappingDecisions']).Count | Should -Be 2
+                $check.request.arguments['mappingDecisions'][0].ambiguityId | Should -BeExactly 'amb-1'
+                $check.request.arguments['mappingDecisions'][0].alternativeId | Should -BeExactly 'alt-2'
+                @($check.request.arguments['mappingDecisions'][0].PSObject.Properties.Name) | Should -Be @('ambiguityId', 'alternativeId')
+                $check.request.arguments['mappingDecisions'][1].ambiguityId | Should -BeExactly 'amb-2'
+                $empty = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                    proposeProfile = $true
+                    mappingDecisions = @()
+                })
+                (Test-DmOperationRequest -Request $empty).isValid | Should -BeTrue
+            }
+
+            It 'rejects malformed or coerced argument values for <Field>' -ForEach @(
+                @{ Field = 'selectedGuidance'; Value = 'Guidance/One.md' }
+                @{ Field = 'selectedGuidance'; Value = @('Guidance/One.md', 7) }
+                @{ Field = 'selectedGuidance'; Value = $null }
+                @{ Field = 'optionalGuidance'; Value = 'Guidance/One.md' }
+                @{ Field = 'optionalGuidance'; Value = @('Guidance/One.md', $true) }
+                @{ Field = 'optionalGuidance'; Value = $null }
+                @{ Field = 'proposeProfile'; Value = 'true' }
+                @{ Field = 'proposeProfile'; Value = 1 }
+                @{ Field = 'mappingDecisions'; Value = [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-1' } }
+                @{ Field = 'mappingDecisions'; Value = 'amb-1:alt-1' }
+                @{ Field = 'mappingDecisions'; Value = $null }
+            ) {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root
+                $req['arguments'][$Field] = $Value
+                $check = Test-DmOperationRequest -Request $req
+                $check.isValid | Should -BeFalse
+                $check.code | Should -BeExactly 'INVALID_REQUEST'
+            }
+
+            It 'rejects unknown argument and campaign/group fields' {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{ recurse = $true })
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root
+                $req['campaignGroup']['campaignName'] = 'Synthetic'
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root
+                $req['vaultHint'] = 'unexpected'
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+            }
+
+            It 'rejects unknown and incomplete mapping-decision fields' -ForEach @(
+                @{ Decision = [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-1'; note = 'extra' } }
+                @{ Decision = [ordered]@{ ambiguityId = 'amb-1' } }
+                @{ Decision = [ordered]@{ alternativeId = 'alt-1' } }
+            ) {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                    proposeProfile = $true
+                    mappingDecisions = @($Decision)
+                })
+                $check = Test-DmOperationRequest -Request $req
+                $check.isValid | Should -BeFalse
+                $check.code | Should -BeExactly 'INVALID_REQUEST'
+            }
+
+            It 'rejects empty or multi-line mapping decision identifiers' -ForEach @(
+                @{ Field = 'ambiguityId'; Id = '' }
+                @{ Field = 'ambiguityId'; Id = "amb-1`namb-2" }
+                @{ Field = 'ambiguityId'; Id = "amb-1`tamb-2" }
+                @{ Field = 'ambiguityId'; Id = '   ' }
+                @{ Field = 'ambiguityId'; Id = 7 }
+                @{ Field = 'ambiguityId'; Id = $true }
+                @{ Field = 'alternativeId'; Id = '' }
+                @{ Field = 'alternativeId'; Id = "alt-1`nalt-2" }
+                @{ Field = 'alternativeId'; Id = "alt-1`talt-2" }
+                @{ Field = 'alternativeId'; Id = '   ' }
+                @{ Field = 'alternativeId'; Id = 7 }
+                @{ Field = 'alternativeId'; Id = $false }
+            ) {
+                $decision = [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-1' }
+                $decision[$Field] = $Id
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                    proposeProfile = $true
+                    mappingDecisions = @($decision)
+                })
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+            }
+
+            It 'rejects duplicate decisions and multiple alternatives for one ambiguity' -ForEach @(
+                @{ Decisions = @(
+                        [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-1' }
+                        [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-1' }
+                    )
+                }
+                @{ Decisions = @(
+                        [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-1' }
+                        [ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-2' }
+                    )
+                }
+            ) {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                    proposeProfile = $true
+                    mappingDecisions = $Decisions
+                })
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+            }
+
+            It 'rejects mappingDecisions without proposeProfile, including an empty array' {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{ mappingDecisions = @() })
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                    mappingDecisions = @([ordered]@{ ambiguityId = 'amb-1'; alternativeId = 'alt-1' })
+                })
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+            }
+
+            It 'requires optional guidance to be a selected guidance subset' {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                    selectedGuidance = [string[]]@('Guidance/Selected.md')
+                    optionalGuidance = [string[]]@('Guidance/Elsewhere.md')
+                })
+                (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
+            }
+
+            It 'rejects invalid selected and optional guidance paths as PATH_INVALID' -ForEach @(
+                @{ Field = 'selectedGuidance'; Path = '../outside.md' }
+                @{ Field = 'optionalGuidance'; Path = 'Guidance\One.md' }
+            ) {
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                    selectedGuidance = [string[]]@('Guidance/One.md')
+                    optionalGuidance = [string[]]@()
+                })
+                $req['arguments'][$Field] = [string[]]@($Path)
+                $check = Test-DmOperationRequest -Request $req
+                $check.isValid | Should -BeFalse
+                $check.code | Should -BeExactly 'PATH_INVALID'
+            }
+
+            It 'rejects approval fields on an inspect-only inventory request' -ForEach @(
+                @{ Field = 'approvedPreviewId'; Value = 'sha256:' + ('a' * 64) }
+                @{ Field = 'reviewedVersions'; Value = @() }
+                @{ Field = 'reviewedDependencyVersions'; Value = @() }
+                @{ Field = 'declinedReviewId'; Value = 'review-1' }
+            ) {
+                $extra = [ordered]@{}
+                $extra[$Field] = $Value
+                $req = New-TestInventoryRequest -VaultRoot $fixture.Root -Extra $extra
                 (Test-DmOperationRequest -Request $req).code | Should -BeExactly 'INVALID_REQUEST'
             }
         }

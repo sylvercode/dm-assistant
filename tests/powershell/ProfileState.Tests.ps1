@@ -31,8 +31,14 @@ Describe 'Vault profile state and pre-note sequence' {
     It 'does not fall back to discovery for a present invalid profile' {
         Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
         [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nunknown: value`n")
+        Mock -ModuleName VaultConfiguration -CommandName Get-DmVaultDiscovery -MockWith {
+            throw 'Conventional discovery ran for an invalid present profile.'
+        }
+
         $outcome = Invoke-DmInspect -Request $request
+
         $outcome.result.completionCode | Should -Be 'PROFILE_SCHEMA_INVALID'
+        Should -Invoke -ModuleName VaultConfiguration -CommandName Get-DmVaultDiscovery -Times 0 -Exactly -Scope It
     }
 
     It 'blocks mapping-dependent requests without designated local guidance' {
@@ -79,6 +85,7 @@ Describe 'Vault profile state and pre-note sequence' {
         $context = Get-DmPreNoteContext -Preflight $preflight
         $context.passed | Should -BeTrue
         $context.sequence | Should -Be @('vault-root-selected', 'dependency-readiness', 'vault-authorization', 'shared-reference', 'profile-validated', 'guidance-loaded', 'campaign-group')
+        $context.discovery | Should -BeNull
         $outcome = Invoke-DmInspect -Request $request
         $outcome.result.completionCode | Should -Be 'OK'
     }
@@ -96,11 +103,53 @@ Describe 'Vault profile state and pre-note sequence' {
 
         $context.passed | Should -BeTrue
         $context.context.guidanceLoaded | Should -BeTrue
+        if ($null -eq $ProfileContent) {
+            $context.discovery.changed | Should -BeFalse
+        }
+        else {
+            $context.discovery | Should -BeNull
+        }
 
         Remove-Item -LiteralPath (Join-Path -Path $fixture.Root -ChildPath '.dmassist-guidance.md')
         $absent = Get-DmPreNoteContext -Preflight $preflight
         $absent.passed | Should -BeTrue
         $absent.context.guidanceLoaded | Should -BeFalse
+    }
+
+    It 'does not perform conventional discovery before request-selected inventory guidance passes validation' {
+        Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+        $preflight = Invoke-DmPreflight -Request $request
+        $preflight.operation = 'vault.orientation.inventory'
+        $preflight.request.operation = 'vault.orientation.inventory'
+        $preflight.request.campaignGroup = [ordered]@{ campaign = $null; group = $null }
+        $preflight.request.arguments = [ordered]@{
+            selectedGuidance = @('Selected Guidance.md')
+            optionalGuidance = @()
+        }
+        Mock -ModuleName VaultConfiguration -CommandName Get-DmOperation -MockWith {
+            [pscustomobject]@{ requiresCampaignGroup = $false; requiresMappings = $false }
+        }
+        Mock -ModuleName VaultConfiguration -CommandName Test-DmProfileReference -ParameterFilter {
+            $Path -ceq 'Selected Guidance.md'
+        } -MockWith {
+            [pscustomobject][ordered]@{
+                passed = $false
+                code = 'REFERENCE_UNAVAILABLE'
+                message = 'The selected guidance is unavailable.'
+            }
+        }
+        Mock -ModuleName VaultConfiguration -CommandName Get-DmVaultDiscovery -MockWith {
+            [pscustomobject][ordered]@{ changed = $false; candidates = @() }
+        }
+
+        $context = Get-DmPreNoteContext -Preflight $preflight
+
+        $context.passed | Should -BeFalse
+        $context.result.completionCode | Should -BeExactly 'REFERENCE_UNAVAILABLE'
+        Should -Invoke -ModuleName VaultConfiguration -CommandName Test-DmProfileReference -Times 1 -Exactly -Scope It -ParameterFilter {
+            $Path -ceq 'Selected Guidance.md'
+        }
+        Should -Invoke -ModuleName VaultConfiguration -CommandName Get-DmVaultDiscovery -Times 0 -Exactly -Scope It
     }
 
     It 'does not read unrelated configured party or template notes during inspection' {

@@ -25,21 +25,24 @@ The plugin will give an AI assistant a focused set of tools and guidance for wor
 
 This repository contains an Agent Plugins 1.0 plugin with a portable
 vault-orientation skill, an article-authoring skill, and the bundled shared
-reference. It does not bundle
-the Obsidian Link Resolver server.
-PowerShell modules implement prerequisite checks, profile validation,
-read-only inspection, preview approval, conflict-aware atomic note edits, and
-no-overwrite article creation; these have local synthetic acceptance coverage,
-not installed-client or cross-platform verification. Installed
-cross-skill resource loading was verified in a disposable two-skill fixture
-using owner-skill activation, not assumed sibling paths. The orientation skill
-checks exact-vault authorization with the separately configured Resolver's
-`get_server_info` tool and must stop when that check cannot be established.
+reference. It does not bundle the Obsidian Link Resolver server.
+PowerShell modules implement prerequisite checks, profile validation, read-only
+inspection and inventory, review-only profile proposals, preview approval,
+conflict-aware atomic note edits, and no-overwrite article creation. Inventory
+uses its shipped JSON entry point, which constructs the runtime request and
+performs PowerShell preflight internally; the operation registry is not a
+dispatcher.
+These have local synthetic acceptance coverage, not installed-client or
+cross-platform verification. Installed cross-skill resource loading was
+verified in a disposable two-skill fixture using owner-skill activation.
+The orientation skill checks exact-vault authorization with the separately
+configured Resolver's `get_server_info` tool and stops if it cannot be established.
 Copilot supplies an explicit vault-scoped `callerPreflight` confirmation after
 the live MCP checks; PowerShell validates that precondition and enforces
 filesystem boundaries, freshness, and write safeguards. It does not independently
 authenticate the MCP session. End-to-end installed-client qualification remains
-outstanding. Other planned capabilities above are not currently available.
+outstanding, as does Feature 006's five-DM review. Other planned capabilities
+above are not currently available.
 
 See [Plugin Architecture](docs/architecture.md) for component locations, extension boundaries, and the separation between the plugin and campaign vaults.
 
