@@ -786,6 +786,33 @@ Describe 'Read-only vault orientation and inventory' {
             $second.inventoryReport | ConvertTo-Json -Depth 30 -Compress | Should -Not -Match ([regex]::Escape($fixture.Root))
         }
 
+        It 'reports custom profile sections using their identifiers and configured paths' {
+            foreach ($directory in @('Campaign Groups', 'Story Collection')) {
+                [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root $directory))
+            }
+            [System.IO.File]::WriteAllText(
+                $fixture.ProfilePath,
+                "version: 1`nsections:`n  custom:`n    factions:`n      path: Campaign Groups`n      description: Synthetic faction description`n    arc:`n      path: Story Collection`n      description: Synthetic arc description`n"
+            )
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            foreach ($case in @(
+                @{ path = 'Campaign Groups'; role = 'factions' }
+                @{ path = 'Story Collection'; role = 'arc' }
+            )) {
+                $mappings = @($outcome.inventoryReport.candidateMappings | Where-Object { $_.path -ceq $case.path })
+                $mappings.Count | Should -Be 1
+                $mappings[0].role | Should -BeExactly $case.role
+                $mappings[0].classification | Should -BeExactly 'observed'
+                $mappings[0].basis | Should -Contain 'profile-configured'
+                $mappings[0].evidence[0].source | Should -BeExactly '.dmassist.yaml'
+            }
+            $outcome.inventoryReport | ConvertTo-Json -Depth 30 -Compress | Should -Not -Match 'Synthetic (faction|arc) description'
+        }
+
         It 'uses token evidence instead of conventional evidence for Adventure and Arc directory names' {
             foreach ($directory in @('Adventure', 'Arc', 'Arcs', 'Adventures/Adventure')) {
                 [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root $directory))

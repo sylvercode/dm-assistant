@@ -697,12 +697,9 @@ function Get-DmInventoryProfileAssignments {
         }
         elseif ($section -ceq 'custom' -and $value -is [System.Collections.IDictionary]) {
             foreach ($customName in $value.Keys) {
-                if ($value[$customName] -isnot [string]) { continue }
-                $customRole = ConvertTo-DmInventoryRole -Label ([string]$customName)
-                if ($null -eq $customRole) { continue }
                 $assignments.Add([pscustomobject]@{
-                    path = [string]$value[$customName]
-                    role = $customRole
+                    path = [string]$value[$customName].path
+                    role = [string]$customName
                     basis = 'profile-configured'
                     source = '.dmassist.yaml'
                     summary = 'The validated profile directly configures this location for the stated role.'
