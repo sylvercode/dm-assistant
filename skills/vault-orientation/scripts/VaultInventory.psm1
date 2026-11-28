@@ -616,8 +616,9 @@ function Get-DmInventorySectionRole {
         [Parameter(Mandatory)][string]$Component,
         [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$ParentComponents
     )
-    $role = ConvertTo-DmInventoryRole -Label $Component
-    if ($null -ne $role -and $Component -notmatch '^(?i:player|locations?|cosmology|persona)$') { return $role }
+    if ($Component -match '^(?i:adventures|lore|monsters stats|rules|sessions|handouts)$') {
+        return (ConvertTo-DmInventoryRole -Label $Component)
+    }
     if ($ParentComponents.Count -gt 0 -and $ParentComponents[$ParentComponents.Count - 1] -ieq 'Lore' -and
         $Component -match '^(?i:player|locations|cosmology|persona)$') {
         $name = (Get-Culture).TextInfo.ToTitleCase($Component.ToLowerInvariant())

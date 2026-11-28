@@ -786,6 +786,74 @@ Describe 'Read-only vault orientation and inventory' {
             $second.inventoryReport | ConvertTo-Json -Depth 30 -Compress | Should -Not -Match ([regex]::Escape($fixture.Root))
         }
 
+        It 'uses token evidence instead of conventional evidence for Adventure and Arc directory names' {
+            foreach ($directory in @('Adventure', 'Arc', 'Arcs', 'Adventures/Adventure')) {
+                [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root $directory))
+            }
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            foreach ($case in @(
+                @{ path = 'Adventure'; role = 'Adventures' }
+                @{ path = 'Arc'; role = 'Adventure' }
+                @{ path = 'Arcs'; role = 'Adventure' }
+                @{ path = 'Adventures/Adventure'; role = 'Adventure' }
+            )) {
+                $mappings = @($outcome.inventoryReport.candidateMappings | Where-Object { $_.path -ceq $case.path })
+                $mappings.Count | Should -Be 1
+                $mappings[0].role | Should -BeExactly $case.role
+                $mappings[0].basis | Should -Contain 'folder-name'
+                $mappings[0].basis | Should -Not -Contain 'default-convention'
+            }
+            @($outcome.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Adventures/Adventure' }).Count | Should -Be 0
+        }
+
+        It 'recognizes only specified conventional section names regardless of case' {
+            $sections = [ordered]@{
+                'adventures' = 'Adventures'
+                'lore' = 'Lore'
+                'monsters stats' = 'Monsters Stats'
+                'rules' = 'Rules'
+                'sessions' = 'Sessions'
+                'handouts' = 'Handouts'
+                'lore/player' = 'Lore/Player'
+                'lore/locations' = 'Lore/Locations'
+                'lore/cosmology' = 'Lore/Cosmology'
+                'lore/persona' = 'Lore/Persona'
+            }
+            foreach ($path in $sections.Keys) {
+                [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root $path))
+            }
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            foreach ($path in $sections.Keys) {
+                $mappings = @($outcome.inventoryReport.candidateMappings | Where-Object {
+                    $_.path -ieq $path -and $_.role -ceq $sections[$path]
+                })
+                $mappings.Count | Should -Be 1
+                $mappings[0].basis | Should -Contain 'default-convention'
+            }
+        }
+
+        It 'does not block a proposal for a nested Adventure directory' {
+            $fixture = Reset-TestInventoryFixture -Notes ([ordered]@{
+                'Adventures/Adventure/Encounter.md' = "# Encounter`nSynthetic content.`n"
+            })
+            $request = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{ proposeProfile = $true })
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $outcome.inventoryReport.profileProposal | Should -Not -BeNull
+            @($outcome.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Adventures/Adventure' }).Count | Should -Be 0
+        }
+
         It 'retains suffixed directory mappings without exposing non-Markdown files' {
             foreach ($directory in @('Chronicles.txt', 'My Lore.txt', 'Adventure.txt')) {
                 [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root $directory))
