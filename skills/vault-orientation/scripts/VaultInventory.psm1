@@ -801,6 +801,81 @@ function Get-DmInventoryMappingEvidenceSortKey {
     }))
 }
 
+function Get-DmInventoryProposalRoleKeys {
+    [ordered]@{
+        Adventures = 'adventures'
+        Lore = 'lore'
+        'Monsters Stats' = 'monsters_stats'
+        Rules = 'rules'
+        Sessions = 'sessions'
+        Handouts = 'handouts'
+    }
+}
+
+function Get-DmInventoryProposalSelections {
+    param([Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Ambiguities)
+    $roleKeys = Get-DmInventoryProposalRoleKeys
+    $selectedPaths = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    $selectedRoles = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    foreach ($ambiguity in $Ambiguities) {
+        if ([string]::IsNullOrEmpty([string]$ambiguity.selectedAlternativeId)) { continue }
+        $alternative = @($ambiguity.alternatives | Where-Object {
+                [string]$_.alternativeId -ceq [string]$ambiguity.selectedAlternativeId
+            })
+        if ($alternative.Count -ne 1) { continue }
+        $subject = [string]$ambiguity.subject
+        $interpretations = @($ambiguity.alternatives | ForEach-Object { [string]$_.interpretation } | Select-Object -Unique)
+        if ($interpretations.Count -eq 1 -and $roleKeys.Contains($subject)) {
+            $selectedPaths[$subject] = [string]$alternative[0].path
+        }
+        elseif ($interpretations.Count -gt 1) {
+            $selectedRoles[$subject] = [string]$alternative[0].interpretation
+        }
+    }
+    [pscustomobject]@{ paths = $selectedPaths; roles = $selectedRoles }
+}
+
+function Test-DmInventoryProposalAmbiguity {
+    param(
+        [Parameter(Mandatory)]$Group,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Mappings,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Entries,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$BaseProfile,
+        [Parameter(Mandatory)]$Selections
+    )
+    $roleKeys = Get-DmInventoryProposalRoleKeys
+    if ($Group.kind -ceq 'role' -and -not $roleKeys.Contains([string]$Group.subject)) { return $false }
+    $directories = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($entry in $Entries) {
+        if ([string]$entry.kind -ceq 'directory') { [void]$directories.Add([string]$entry.path) }
+    }
+    if ($Group.kind -ceq 'path' -and -not $directories.Contains([string]$Group.subject)) { return $false }
+    $signatures = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($alternative in $Group.alternatives) {
+        $parts = [System.Collections.Generic.List[string]]::new()
+        foreach ($role in $roleKeys.Keys) {
+            $paths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            foreach ($mapping in $Mappings) {
+                if ([string]$mapping.role -cne [string]$role -or -not $directories.Contains([string]$mapping.path)) { continue }
+                if ($Selections.paths.ContainsKey([string]$role) -and $Selections.paths[[string]$role] -cne [string]$mapping.path) { continue }
+                if ($Selections.roles.ContainsKey([string]$mapping.path) -and $Selections.roles[[string]$mapping.path] -cne [string]$role) { continue }
+                if ($Group.kind -ceq 'role' -and [string]$Group.subject -ceq [string]$role -and
+                    [string]$mapping.path -cne [string]$alternative.path) { continue }
+                if ($Group.kind -ceq 'path' -and [string]$mapping.path -ceq [string]$Group.subject -and
+                    [string]$mapping.role -cne [string]$alternative.role) { continue }
+                [void]$paths.Add([string]$mapping.path)
+            }
+            if ($paths.Count -eq 0) { [void]$paths.Add([string]$BaseProfile.sections[[string]$roleKeys[$role]]) }
+            $orderedPaths = [string[]]@($paths)
+            [Array]::Sort($orderedPaths, [System.StringComparer]::Ordinal)
+            $parts.Add([string]::Join([char]1, $orderedPaths))
+        }
+        [void]$signatures.Add([string]::Join([char]0, $parts))
+        if ($signatures.Count -gt 1) { return $true }
+    }
+    $false
+}
+
 function Get-DmInventoryAmbiguities {
     <#
     .SYNOPSIS
@@ -813,12 +888,18 @@ function Get-DmInventoryAmbiguities {
     Whether the request intends to create a proposal.
     .PARAMETER Decisions
     User decisions supplied for current ambiguity alternatives.
+    .PARAMETER Entries
+    Eligible inventory entries used to determine proposal-relevant paths.
+    .PARAMETER BaseProfile
+    Effective profile used as the basis for proposal content.
     #>
     param(
         [Parameter(Mandatory)][System.Collections.Generic.Dictionary[string, object]]$Mappings,
         [Parameter(Mandatory)][string]$CanonicalRoot,
         [Parameter(Mandatory)][bool]$ProposalRequested,
-        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Decisions
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Decisions,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Entries,
+        [AllowNull()][System.Collections.IDictionary]$BaseProfile
     )
     $groups = [System.Collections.Generic.List[object]]::new()
     $records = @($Mappings.Values)
@@ -831,7 +912,7 @@ function Get-DmInventoryAmbiguities {
         $items = @($byPath[$path] | Sort-Object -Property role -CaseSensitive)
         $roles = @($items | ForEach-Object { [string]$_.role } | Select-Object -Unique)
         if ($roles.Count -gt 1) {
-            $groups.Add([pscustomobject]@{ subject = [string]$path; reason = 'More than one supported role interpretation applies to this location.'; alternatives = $items })
+            $groups.Add([pscustomobject]@{ kind = 'path'; subject = [string]$path; reason = 'More than one supported role interpretation applies to this location.'; alternatives = $items })
         }
     }
     $byRole = @{}
@@ -851,11 +932,12 @@ function Get-DmInventoryAmbiguities {
             else {
                 'More than one supported location could supply this role in a proposed profile.'
             }
-            $groups.Add([pscustomobject]@{ subject = [string]$role; reason = $reason; alternatives = $items })
+            $groups.Add([pscustomobject]@{ kind = 'role'; subject = [string]$role; reason = $reason; alternatives = $items })
         }
     }
 
     $result = [System.Collections.Generic.List[object]]::new()
+    $resultGroups = [System.Collections.Generic.List[object]]::new()
     $seenGroups = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($group in $groups) {
         $alternatives = [System.Collections.Generic.List[object]]::new()
@@ -905,9 +987,18 @@ function Get-DmInventoryAmbiguities {
             subject = [string]$group.subject
             alternatives = [object[]]$publicAlternatives.ToArray()
             reason = [string]$group.reason
-            requiresDmDecision = ($ProposalRequested -and $null -eq $selectedAlternative)
+            requiresDmDecision = $false
             selectedAlternativeId = $selectedAlternative
         })
+        $resultGroups.Add($group)
+    }
+    if ($ProposalRequested) {
+        $selections = Get-DmInventoryProposalSelections -Ambiguities ([object[]]$result.ToArray())
+        for ($index = 0; $index -lt $result.Count; $index++) {
+            if ($null -ne $result[$index].selectedAlternativeId) { continue }
+            $result[$index].requiresDmDecision = Test-DmInventoryProposalAmbiguity -Group $resultGroups[$index] `
+                -Mappings $records -Entries $Entries -BaseProfile $BaseProfile -Selections $selections
+        }
     }
     $result.ToArray()
 }
@@ -938,30 +1029,10 @@ function New-DmInventoryProfileProposal {
         [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Ambiguities
     )
 
-    $roleKeys = [ordered]@{
-        Adventures = 'adventures'
-        Lore = 'lore'
-        'Monsters Stats' = 'monsters_stats'
-        Rules = 'rules'
-        Sessions = 'sessions'
-        Handouts = 'handouts'
-    }
-    $selectedPaths = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
-    $selectedRoles = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
-    foreach ($ambiguity in $Ambiguities) {
-        if ([string]::IsNullOrEmpty([string]$ambiguity.selectedAlternativeId)) { continue }
-        $alternative = @($ambiguity.alternatives | Where-Object {
-                [string]$_.alternativeId -ceq [string]$ambiguity.selectedAlternativeId
-            })
-        if ($alternative.Count -ne 1) { continue }
-        $subject = [string]$ambiguity.subject
-        if ($roleKeys.Contains($subject)) {
-            $selectedPaths[$subject] = [string]$alternative[0].path
-        }
-        elseif ($roleKeys.Contains([string]$alternative[0].interpretation)) {
-            $selectedRoles[$subject] = [string]$alternative[0].interpretation
-        }
-    }
+    $roleKeys = Get-DmInventoryProposalRoleKeys
+    $selections = Get-DmInventoryProposalSelections -Ambiguities $Ambiguities
+    $selectedPaths = $selections.paths
+    $selectedRoles = $selections.roles
 
     $entryDirectories = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($entry in $Entries) {
@@ -1515,8 +1586,18 @@ function Invoke-DmInventory {
     $publicMappings = [object[]](ConvertTo-DmInventoryPublicMappings -Mappings $mappings)
     $decisionArray = @()
     if ($arguments.Contains('mappingDecisions')) { $decisionArray = @($arguments.mappingDecisions) }
+    $proposalBase = if (-not [bool]$arguments.proposeProfile) {
+        $null
+    }
+    elseif ($null -ne $context.profile) {
+        $context.profile
+    }
+    else {
+        Resolve-DmProfileDefaults -Profile ([ordered]@{})
+    }
     $ambiguities = [object[]](Get-DmInventoryAmbiguities -Mappings $mappings -CanonicalRoot ([string]$preflight.boundary.canonicalRoot) `
-        -ProposalRequested ([bool]$arguments.proposeProfile) -Decisions ([object[]]$decisionArray))
+        -ProposalRequested ([bool]$arguments.proposeProfile) -Decisions ([object[]]$decisionArray) `
+        -Entries ([object[]]$internalEntries.ToArray()) -BaseProfile $proposalBase)
     $ambiguitySort = [System.Comparison[object]]{
         param($left, $right)
         $comparison = [System.StringComparer]::OrdinalIgnoreCase.Compare([string]$left.subject, [string]$right.subject)
@@ -1578,12 +1659,6 @@ function Invoke-DmInventory {
     if ([bool]$arguments.proposeProfile) {
         $unresolvedProposalChoice = @($report.ambiguities | Where-Object { $_.requiresDmDecision }).Count -gt 0
         $staleProposalChoice = $decisionIssues.Count -gt 0
-        $proposalBase = if ($null -ne $context.profile) {
-            $context.profile
-        }
-        else {
-            Resolve-DmProfileDefaults -Profile ([ordered]@{})
-        }
         $proposalMappings = if ($unresolvedProposalChoice -or $staleProposalChoice) {
             [object[]]@()
         }

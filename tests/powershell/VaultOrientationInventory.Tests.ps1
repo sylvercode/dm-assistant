@@ -1081,6 +1081,117 @@ Describe 'Read-only vault orientation and inventory' {
             $cycleOutcome.inventoryReport | Should -BeNull
         }
 
+        It 'keeps adventure-only location conflicts informational for profile proposals' {
+            $fixture = Reset-TestInventoryFixture -Notes ([ordered]@{
+                'Arc - One/Encounter.md' = 'Synthetic encounter.'
+                'Arc - Two/Encounter.md' = 'Synthetic encounter.'
+            })
+            $request = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{ proposeProfile = $true })
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $conflict = @($outcome.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Adventure' })
+            $conflict.Count | Should -Be 1
+            $conflict[0].requiresDmDecision | Should -BeFalse
+            $conflict[0].selectedAlternativeId | Should -BeNull
+            $outcome.inventoryReport.profileProposal.content | Should -Not -BeNullOrEmpty
+        }
+
+        It 'keeps note-only role conflicts informational for profile proposals' {
+            $fixture = Reset-TestInventoryFixture -Notes ([ordered]@{
+                'Neutral.md' = "---`ntype: location`n---`nThis note is an adventure.`n"
+            })
+            Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Usable.md' -Text "# Guidance`nPermit synthetic note inspection.`n"
+            $request = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                proposeProfile = $true
+                selectedGuidance = [string[]]@('Selected/Usable.md')
+            })
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $conflict = @($outcome.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Neutral.md' })
+            $conflict.Count | Should -Be 1
+            $conflict[0].requiresDmDecision | Should -BeFalse
+            $outcome.inventoryReport.profileProposal.content | Should -Not -BeNullOrEmpty
+        }
+
+        It 'applies a custom-role decision when it changes the proposed profile' {
+            $fixture = Reset-TestInventoryFixture -Notes ([ordered]@{ 'Mystery/Note.md' = 'Synthetic note.' })
+            [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nsections:`n  custom:`n    factions:`n      path: Mystery`n      description: Synthetic faction section`n")
+            Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Layout.md' -Text "Mystery contains lore.`n"
+            $request = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                proposeProfile = $true
+                selectedGuidance = [string[]]@('Selected/Layout.md')
+            })
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $unresolved = Invoke-DmInventory -Request $request
+            $unresolved.result.completionCode | Should -BeExactly 'AMBIGUOUS_CONTEXT'
+            $conflict = @($unresolved.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Mystery' })[0]
+            $conflict.requiresDmDecision | Should -BeTrue
+            $custom = @($conflict.alternatives | Where-Object { $_.interpretation -ceq 'factions' })[0]
+            $request.arguments.mappingDecisions = @([ordered]@{
+                ambiguityId = [string]$conflict.ambiguityId
+                alternativeId = [string]$custom.alternativeId
+            })
+
+            $resolved = Invoke-DmInventory -Request $request
+
+            $resolved.result.completionCode | Should -BeExactly 'OK'
+            $parsed = ConvertFrom-DmVaultProfileYaml -Yaml $resolved.inventoryReport.profileProposal.content
+            $parsed.passed | Should -BeTrue
+            $parsed.profile.sections.Contains('lore') | Should -BeFalse
+            $parsed.profile.sections.custom.factions.path | Should -BeExactly 'Mystery'
+        }
+
+        It 'keeps equivalent default profile choices informational' {
+            $fixture = Reset-TestInventoryFixture -Notes ([ordered]@{ 'Lore/Note.md' = 'Synthetic note.' })
+            [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nsections:`n  custom:`n    factions:`n      path: Lore`n      description: Synthetic faction section`n")
+            $request = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{ proposeProfile = $true })
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $conflict = @($outcome.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Lore' -and @($_.alternatives | Where-Object { $_.interpretation -ceq 'factions' }).Count -gt 0 })
+            $conflict.Count | Should -Be 1
+            $conflict[0].requiresDmDecision | Should -BeFalse
+            $outcome.inventoryReport.profileProposal.content | Should -Not -BeNullOrEmpty
+        }
+
+        It 'reassesses other conflicts after a current proposal decision' {
+            $fixture = Reset-TestInventoryFixture -Notes ([ordered]@{
+                'Mystery/Note.md' = 'Synthetic note.'
+                'Other/Note.md' = 'Synthetic note.'
+            })
+            [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nsections:`n  custom:`n    factions:`n      path: Mystery`n      description: Synthetic faction section`n")
+            Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Layout.md' -Text "Mystery contains lore.`nOther contains lore.`n"
+            $request = New-TestInventoryRequest -VaultRoot $fixture.Root -Arguments ([ordered]@{
+                proposeProfile = $true
+                selectedGuidance = [string[]]@('Selected/Layout.md')
+            })
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+            $unresolved = Invoke-DmInventory -Request $request
+            $roleConflict = @($unresolved.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Lore' })[0]
+            $other = @($roleConflict.alternatives | Where-Object { $_.path -ceq 'Other' })[0]
+            $request.arguments.mappingDecisions = @([ordered]@{
+                ambiguityId = [string]$roleConflict.ambiguityId
+                alternativeId = [string]$other.alternativeId
+            })
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $pathConflict = @($outcome.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Mystery' })[0]
+            $pathConflict.requiresDmDecision | Should -BeFalse
+            $parsed = ConvertFrom-DmVaultProfileYaml -Yaml $outcome.inventoryReport.profileProposal.content
+            $parsed.profile.sections.lore | Should -BeExactly 'Other'
+        }
+
         It 'requires current DM direction for proposal-affecting alternatives and binds IDs to the vault' {
             [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root 'Chronicles'))
             [System.IO.File]::WriteAllText($fixture.ProfilePath, "version: 1`nsections:`n  adventures: Chronicles`n")
@@ -1141,7 +1252,25 @@ Describe 'Read-only vault orientation and inventory' {
             $secondAmbiguity[0].ambiguityId | Should -Not -BeExactly $firstId
         }
 
+        It 'keeps absent guidance locations informational when proposal content is unchanged' {
+            Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
+            Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Layout.md' -Text "Chronicles contains adventures.`n"
+            $request.arguments = [ordered]@{
+                selectedGuidance = [string[]]@('Selected/Layout.md')
+                proposeProfile = $true
+            }
+
+            $outcome = Invoke-DmInventory -Request $request
+
+            $outcome.result.completionCode | Should -BeExactly 'OK'
+            $conflict = @($outcome.inventoryReport.ambiguities | Where-Object { $_.subject -ceq 'Adventures' })
+            $conflict.Count | Should -Be 1
+            $conflict[0].requiresDmDecision | Should -BeFalse
+            $outcome.inventoryReport.profileProposal.content | Should -Not -BeNullOrEmpty
+        }
+
         It 'requires a decision for a renamed role that conflicts with conventional organization' {
+            [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root 'Chronicles'))
             Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
             Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Layout.md' -Text "Chronicles contains adventures.`n"
             $request.arguments = [ordered]@{
@@ -1160,6 +1289,9 @@ Describe 'Read-only vault orientation and inventory' {
         }
 
         It 'reports multiple guidance-assigned locations as competing proposal alternatives' {
+            foreach ($directory in @('Chronicles', 'Legends')) {
+                [void][System.IO.Directory]::CreateDirectory((Join-Path $fixture.Root $directory))
+            }
             Enable-TestAuthorizationProvider -VaultRoot $fixture.Root
             Set-TestGuidanceFile -VaultRoot $fixture.Root -Path 'Selected/Layout.md' -Text "Chronicles contains adventures.`nLegends contains adventures.`n"
             $request.arguments = [ordered]@{
